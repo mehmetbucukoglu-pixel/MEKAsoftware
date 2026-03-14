@@ -1,0 +1,16 @@
+# Sprint 5: Finance, Notes, Dashboard (incl. Accountant Access)
+# Sprint 5: Finance & Dashboard Implementation
+- [x] RBAC: Add ACCOUNTANT role and update permissions
+- [x] Backend: Create Finance module (payments, summaries)
+- [x] Backend: Update Clinical Notes visibility
+- [x] Backend: Create Dashboard stats API
+- [x] Frontend: Create Dashboard page with role-based views
+- [x] Frontend: Create Finance management page
+- [x] Frontend: Enhance Patient Detail with history & balances
+- [x] Verification: Test role isolation and data flow
+- [/] Sprint 6: Advanced Finance Analytics & Expense Management
+    - [x] Database: Update schema with `Expense` model
+    - [/] Backend: Create Expense module (CRUD)
+    - [ ] Backend: Update Finance analytics (Weekly, Monthly, 3-Month)
+    - [ ] Frontend: Add Expense management UI
+    - [ ] Frontend: Implement Advanced Analytics views

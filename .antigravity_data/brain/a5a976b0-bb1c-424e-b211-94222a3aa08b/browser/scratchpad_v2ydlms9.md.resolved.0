@@ -1,0 +1,12 @@
+# Task: Verify KlinikApp Changes
+
+- [ ] Open http://localhost:3001
+- [ ] Log in (admin@demo.com / Admin123!)
+- [ ] Navigate to "İşler/Panom" (Tasks/Workspace)
+- [ ] Open a workspace document
+- [ ] Verify:
+    - [ ] No sticky header/title bar at the top
+    - [ ] Dark grid background
+    - [ ] Large editable title block
+    - [ ] Left sidebar design (dark style, icons, timestamps)
+- [ ] Take screenshots for documentation

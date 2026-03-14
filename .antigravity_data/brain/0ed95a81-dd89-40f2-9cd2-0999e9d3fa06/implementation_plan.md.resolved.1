@@ -1,0 +1,88 @@
+# HBYS Hasta Giriş/Çıkış Takibi — İstatistikler Sayfası
+
+Psikoterapist kliniği için HBYS uyumlu hasta giriş/çıkış takibi. Mevcut randevu akışı (`CONFIRMED → ARRIVED → COMPLETED`) üzerine zaman damgaları eklenerek, yeni bir **İstatistikler** sayfasında raporlanacak.
+
+## HBYS Gereklilikleri (Araştırma Sonucu)
+
+Sağlık Bakanlığı HBYS yönetmeliğine göre kliniğin tutması gereken kayıtlar:
+
+| Gereklilik | Mevcut Durum | Yapılacak |
+|---|---|---|
+| Hasta kabul kaydı (check-in zamanı) | `ARRIVED` status var ama zaman tutulmuyor | `arrivedAt` timestamp ekle |
+| Hasta çıkış kaydı (check-out zamanı) | `COMPLETED` status var ama zaman tutulmuyor | `completedAt` timestamp ekle |
+| Hasta demografik verileri | ✅ `Patient` modeli mevcut (TC, ad, soyad, doğum tarihi, cinsiyet) | — |
+| Ziyaret süresi hesaplama | ❌ | `completedAt - arrivedAt` ile otomatik |
+| İstatistiksel raporlama | ❌ | Yeni İstatistikler sayfası |
+| Doktor bazlı hasta takibi | ✅ Randevularda `doctorId` mevcut | İstatistiklerde filtreleme |
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Yeni DB alanları:** Appointment modeline `arrivedAt` ve `completedAt` alanları eklenecek. Bu, bir Prisma migration gerektirecek.
+
+> [!NOTE]
+> **Yeni bir tablo oluşturmuyoruz.** Mevcut [Appointment](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts#5-228) modelini genişletiyoruz çünkü her ziyaret zaten bir randevu ile ilişkili. Bu, minimum DB değişikliği ile HBYS uyumluluğu sağlar.
+
+## Proposed Changes
+
+### Database Layer (Prisma)
+
+#### [MODIFY] [schema.prisma](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/prisma/schema.prisma)
+- [Appointment](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts#5-228) modeline `arrivedAt DateTime?` ve `completedAt DateTime?` alanları ekle
+
+---
+
+### Backend — Statistics Module (Yeni)
+
+#### [NEW] [statistics.module.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/statistics/statistics.module.ts)
+#### [NEW] [statistics.controller.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/statistics/statistics.controller.ts)
+- `GET /statistics/visits` — Giriş/çıkış istatistikleri
+- `GET /statistics/overview` — Genel özet
+
+#### [NEW] [statistics.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/statistics/statistics.service.ts)
+İstatistik sorguları:
+- **Günlük/Haftalık/Aylık hasta giriş sayısı** (ARRIVED olan randevular)
+- **Ortalama seans süresi** (completedAt - arrivedAt)
+- **Doktor bazlı hasta dağılımı**
+- **No-show oranı** (NO_SHOW / toplam randevu)
+- **Zaman dilimi bazlı yoğunluk** (hangi saatler daha yoğun)
+- **Toplam benzersiz hasta sayısı** (belirli dönemde)
+
+---
+
+### Backend — Appointment Service Güncelleme
+
+#### [MODIFY] [appointment.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts)
+- [updateStatus](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts#106-115) metodu: status `ARRIVED` olduğunda `arrivedAt = now()`, status `COMPLETED` olduğunda `completedAt = now()` olarak set et
+
+---
+
+### Frontend — İstatistikler Sayfası (Yeni)
+
+#### [NEW] [page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/statistics/page.tsx)
+Premium tasarımlı istatistikler sayfası:
+- **Özet kartları:** Bugünkü giriş sayısı, ortalama seans süresi, no-show oranı, aktif hasta sayısı
+- **Ziyaret grafiği:** Son 30 günlük günlük giriş/çıkış trend çizgisi (recharts)
+- **Doktor bazlı dağılım:** Bar chart
+- **Saatlik yoğunluk haritası:** Heatmap tarzı
+- **Son ziyaretler tablosu:** Hasta adı, doktor, giriş saati, çıkış saati, süre
+
+---
+
+### Frontend — Navigation & API
+
+#### [MODIFY] [layout.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/layout.tsx)
+- Sidebar'a İstatistikler (BarChart3 icon) nav item ekle
+
+#### [MODIFY] [api.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts)
+- `statisticsApi` objesi ekle: `getVisits()`, `getOverview()`
+
+## Verification Plan
+
+### Automated Tests
+- Backend başlatılıp `GET /api/v1/statistics/overview` endpoint'ine istek atılacak
+- Bir randevuyu ARRIVED → COMPLETED akışından geçirip timestamp'ların doğru yazıldığı kontrol edilecek
+
+### Manual Verification
+- İstatistikler sayfasını browser'da açıp görsel doğrulama
+- Farklı tarih aralıkları ve doktor filtreleri ile test

@@ -1,0 +1,75 @@
+# Sprint 2 — Hasta Modülü & UX İyileştirmeleri ✅
+
+## Yapılan Değişiklikler (Bölüm 1: Veri Modeli ve Yetkiler)
+
+### 1. TC Kimlik No & Adres Alanları
+- **Veritabanı**: `tc_kimlik` ve `address` eklendi.
+- **Backend DTO**: 11 hane + sadece rakam validasyonu, adres min 5 karakter.
+- **Frontend Form**: TC Kimlik ilk sırada, sadece rakam girişine izin veriyor. Adres textarea olarak eklendi.
+
+### 2. Doktor Yetkisi
+- Hasta ekleme/güncelleme: `ADMIN, ASSISTANT, DOCTOR`
+- Hasta silme: **Sadece ADMIN** (değişmedi)
+
+### 3. TC ile Arama
+- Arama mekanizması: isim, telefon, e-posta + **TC Kimlik No**
+
+## Yapılan Değişiklikler (Bölüm 2: UX ve KVKK İyileştirmeleri)
+
+### 4. KVKK Uyumluluğu ve Veri Güvenliği
+- **TC Kimlik Şifreleme (AES-256-GCM)**: Veriler veritabanına [crypto.util.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/common/utils/crypto.util.ts) aracılığıyla şifrelenerek kaydediliyor.
+- **TC Kimlik Hash**: Arama ve benzersizlik kontrolü yapabilmek için SHA-256 hashi ayrı bir sütunda tutuluyor (`tcKimlikHash`).
+
+### 5. Hasta Yönetimi Geliştirmeleri (Backend)
+- **Silinmiş Hastalar**: Adminlerin silinen hastaları görebilmesi ve geri alabilmesi için `GET /patients/deleted` ve `PATCH /patients/:id/restore` eklendi.
+- **Mükerrer TC Kontrolü**: Yeni hasta eklerken `GET /patients/check-tc` çağrılıyor.
+
+### 6. Kullanıcı Deneyimi İyileştirmeleri (Frontend UI & UX)
+- **Formatlama & Maskeleme**: TC kimlik listede `123****901` şeklinde maskelenmeye başlandı. Telefon no otomatik olarak [(555) 123 45 67](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#142-143) formatlanıyor.
+- **Hızlı Arama (Ctrl+K)**: Tüm ekranlardan erişilebilen hızlı arama eklendi. İlk açılışta bilgilendirme balonu çıkıyor.
+- **Sonuç Vurgulama**: Arama sonuçlarında eşleşen harfler parlatılıyor (`<Highlight>`).
+- **Son Görüntülenen Hastalar**: Girilen hastalar `localStorage`'da tutuluyor ve Dashboard ekranında "Son Görüntülenenler" olarak listeleniyor. 
+- **Ekleme Sonrası Yönlendirme**: Formdan hasta kaydı tamamlanınca direk kapanmak yerine "Başarılı" ekranı çıkıyor ve "Detaya Git" veya "Randevu Ver" seçenekleri sunuluyor.
+- **TC Duplicate Uyarısı**: Modal içindeyken TC Kimlik mükerrer ise isimle birlikte uyarı (sarı uyarı) gösteriliyor.
+- **Admin Çöp Kutusu**: Hasta listesine sadece Adminlerin görebildiği "Silinen Hastalar (Çöp Kutusu)" butonu ve sayfası eklendi.
+
+---
+
+## Doğrulama (Sprint 2)
+- ✅ Backend KVKK şifreleme ve seed çalıştı (`prisma db push --force-reset` & `prisma db seed`)
+- ✅ Backend REST API ve Frontend UI sorunsuz ayağa kalktı.
+- ✅ Backend `tsc --noEmit` & Frontend `tsc --noEmit` → Hata Yok (0 Error)
+
+---
+
+# Sprint 3 — Randevu Sistemi & Takvim Modülü 🗓️
+
+## Yapılan Değişiklikler (Bölüm 3: Randevu Altyapısı)
+
+### 1. Veri Modeli ve API (Backend)
+- **Appointment**: Hasta ve Doktor ID'leri ile randevu tutan ana model eklendi. Durumlar (CONFIRMED, COMPLETED, NO_SHOW, CANCELLED) ve kaynaklar (MANUAL, WHATSAPP) tanımlandı.
+- **DoctorSchedule**: Doktorların gün gün çalışma saatlerini, mola aralıklarını ve randevu slot sürelerini tutan yapı oluşturuldu.
+- **Appointment API**: 
+  - CRUD işlemleri.
+  - [updateStatus](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts#93-102) (İptal, Gelmedi, Tamamlandı durumları).
+  - Randevu çakışmalarını hesaplayan ve uygun slotları ([availableSlots](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.controller.ts#83-86)) bulup dönen Core mantık.
+
+### 2. Doktor Çalışma Saatleri (Frontend)
+- **Settings / Schedule Sayfası**: Sadece yetkili personelin erişebildiği, doktorların haftalık mesai, mola ve 15-30 dk gibi aralıklarını ayarlayabildiği kullanıcı dostu UI eklendi.
+
+### 3. Ana Takvim ve Modal (Frontend)
+- **FullCalendar Entegrasyonu**: `@fullcalendar/react` eklentisi ile günlük, haftalık ve aylık görünümleri destekleyen modern bir takvim sayfası tasarlandı (`/appointments`).
+- **Renk ve Durum Kodlaması**: Tamamlanan randevular yeşil, iptaller kırmızı, onaylılar birincil renkte gösterilecek şekilde takvime işlendi.
+- **Randevu Modülü (Modal)**: 
+  - Animasyonlu bir form üzerinde çalışıyor.
+  - Hasta araması hızlıca yapılıp seçilebiliyor.
+  - O gün için doktorun çalışma saatinden **Sadece Müsait Olan** saat dilimleri listeleniyor.
+  - Backend tarafında hata dönerse (Çakışma var ise), modal içerisinde özel uyarı banner'ı çıkıyor.
+
+### 4. Gösterge Paneli (Dashboard)
+- Dashboard'da yer alan sahte (Mock) Yaklaşan Randevular listesi kaldırıldı. Artık **O güne ait gerçek randevular**, doktor ve hasta bilgileri ile listeleniyor.
+
+## Doğrulama (Sprint 3)
+- ✅ Tüm REST uçları bağlandı ([api.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts) güncellendi).
+- ✅ Çakışma ve TS Type hataları (`patient._count` ve `appointment.doctor` vb.) tamamen düzeltildi.
+- ✅ Frontend `tsc --noEmit` → Sorunsuz derleniyor.

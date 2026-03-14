@@ -1,0 +1,12 @@
+# Patient Canvas Overhaul
+
+- [/] Plan the changes
+- [ ] Match workspace paper background style
+- [ ] Add frosted glass (buzlu cam) effect to text blocks
+- [ ] Make text blocks freely resizable (width & height)
+- [ ] Make task blocks resizable
+- [ ] Add color customization to text & task blocks
+- [ ] Add prescription (reçete) block type
+- [ ] Add file upload block with image preview
+- [ ] Ensure all blocks are easily resizable
+- [ ] Verify changes in browser

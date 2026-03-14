@@ -1,0 +1,32 @@
+# Sprint 2 — Hasta Yönetimi
+
+## Backend
+- [ ] DTO'lar: `CreatePatientDto`, `UpdatePatientDto` (class-validator)
+- [ ] [patient.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.service.ts) iyileştirme (soft delete, email filtreleme)
+- [ ] [patient.controller.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.controller.ts) iyileştirme (DTO tipi, Swagger dekoratörleri)
+- [ ] Roles dekoratörü ekleme (ADMIN, ASSISTANT oluşturabilir; herkes listeleyebilir)
+
+## Frontend — Hasta Listesi
+- [ ] API entegrasyonu (mock data → gerçek API)
+- [ ] Arama (debounce)
+- [ ] Sayfalama (pagination)
+- [ ] Boş durum (empty state)
+- [ ] Yükleniyor durumu (loading state)
+
+## Frontend — Hasta Ekleme/Düzenleme
+- [ ] Hasta ekleme modal/drawer
+- [ ] Hasta düzenleme (mevcut verilerin doldurulması)
+- [ ] Form validasyonu (frontend tarafında)
+- [ ] Başarı/hata bildirimleri (toast)
+
+## Frontend — Hasta Detay
+- [ ] `/patients/[id]` dinamik sayfa
+- [ ] Hasta bilgileri kartı
+- [ ] Geçmiş randevular sekmesi
+- [ ] Klinik notları sekmesi
+- [ ] Düzenleme butonu → modal/forma bağlama
+
+## Doğrulama
+- [ ] Backend TypeScript derleme kontrolü
+- [ ] Frontend dev server kontrolü
+- [ ] Tarayıcıda hasta akışı testi

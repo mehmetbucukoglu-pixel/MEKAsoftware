@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "Implementation plan for unifying page headers by moving titles and any remaining actions from the global header to the page content.",
+  "updatedAt":  "2026-03-10T18:17:52.307773600Z"
+}

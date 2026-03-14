@@ -1,0 +1,14 @@
+# Task Management Testing
+
+## Checklist
+- [ ] Open `http://localhost:3001/tasks`
+- [ ] Verify page loads without error
+- [ ] Add a task "Final Test"
+- [ ] Verify task "Final Test" appears
+- [ ] Switch between list and board view
+- [ ] Verify notification bell functionality
+- [ ] Final report
+
+## Notes
+- Base URL: `http://localhost:3001`
+- Target Page: `/tasks`

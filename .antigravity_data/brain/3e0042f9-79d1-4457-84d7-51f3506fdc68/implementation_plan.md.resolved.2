@@ -1,0 +1,41 @@
+# Implementation Plan - Sprint 4: Messaging Module
+
+This plan outlines the implementation of the Messaging module, focusing on real-time communication between patients (via WhatsApp) and clinic staff (via the dashboard).
+
+## User Review Required
+
+> [!IMPORTANT]
+> The WhatsApp integration currently lacks a real Business API connection. For now, we will use a webhook simulation for inbound messages and a simulated response for outbound messages. Real integration will follow once n8n or a direct API is connected.
+
+## Proposed Changes
+
+### [Backend]
+Summary of changes to support real-time messaging.
+
+#### [NEW] [socket.gateway.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/common/gateways/socket.gateway.ts)
+Create a WebSocket gateway to handle real-time events for messaging and notifications.
+
+#### [MODIFY] [messaging.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.service.ts)
+Integrate the `SocketGateway` to emit events when new messages are received or sent.
+
+### [Frontend]
+Summary of changes to implement the messaging UI.
+
+#### [NEW] [messaging/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/messaging/page.tsx)
+Main messaging page containing the conversation list and active chat window.
+
+#### [NEW] [conversation-list.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/messaging/conversation-list.tsx)
+Component to display and filter active conversations.
+
+#### [NEW] [chat-window.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/messaging/chat-window.tsx)
+The main chat interface for sending and receiving messages in a specific conversation.
+
+## Verification Plan
+
+### Automated Tests
+- No new automated tests planned yet.
+
+### Manual Verification
+1.  **Inbound Message**: Trigger the WhatsApp webhook via Postman and verify the message appears in the frontend in real-time.
+2.  **Outbound Message**: Send a message from the frontend and verify it's saved in the database and visible in the chat.
+3.  **Mode Switch**: Toggle between BOT and HUMAN modes and verify the change is reflected.

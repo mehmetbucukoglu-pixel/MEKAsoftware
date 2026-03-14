@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "This document outlines the strategic planning for integrating n8n (workflow automation) and HBYS (Turkish Ministry of Health - USS/e-Nabız) into the KlinikApp. It covers architectural changes, required components, and a phased implementation approach.",
+  "updatedAt":  "2026-03-11T20:13:51.642061600Z"
+}

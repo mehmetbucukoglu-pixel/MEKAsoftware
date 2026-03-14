@@ -1,0 +1,46 @@
+# UI Refinements Walkthrough
+
+## Changes Made
+
+### 1. Global Header (64px)
+Increased header height from 56px to 64px across all pages for better visual balance. The header now also renders `headerActions` alongside the title, enabling page-specific controls (toggles, tabs) to live in the header bar.
+
+### 2. Dashboard
+- **Header**: Shows the current date only (e.g. "10 Mart 2026 Salı")
+- **Page**: "Merhaba, Ahmet! 👋" greeting displayed locally in page content
+
+### 3. Patients
+- **Removed**: Top "Yeni Hasta" button bar
+- **Changed**: Empty state "İlk Hastayı Ekle" → "Yeni Hasta" + "Silinen Hastalar" side by side
+
+### 4. Appointments
+- **Header**: View toggle ("Doktor Sütunları" / "Takvim") moved to header
+- **Removed**: "Yeni Randevu" button
+
+### 5. Workspace (formerly İşler/Panom)
+- **Sidebar**: Renamed "İşler/Panom" → "Workspace"
+- **Header**: Shows "Workspace" title
+- **Page**: Empty state shows clinic name ("Demo Diş Kliniği") instead of "Çalışma Alanı"
+
+### 6. Messages
+- **Header**: Shows "Mesajlar" only, no sub-header/description
+
+### 7. Reports
+- **Header**: Shows "Raporlar" with Finans/İstatistikler tab toggle
+- **Sub-pages**: Finance and Statistics titles rendered locally in page content (no longer override global header)
+
+## Verification
+
+All changes verified in browser at `localhost:3001`:
+
+````carousel
+![Dashboard — date in header, greeting in content](C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/.system_generated/click_feedback/click_feedback_1773168528281.png)
+<!-- slide -->
+![Patients — Yeni Hasta + Silinen Hastalar in empty state](C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/.system_generated/click_feedback/click_feedback_1773168556667.png)
+<!-- slide -->
+![Workspace — clinic name, sidebar renamed](C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/.system_generated/click_feedback/click_feedback_1773168591021.png)
+<!-- slide -->
+![Messages — clean header, no sub-header](C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/.system_generated/click_feedback/click_feedback_1773168607439.png)
+<!-- slide -->
+![Reports — Finans/İstatistikler toggle in header](C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/.system_generated/click_feedback/click_feedback_1773168632177.png)
+````

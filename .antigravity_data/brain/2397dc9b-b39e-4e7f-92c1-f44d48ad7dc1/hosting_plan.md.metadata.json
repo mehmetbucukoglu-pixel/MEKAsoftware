@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "Hosting strategy for KlinikApp.\n    - Frontend deployment to Vercel.\n    - Backend and Database deployment to Railway or Render.\n    - Environment variable configuration for inter-service communication.",
+  "updatedAt":  "2026-03-03T16:14:42.564612Z"
+}

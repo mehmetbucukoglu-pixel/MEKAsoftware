@@ -1,0 +1,6 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_WALKTHROUGH",
+  "summary":  "Fixed Windows absolute path URI logic by stripping /C:/ and just doing c:\\Users... and wrapping with file:/// which matches typical Windows URL conversion.",
+  "updatedAt":  "2026-03-10T14:00:22.964481700Z",
+  "version":  "9"
+}

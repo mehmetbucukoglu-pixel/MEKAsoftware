@@ -1,0 +1,85 @@
+# KlinikApp Integration Strategy: n8n & HBYS (USS)
+
+This document outlines the planning for two critical integrations: **n8n** for internal/external workflow automation and **HBYS** for mandatory health data reporting to the Turkish Ministry of Health (Sağlık Bakanlığı).
+
+## 1. n8n Integration Plan
+
+n8n will serve as the "glue" between KlinikApp and other services (Google Calendar, WhatsApp, Email, etc.).
+
+### 1.1. Outbound: Webhooks (KlinikApp -> n8n)
+*   **Mechanism**: An `IntegrationService` that listens to internal events and sends POST requests to configured n8n webhook URLs.
+*   **Events to Trigger**:
+    *   `patient.created`: New registration.
+    *   `appointment.confirmed`: New booking.
+    *   `payment.received`: Invoicing/Accounting triggers.
+    *   `task.assigned`: Internal notification routing.
+*   **Data Model Changes**:
+    *   Add `webhooks` table or `settings.integrations.n8n` JSON field in `Clinic` model to store the n8n endpoint URL and secret.
+
+### 1.2. Inbound: API Access (n8n -> KlinikApp)
+*   **Mechanism**: A dedicated `InternalAPI` controller or specialized Service Account tokens.
+*   **Use Cases**:
+    *   n8n updating appointment status after a WhatsApp confirmation.
+    *   n8n syncing patient data from an external lead form.
+*   **Authentication**: API Keys (uniquely generated per clinic) passed in `X-API-KEY` header.
+
+---
+
+## 2. HBYS / Sağlık Bakanlığı (USS) Integration Plan
+
+This is a mandatory integration for clinical data reporting in Turkey. It primarily uses the **USS (Ulusal Sağlık Sistemi)** via SOAP/XML.
+
+### 2.1. Core Components
+*   **`HbysModule`**: A dedicated backend module.
+*   **`SKRSService`**: Handle Health Code Reference System (SKRS) lookups (e.g., ICD-10 diagnosis codes, procedure codes).
+*   **`UssClient`**: A SOAP client to communicate with the Ministry's `saglik.gov.tr` endpoints.
+*   **`TransmissionQueue`**: To handle retries and ensure no data is lost during connectivity issues with Ministry servers.
+
+### 2.2. Required Data Mapping
+To comply with USS, we need to capture or map:
+*   **Patient**: TC Kimlik (verified via MERNIS), Gender, Date of Birth.
+*   **Encounter (Muayene)**:
+    *   `Muayene Baslangic/Bitis` (Start/End times).
+    *   `Tani` (Diagnosis codes - ICD-10).
+    *   `Islem` (Procedure codes).
+    *   `Recete` (Prescriptions - if applicable).
+*   **Clinic Info**: `Kurum Kodu`, `Sifre` (Credentials provided by the Ministry).
+
+### 2.3. Workflow
+1.  **Trigger**: Doctor completes a `ClinicalNote` or `Appointment`.
+2.  **Processing**: Service checks if the encounter should be reported (based on clinic settings).
+3.  **Validation**: Ensure all required SKRS codes are present.
+4.  **XML Generation**: Build the USS-compliant XML payload.
+5.  **Transmission**: Send to USS endpoint and log the `Paket ID` and response status.
+
+---
+
+## 3. Recommended Phased Implementation
+
+### Phase 1: Infrastructure (Backend Prep)
+- [ ] Add `apiKey` and `externalSettings` to `Clinic` Prisma model.
+- [ ] Implement `WebhookService` with a generic retry logic.
+- [ ] Create `Integration` module in NestJS.
+
+### Phase 2: n8n Launch
+- [ ] Implement triggers in [PatientService](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.service.ts#7-197) and `AppointmentService`.
+- [ ] Create a UI in Settings for users to paste their n8n Webhook URL.
+- [ ] Add API Key generation/revocation UI.
+
+### Phase 3: HBYS / USS Mapping & SKRS
+- [ ] Populate a local database or cache for SKRS codes (ICD-10).
+- [ ] Update `ClinicalNote` UI to allow selection of "Standardized Diagnosis Codes".
+- [ ] Implement SOAP client for test environment (`test.saglik.gov.tr`).
+
+### Phase 4: Full Compliance & Reporting
+- [ ] Implement the `TransmissionQueue` using BullMQ or similar.
+- [ ] Add an "HBYS Reporting Dashboard" to see status of sent/failed records.
+- [ ] Final security audit (MTR/TLS requirements for Ministry connections).
+
+---
+
+## 4. Key Considerations
+> [!IMPORTANT]
+> **Data Privacy**: All data sent to external services (n8n or HBYS) must respect KVKK (Turkish Data Protection Law). n8n flows should ideally be self-hosted by the clinic for maximum privacy.
+>
+> **SOAP Complexity**: The Ministry API uses legacy SOAP. Tools like `easy-soap-request` or building custom XML templates are recommended over generic SOAP libraries that might struggle with Turkish character encoding or specific headers.

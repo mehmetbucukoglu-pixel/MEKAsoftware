@@ -1,0 +1,65 @@
+# KlinikApp: Legendary Minimalistic UI Refactor
+
+This plan outlines the transformation of the KlinikApp frontend into a premium, state-of-the-art interface with a "Clinic Coordinator" philosophy. The focus is on high-density information, fluid interactions, and zero-flicker feedback.
+
+## User Review Required
+
+> [!IMPORTANT]
+> This refactor introduces **TanStack Query** as the primary data fetching and state management layer for the Workspace, replacing traditional `useEffect` hooks to enable **Optimistic UI**.
+
+## Proposed Changes
+
+### 🛠️ Infrastructure
+#### [NEW] Dependency Installation
+- Install `@tanstack/react-query` and `@tanstack/react-query-devtools`.
+
+#### [NEW] [query-client.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/query-client.ts)
+- Initialize a global `QueryClient` with standard defaults for a snappy SPA.
+
+#### [MODIFY] [layout.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/layout.tsx)
+- Wrap the application in a `QueryProvider`.
+
+---
+
+### 🎨 Design System
+#### [MODIFY] [globals.css](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/globals.css)
+- Implement a curated HSL/OKLCH color palette for a "premium" feel.
+- Add advanced shadow tokens and glassmorphism utilities (`.glass-morphism`).
+- Add micro-animation classes for smooth transitions.
+
+---
+
+### 🧩 Components
+#### [NEW] [detail-drawer.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/ui/detail-drawer.tsx)
+- A reusable, high-performance slide-over panel for task and patient details.
+
+#### [MODIFY] [TaskRow.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/TaskRow.tsx)
+- Redesign for 36px height (high density).
+- Integrate "Detail Drawer" trigger.
+- Add hover-triggered action buttons.
+
+#### [MODIFY] [TaskList.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/TaskList.tsx)
+- Refine the "Ghost Input" experience: seamless task creation without losing focus.
+
+---
+
+### 📄 Pages
+#### [MODIFY] [tasks/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/tasks/page.tsx)
+- Migrate from `useState` to `useQuery` for fetching documents and tasks.
+- Implement `useMutation` with **Optimistic Updates** for:
+    - Task status toggling (instant feedback).
+    - Task title editing.
+    - New task creation.
+- Implement the "Detail Drawer" as the primary interaction point for task metadata.
+
+## Verification Plan
+
+### Automated Tests
+- Run `npm run build` to ensure no TypeScript or build errors.
+- Verify React Query provider initialization in the browser.
+
+### Manual Verification
+- **Ghost Input Test:** Rapidly add 5 tasks without the input losing focus or the UI flickering.
+- **Optimistic Toggle Test:** Click a task checkbox; it should appear "DONE" immediately, even before the server responds.
+- **Premium UI Check:** Verify glassmorphism effects on the Sidebar and Detail Drawer.
+- **Responsive Check:** Ensure the Detail Drawer behaves correctly on smaller screens.

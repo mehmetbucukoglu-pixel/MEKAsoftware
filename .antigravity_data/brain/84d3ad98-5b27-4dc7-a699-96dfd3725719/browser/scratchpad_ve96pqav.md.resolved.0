@@ -1,0 +1,13 @@
+# Patient Desk Testing Plan
+
+- [ ] Navigate to http://localhost:3001/patients
+- [ ] Login if required (admin@klinik.com / 123456)
+- [ ] Select a patient from the list
+- [ ] Verify Patient Header collapse/expand
+- [ ] Verify "Klinik Notları" tab
+- [ ] Verify Right-click context menu (6 options)
+- [ ] Test Metin Bloğu (Add, Type, Focus loss)
+- [ ] Test Görev Listesi (Add)
+- [ ] Test Dragging
+- [ ] Check console for errors
+- [ ] Report findings

@@ -1,0 +1,20 @@
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { DashboardService } from './dashboard.service';
+
+@ApiTags('Dashboard')
+@Controller('dashboard')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@ApiBearerAuth()
+export class DashboardController {
+    constructor(private dashboardService: DashboardService) { }
+
+    @Get()
+    @ApiOperation({ summary: 'Dashboard verilerini getir' })
+    async getDashboardData(@CurrentUser() user: CurrentUserPayload) {
+        return this.dashboardService.getDashboardData(user.clinicId);
+    }
+}

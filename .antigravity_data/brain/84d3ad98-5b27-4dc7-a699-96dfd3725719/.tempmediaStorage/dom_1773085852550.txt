@@ -1,0 +1,106 @@
+<current_dom_explanation>
+This is a temporary snapshot of the current page's DOM structure. The DOM will change if you navigate to or interact with another page. Use a tool like browser_get_dom to capture and preserve the DOM in your trajectory if needed for later reference.
+</current_dom_explanation>
+<current_dom>
+Demo Diş Kliniği
+[0] (70,188)<a href='/dashboard' />
+	[1] (56,188)<span >Ana Sayfa />
+[2] (70,246)<a href='/appointments' />
+	[3] (49,246)<span >Takvim />
+[4] (70,305)<a href='/tasks' />
+	[5] (59,305)<span >İşler/Panom />
+[6] (70,363)<a href='/messages' />
+	[7] (52,363)<span >Mesajlar />
+	[8] (119,363)<span >3 />
+[9] (70,421)<a href='/patients' />
+	[10] (9,421)<div  />
+	[11] (52,421)<span >Hastalar />
+[12] (70,479)<a href='/finance' />
+	[13] (48,479)<span >Finans />
+[14] (70,538)<a href='/notes' />
+	[15] (47,538)<span >Notlar />
+[16] (70,863)<a href='/settings' />
+	[17] (49,863)<span >Ayarlar />
+A
+Y
+Ahmet
+Yılmaz
+Admin
+[18] (116,943)<button class='btn-icon btn-ghost' title='Çıkış Yap' />
+Demo Diş Kliniği
+Hastalar
+[19] (353,37)<button class='btn-icon' />
+	[20] (345,37)<span >Hızlı Arama />
+	[21] (387,37)<span >Ctrl K />
+[22] (973,37)<button class='btn-icon' />
+[23] (570,538)<div scrollable='true' />
+	Kayıt:
+	09 Mart 2026
+	TC Kimlik
+	500****0005
+	Telefon
+	(555) 000 55 55
+	E-posta
+	—
+	Doğum Tarihi
+	—
+	[24] (204,259)<button class='tab '>Randevular />
+	[25] (316,259)<button class='tab tab-active'>Klinik Notları />
+		[26] (356,259)<span >1 />
+	[27] (446,259)<button class='tab '>Finansal Hareketler />
+	Sağ tıkla → metin, görev, tablo veya bağlantı ekle · Sürükle yaymak için
+	[28] (569,769)<div scrollable='true' />
+		[29] (406,916)<div  />
+			[30] (406,916)<div  />
+				[31] (406,634)<div class='patient-canvas-text' />
+		[32] (715,699)<div  />
+			[33] (715,699)<div  />
+				[34] (715,699)<div  />
+					[35] (715,638)<div  />
+						[36] (673,638)<span >Görev Listesi />
+						[37] (778,638)<span >0
+/
+2 />
+					[38] (715,691)<div  />
+						[39] (715,675)<div  />
+							[40] (722,675)<span >kms />
+						[41] (715,708)<div  />
+							[42] (722,708)<span >kmkclkşx />
+					[43] (715,752)<div  />
+						[44] (721,757)<input placeholder='Görev ekle (Enter)' />
+				[45] (787,777)<div  />
+		Reçete / İlaç Geçmişi
+		İlaç Ekle
+	Blok Ekle
+	[46] (578,486)<button  />
+		[47] (522,486)<div  />
+		[48] (570,486)<div  />
+			[49] (570,474)<div >Metin Bloğu />
+			[50] (570,500)<div >Serbest düz metin />
+	[51] (578,558)<button  />
+		[52] (522,558)<div  />
+		[53] (581,558)<div  />
+			[54] (581,547)<div >Görev Listesi />
+			[55] (581,573)<div >Tamamlanabilir maddeler />
+	[56] (578,631)<button  />
+		[57] (522,631)<div  />
+		[58] (577,631)<div  />
+			[59] (577,620)<div >Reçete />
+			[60] (577,646)<div >İlaç bilgileri ve geçmişi />
+	[61] (578,716)<button  />
+		[62] (522,716)<div  />
+		[63] (591,716)<div  />
+			[64] (591,693)<div >Dosya / Görsel />
+			[65] (591,730)<div >Dosya yükle, görseller görüntülenir />
+	[66] (578,800)<button  />
+		[67] (522,800)<div  />
+		[68] (573,800)<div  />
+			[69] (573,788)<div >Tablo />
+			[70] (573,814)<div >Sütun ve satırlı tablo />
+	[71] (578,873)<button  />
+		[72] (522,873)<div  />
+		[73] (563,873)<div  />
+			[74] (563,861)<div >Bağlantı />
+			[75] (563,887)<div >Harici link ekle />
+
+</current_dom>

@@ -1,0 +1,71 @@
+<current_dom_explanation>
+This is a temporary snapshot of the current page's DOM structure. The DOM will change if you navigate to or interact with another page. Use a tool like browser_get_dom to capture and preserve the DOM in your trajectory if needed for later reference.
+</current_dom_explanation>
+<current_dom>
+KlinikApp
+Demo Diş Kliniği
+[0] (84,143)<a href='/dashboard' />
+	[1] (56,143)<span >Ana Sayfa />
+[2] (84,201)<a href='/appointments' />
+	[3] (49,201)<span >Takvim />
+[4] (84,259)<a href='/tasks' />
+	[5] (9,259)<div  />
+	[6] (60,259)<span >İşler/Panom />
+[7] (84,317)<a href='/messages' />
+	[8] (52,317)<span >Mesajlar />
+	[9] (147,317)<span >3 />
+[10] (84,376)<a href='/patients' />
+	[11] (52,376)<span >Hastalar />
+[12] (84,434)<a href='/finance' />
+	[13] (48,434)<span >Finans />
+[14] (84,492)<a href='/notes' />
+	[15] (47,492)<span >Notlar />
+[16] (84,863)<a href='/settings' />
+	[17] (49,863)<span >Ayarlar />
+A
+Y
+Ahmet
+Yılmaz
+Admin
+[18] (144,943)<button class='btn-icon btn-ghost' title='Çıkış Yap' />
+Demo Diş Kliniği
+İşler/Panom
+[19] (397,37)<button class='btn-icon' />
+	[20] (388,37)<span >Hızlı Arama />
+	[21] (431,37)<span >Ctrl K />
+[22] (973,37)<button class='btn-icon' />
+[23] (585,538)<div scrollable='true' />
+	KlinikApp
+	Demo Diş Kliniği
+	[24] (269,251)<a href='/dashboard' />
+		[25] (241,251)<span >Ana Sayfa />
+	[26] (269,309)<a href='/appointments' />
+		[27] (234,309)<span >Takvim />
+	[28] (269,368)<a href='/tasks' />
+		[29] (194,368)<div  />
+		[30] (245,368)<span >İşler/Panom />
+	[31] (269,426)<a href='/messages' />
+		[32] (237,426)<span >Mesajlar />
+		[33] (332,426)<span >3 />
+	[34] (269,484)<a href='/patients' />
+		[35] (237,484)<span >Hastalar />
+	[36] (269,542)<a href='/finance' />
+		[37] (233,542)<span >Finans />
+	[38] (269,601)<a href='/notes' />
+		[39] (232,601)<span >Notlar />
+	[40] (269,972)<a href='/settings' />
+		[41] (234,972)<span >Ayarlar />
+	Demo Diş Kliniği
+	İşler/Panom
+	[42] (582,146)<button class='btn-icon' />
+		[43] (573,146)<span >Hızlı Arama />
+		[44] (615,146)<span >Ctrl K />
+	[45] (953,146)<button class='btn-icon' />
+	Panom & İşler
+	[46] (804,241)<button class='inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-8 rounded-md px-3 has-[>svg]:px-2.5 gap-2'>Liste />
+	[47] (862,241)<button class='inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md px-3 has-[>svg]:px-2.5 gap-2'>Pano (Kanban) />
+	[48] (934,241)<button class='inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3'>Yeni Görev />
+	Yapılacaklar
+	Henüz görev bulunmuyor. Yeni bir görev ekleyin.
+
+</current_dom>

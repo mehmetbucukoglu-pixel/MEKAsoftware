@@ -1,0 +1,71 @@
+# Local Development Environment Walkthrough
+
+I have successfully set up and started the local development environment for KlinikApp.
+
+## Steps Taken
+
+1.  **Infrastructure**: Started PostgreSQL and Redis containers using `docker-compose`.
+2.  **Backend Fixes**:
+    *   **TypeScript Error**: Resolved a type mismatch in [crypto.util.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/common/utils/crypto.util.ts) where [decrypt](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/common/utils/crypto.util.ts#39-68) was receiving potentially null values from the database.
+    *   **Dependency Injection**: Fixed a NestJS startup error by exporting [AuditService](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/audit/audit.service.ts#4-33) from the [AuditModule](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/audit/audit.module.ts#5-11), allowing it to be injected into the [MessagingService](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.service.ts#9-247).
+3.  **Launch**:
+    *   **Backend**: Running at [http://localhost:3000](http://localhost:3000)
+    *   **Frontend**: Running at [http://localhost:3001](http://localhost:3001)
+    *   **API Docs**: Available at [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
+
+## Verification
+
+The application was verified by navigating to the frontend URL. The login page loaded successfully with the following features:
+- **KlinikApp** branding.
+- **Login form** with email and password fields.
+- **Demo credentials** provided on the page for quick testing.
+
+## Sprint 5: Finance, Dashboard & Accountant Role
+
+Implemented the full financial management cycle, clinical staff visibility controls, and a new high-level dashboard.
+
+### 1. Finance & Accountant Role
+- **New Role**: `ACCOUNTANT` role with restricted access. They can ONLY access finance and dashboard summaries.
+- **Finance Module**: Full tracking of payments and refunds with real-time balance calculations.
+- **Patient Balances**: Patients now have a dynamic balance shown on their profile.
+
+![Finance Management Page](file:///C:/Users/Lenovo/.gemini/antigravity/brain/ef513962-6af6-4575-9e48-84651e873d33/finance_page_1772473098497.png)
+
+### 2. Enhanced Dashboard
+- **Role-Based Views**: Doctors see schedules; Accountants see revenue trends and net income.
+- **Quick Links**: Integrated shortcut buttons for frequent actions based on user role.
+
+![Role-Based Dashboard](file:///C:/Users/Lenovo/.gemini/antigravity/brain/ef513962-6af6-4575-9e48-84651e873d33/dashboard_sprint5_1772473087896.png)
+
+### 3. Patient History & Clinical Notes
+- **Clinical Visibility**: Notes are now filtered based on "STAFF", "DOCTOR_ONLY", or "ALL" visibility flags.
+- **Patient Detail Tabs**: Merged appointments, notes, and payments into a unified workspace.
+
+![Patient Detail Profile](file:///C:/Users/Lenovo/.gemini/antigravity/brain/ef513962-6af6-4575-9e48-84651e873d33/patient_detail_sprint5_1772473170471.png)
+
+![Login Page](/C:/Users/Lenovo/.gemini/antigravity/brain/ef513962-6af6-4575-9e48-84651e873d33/verifying_local_host_1772467375504.webp)
+
+## Components Status
+
+| Component | Status | Port |
+| :--- | :--- | :--- |
+| **PostgreSQL** | `Running` | 5432 |
+| **Redis** | `Running` | 6379 |
+| **Backend (NestJS)** | `Running` | 3000 |
+| **Frontend (Next.js)** | `Running` | 3001 |
+
+## Messaging Fix (2026-03-02)
+
+I resolved the following issues in the WhatsApp messaging module:
+
+1.  **Duplicate Messages (2x)**:
+    *   **Cause**: Messages were being added to the UI state from both the API response and the WebSocket event without proper deduplication.
+    *   **Fix**: Implemented a robust deduplication check in the frontend [MessagesPage](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/messages/page.tsx#12-198) using message IDs.
+2.  **Cross-Chat Message Leakage**:
+    *   **Cause**: Real-time messages were being broadcast to all staff members regardless of which conversation they were viewing.
+    *   **Fix**: 
+        *   Introduced **Conversation-specific Socket Rooms** in the backend.
+        *   The frontend now joins a specific room when a conversation is selected and leaves it when switching.
+        *   The backend only emits `new_message` events to the corresponding conversation room.
+
+![Messaging Test](/C:/Users/Lenovo/.gemini/antigravity/brain/ef513962-6af6-4575-9e48-84651e873d33/verifying_messaging_fix_1772468172828.webp)

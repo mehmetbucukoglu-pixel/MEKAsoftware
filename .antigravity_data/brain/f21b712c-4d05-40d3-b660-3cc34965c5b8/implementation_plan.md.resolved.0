@@ -1,0 +1,818 @@
+# Klinik Yönetim SaaS — Mimari Tasarım Dokümanı
+
+Multi-tenant, randevu merkezli bir Klinik Yönetim SaaS ürünü için kapsamlı mimari tasarım.
+
+---
+
+## 1. Mimari Yaklaşım: Modüler Monolit
+
+### Karar
+**Modular Monolith** + **Clean/Hexagonal Architecture** hibrit yaklaşımı.
+
+### Gerekçe
+
+| Kriter | Modüler Monolit | Microservice |
+|---|---|---|
+| MVP hızı | ✅ Hızlı | ❌ Yavaş |
+| Operasyonel yük | ✅ Düşük | ❌ Yüksek |
+| Transaction bütünlüğü | ✅ Doğal | ❌ Saga pattern gerekir |
+| Ölçeklenebilirlik | ✅ Yeterli (vertical) | ✅ Daha esnek |
+| İleride ayrıştırma | ✅ Modül sınırları hazır | — |
+
+**Her modül kendi domain sınırları içinde çalışır.** Modüller arası iletişim sadece tanımlı interface'ler ve event'ler üzerinden yapılır. Bu sayede ileride WhatsApp veya Finance modülü bağımsız servise dönüştürülebilir.
+
+### Katman Yapısı (Her Modül İçin)
+
+```
+┌─────────────────────────────────┐
+│         Presentation            │  ← Controller, DTO, Validation
+├─────────────────────────────────┤
+│         Application             │  ← Use Cases, Event Handlers
+├─────────────────────────────────┤
+│           Domain                │  ← Entity, Value Object, Domain Events
+├─────────────────────────────────┤
+│        Infrastructure           │  ← Repository impl, External APIs
+└─────────────────────────────────┘
+```
+
+---
+
+## 2. Tech Stack
+
+### Backend
+
+| Katman | Teknoloji | Gerekçe |
+|---|---|---|
+| Runtime | **Node.js 20 LTS** | Async I/O, WhatsApp webhook'lar için ideal, geniş ekosistem |
+| Framework | **NestJS 10** | Modüler yapı doğal, DI container, Guard/Interceptor sistemi, enterprise-grade |
+| Dil | **TypeScript 5.3+** | Tip güvenliği, domain modelleme, refactoring kolaylığı |
+| ORM | **Prisma 5** | Type-safe query, migration, introspection, multi-schema desteği |
+| Validation | **class-validator + class-transformer** | DTO validation, NestJS ile doğal entegrasyon |
+| Auth | **JWT (access + refresh)** | Stateless, SaaS multi-tenant uyumlu |
+| API Docs | **Swagger / OpenAPI 3.0** | NestJS `@nestjs/swagger` ile otomatik üretim |
+| Realtime | **Socket.IO** (`@nestjs/websockets`) | Mesaj inbox'ı için, NestJS gateway desteği |
+| Job Queue | **BullMQ + Redis** | Hold timeout, scheduled iptal, async webhook işleme |
+
+### Database & Cache
+
+| Bileşen | Teknoloji | Gerekçe |
+|---|---|---|
+| Primary DB | **PostgreSQL 16** | ACID, advisory lock, RLS, JSON desteği, olgun ekosistem |
+| Cache / Queue | **Redis 7** | BullMQ backend, session cache, rate limiting |
+| Tenant izolasyon | **Row-Level Security (RLS)** + `tenant_id` FK | Schema-per-tenant overkill, RLS performans ve güvenlik dengesini sağlar |
+
+### DevOps / Tooling
+
+| Bileşen | Teknoloji |
+|---|---|
+| Container | Docker + Docker Compose |
+| Linting | ESLint + Prettier |
+| Testing | Jest + Supertest |
+| CI/CD | GitHub Actions (ileride) |
+| Logging | Pino (structured JSON) |
+| Monitoring | OpenTelemetry-ready (ileride) |
+
+---
+
+## 3. Veritabanı Şeması
+
+### 3.1 Tenant & Auth
+
+```sql
+-- Klinik (Tenant)
+CREATE TABLE clinics (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name          VARCHAR(255) NOT NULL,
+  slug          VARCHAR(100) UNIQUE NOT NULL,  -- subdomain / identifier
+  phone         VARCHAR(20),
+  address       TEXT,
+  timezone      VARCHAR(50) NOT NULL DEFAULT 'UTC',
+  settings      JSONB DEFAULT '{}',            -- branş özelleştirme için genişleyebilir
+  is_active     BOOLEAN NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Kullanıcı
+CREATE TABLE users (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id     UUID NOT NULL REFERENCES clinics(id),
+  email         VARCHAR(255) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  first_name    VARCHAR(100) NOT NULL,
+  last_name     VARCHAR(100) NOT NULL,
+  phone         VARCHAR(20),
+  role          VARCHAR(20) NOT NULL CHECK (role IN ('OWNER','DOCTOR','ASSISTANT','ACCOUNTANT')),
+  is_active     BOOLEAN NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(clinic_id, email)
+);
+
+-- Refresh Token (JWT)
+CREATE TABLE refresh_tokens (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash    VARCHAR(255) NOT NULL,
+  expires_at    TIMESTAMPTZ NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### 3.2 Hasta Yönetimi
+
+```sql
+CREATE TABLE patients (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id     UUID NOT NULL REFERENCES clinics(id),
+  first_name    VARCHAR(100) NOT NULL,
+  last_name     VARCHAR(100) NOT NULL,
+  phone         VARCHAR(20) NOT NULL,
+  email         VARCHAR(255),
+  date_of_birth DATE,
+  gender        VARCHAR(10),
+  notes         TEXT,
+  metadata      JSONB DEFAULT '{}',            -- branş spesifik ek alanlar
+  is_active     BOOLEAN NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(clinic_id, phone)                     -- aynı klinikte aynı telefon tekrarsız
+);
+
+CREATE INDEX idx_patients_search ON patients(clinic_id, last_name, first_name);
+CREATE INDEX idx_patients_phone ON patients(clinic_id, phone);
+
+-- Hasta Dosya Ekleri (meta bilgi, storage ileride S3/MinIO)
+CREATE TABLE patient_attachments (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id     UUID NOT NULL REFERENCES clinics(id),
+  patient_id    UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  file_name     VARCHAR(255) NOT NULL,
+  file_type     VARCHAR(50) NOT NULL,
+  file_size     INTEGER NOT NULL,
+  storage_key   VARCHAR(500) NOT NULL,          -- S3 key veya local path
+  uploaded_by   UUID NOT NULL REFERENCES users(id),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### 3.3 Randevu Sistemi (Kritik)
+
+```sql
+-- Doktor Çalışma Saatleri
+CREATE TABLE doctor_schedules (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id     UUID NOT NULL REFERENCES clinics(id),
+  doctor_id     UUID NOT NULL REFERENCES users(id),
+  day_of_week   SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Pzt
+  start_time    TIME NOT NULL,
+  end_time      TIME NOT NULL,
+  slot_duration SMALLINT NOT NULL DEFAULT 30,   -- dakika
+  is_active     BOOLEAN NOT NULL DEFAULT true,
+  UNIQUE(clinic_id, doctor_id, day_of_week)
+);
+
+-- Randevu
+CREATE TABLE appointments (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id     UUID NOT NULL REFERENCES clinics(id),
+  doctor_id     UUID NOT NULL REFERENCES users(id),
+  patient_id    UUID NOT NULL REFERENCES patients(id),
+  start_time    TIMESTAMPTZ NOT NULL,
+  end_time      TIMESTAMPTZ NOT NULL,
+  duration_min  SMALLINT NOT NULL,
+  status        VARCHAR(20) NOT NULL DEFAULT 'HOLD'
+                CHECK (status IN ('HOLD','CONFIRMED','CANCELLED','NO_SHOW','COMPLETED')),
+  hold_until    TIMESTAMPTZ,                   -- HOLD durumunda son geçerlilik
+  cancel_reason TEXT,
+  notes         TEXT,
+  created_by    UUID NOT NULL REFERENCES users(id),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- ÇAKIŞMAYı DB SEVİYESİNDE ENGELLE (sadece aktif randevular)
+  CONSTRAINT chk_time_range CHECK (end_time > start_time)
+);
+
+-- Çakışma engelleme indexi - Partial unique + exclusion constraint
+-- GiST index ile range overlap kontrolü
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+ALTER TABLE appointments ADD CONSTRAINT no_overlap_confirmed
+  EXCLUDE USING gist (
+    clinic_id WITH =,
+    doctor_id WITH =,
+    tstzrange(start_time, end_time) WITH &&
+  )
+  WHERE (status IN ('HOLD', 'CONFIRMED'));
+```
+
+> [!IMPORTANT]
+> `EXCLUDE USING gist` constraint'i veritabanı seviyesinde randevu çakışmasını engelleyen en güvenilir yöntemdir. Application-level kontrol tek başına yeterli değildir — race condition riski vardır.
+
+### 3.4 WhatsApp Mesajlaşma
+
+```sql
+-- Konuşma (telefon numarası bazlı)
+CREATE TABLE conversations (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id     UUID NOT NULL REFERENCES clinics(id),
+  patient_id    UUID REFERENCES patients(id),
+  wa_phone      VARCHAR(20) NOT NULL,          -- WhatsApp telefon numarası
+  status        VARCHAR(20) NOT NULL DEFAULT 'BOT'
+                CHECK (status IN ('BOT','HUMAN','CLOSED')),
+  assigned_to   UUID REFERENCES users(id),     -- human takeover
+  last_message_at TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(clinic_id, wa_phone)
+);
+
+-- Mesajlar
+CREATE TABLE messages (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id     UUID NOT NULL REFERENCES clinics(id),
+  conversation_id UUID NOT NULL REFERENCES conversations(id),
+  wa_message_id VARCHAR(255),                  -- Meta API'den gelen ID (idempotency)
+  direction     VARCHAR(10) NOT NULL CHECK (direction IN ('INBOUND','OUTBOUND')),
+  content_type  VARCHAR(20) NOT NULL DEFAULT 'TEXT'
+                CHECK (content_type IN ('TEXT','IMAGE','DOCUMENT','AUDIO','VIDEO','TEMPLATE')),
+  body          TEXT,
+  media_url     VARCHAR(500),
+  status        VARCHAR(20) DEFAULT 'SENT'
+                CHECK (status IN ('SENT','DELIVERED','READ','FAILED')),
+  metadata      JSONB DEFAULT '{}',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Webhook idempotency (duplicate engelleme)
+CREATE UNIQUE INDEX idx_messages_wa_id
+  ON messages(clinic_id, wa_message_id)
+  WHERE wa_message_id IS NOT NULL;
+
+CREATE INDEX idx_messages_conversation ON messages(conversation_id, created_at DESC);
+```
+
+### 3.5 Finans / Tahsilat
+
+```sql
+CREATE TABLE payments (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id     UUID NOT NULL REFERENCES clinics(id),
+  patient_id    UUID NOT NULL REFERENCES patients(id),
+  appointment_id UUID REFERENCES appointments(id), -- opsiyonel ilişki
+  amount        DECIMAL(10,2) NOT NULL,
+  currency      VARCHAR(3) NOT NULL DEFAULT 'TRY',
+  payment_method VARCHAR(20) NOT NULL
+                CHECK (payment_method IN ('CASH','CREDIT_CARD','BANK_TRANSFER','INSURANCE','OTHER')),
+  payment_type  VARCHAR(20) NOT NULL DEFAULT 'PAYMENT'
+                CHECK (payment_type IN ('PAYMENT','REFUND')),
+  description   TEXT,
+  paid_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by    UUID NOT NULL REFERENCES users(id),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_payments_patient ON payments(clinic_id, patient_id);
+
+-- Bakiye View
+CREATE VIEW patient_balances AS
+SELECT
+  clinic_id,
+  patient_id,
+  SUM(CASE WHEN payment_type = 'PAYMENT' THEN amount ELSE -amount END) AS total_paid
+FROM payments
+GROUP BY clinic_id, patient_id;
+```
+
+### 3.6 Klinik Notu / Reçete
+
+```sql
+CREATE TABLE clinical_notes (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id     UUID NOT NULL REFERENCES clinics(id),
+  patient_id    UUID NOT NULL REFERENCES patients(id),
+  appointment_id UUID REFERENCES appointments(id),
+  doctor_id     UUID NOT NULL REFERENCES users(id),
+  note_type     VARCHAR(20) NOT NULL DEFAULT 'NOTE'
+                CHECK (note_type IN ('NOTE','PRESCRIPTION','DIAGNOSIS')),
+  title         VARCHAR(255),
+  content       TEXT NOT NULL,
+  visibility    VARCHAR(20) NOT NULL DEFAULT 'DOCTOR_ONLY'
+                CHECK (visibility IN ('DOCTOR_ONLY','STAFF','ALL')),
+  metadata      JSONB DEFAULT '{}',            -- branş spesifik veriler
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_clinical_notes_patient ON clinical_notes(clinic_id, patient_id);
+```
+
+### 3.7 Audit Log
+
+```sql
+CREATE TABLE audit_logs (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id     UUID NOT NULL REFERENCES clinics(id),
+  user_id       UUID REFERENCES users(id),
+  action        VARCHAR(50) NOT NULL,           -- CREATE, UPDATE, DELETE, LOGIN, etc.
+  entity_type   VARCHAR(50) NOT NULL,           -- appointment, patient, payment, etc.
+  entity_id     UUID,
+  old_values    JSONB,
+  new_values    JSONB,
+  ip_address    VARCHAR(45),
+  user_agent    TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_audit_logs_entity ON audit_logs(clinic_id, entity_type, entity_id);
+CREATE INDEX idx_audit_logs_time ON audit_logs(clinic_id, created_at DESC);
+```
+
+### ER Diyagram
+
+```mermaid
+erDiagram
+    CLINICS ||--o{ USERS : has
+    CLINICS ||--o{ PATIENTS : has
+    CLINICS ||--o{ APPOINTMENTS : has
+    CLINICS ||--o{ CONVERSATIONS : has
+    CLINICS ||--o{ PAYMENTS : has
+    CLINICS ||--o{ AUDIT_LOGS : has
+
+    USERS ||--o{ APPOINTMENTS : "doctor/creator"
+    PATIENTS ||--o{ APPOINTMENTS : attends
+    PATIENTS ||--o{ PAYMENTS : pays
+    PATIENTS ||--o{ CLINICAL_NOTES : "has notes"
+    PATIENTS ||--o{ PATIENT_ATTACHMENTS : "has files"
+
+    APPOINTMENTS ||--o| PAYMENTS : "linked to"
+    APPOINTMENTS ||--o| CLINICAL_NOTES : "linked to"
+
+    CONVERSATIONS ||--o{ MESSAGES : contains
+    PATIENTS ||--o| CONVERSATIONS : "linked via phone"
+```
+
+---
+
+## 4. Modül Yapısı (Proje Dizin Ağacı)
+
+```
+src/
+├── main.ts
+├── app.module.ts
+│
+├── common/                          # Paylaşılan altyapı
+│   ├── guards/
+│   │   ├── jwt-auth.guard.ts
+│   │   ├── roles.guard.ts
+│   │   └── tenant.guard.ts
+│   ├── decorators/
+│   │   ├── roles.decorator.ts
+│   │   ├── current-user.decorator.ts
+│   │   └── current-tenant.decorator.ts
+│   ├── interceptors/
+│   │   ├── audit-log.interceptor.ts
+│   │   ├── tenant-context.interceptor.ts
+│   │   └── transform.interceptor.ts
+│   ├── filters/
+│   │   └── global-exception.filter.ts
+│   ├── pipes/
+│   │   └── validation.pipe.ts
+│   ├── interfaces/
+│   │   └── tenant-context.interface.ts
+│   └── utils/
+│       ├── pagination.util.ts
+│       └── date.util.ts
+│
+├── modules/
+│   ├── auth/                        # Kimlik Doğrulama
+│   │   ├── auth.module.ts
+│   │   ├── auth.controller.ts
+│   │   ├── auth.service.ts
+│   │   ├── strategies/
+│   │   │   └── jwt.strategy.ts
+│   │   └── dto/
+│   │       ├── login.dto.ts
+│   │       └── register.dto.ts
+│   │
+│   ├── tenant/                      # Multi-Tenant Yönetimi
+│   │   ├── tenant.module.ts
+│   │   ├── tenant.controller.ts
+│   │   ├── tenant.service.ts
+│   │   └── dto/
+│   │
+│   ├── user/                        # Kullanıcı Yönetimi
+│   │   ├── user.module.ts
+│   │   ├── user.controller.ts
+│   │   ├── user.service.ts
+│   │   └── dto/
+│   │
+│   ├── patient/                     # Hasta Yönetimi
+│   │   ├── patient.module.ts
+│   │   ├── patient.controller.ts
+│   │   ├── patient.service.ts
+│   │   └── dto/
+│   │
+│   ├── appointment/                 # Randevu Sistemi ⭐
+│   │   ├── appointment.module.ts
+│   │   ├── appointment.controller.ts
+│   │   ├── appointment.service.ts
+│   │   ├── appointment-conflict.service.ts    # Çakışma algoritması
+│   │   ├── appointment-hold.processor.ts      # BullMQ hold timeout
+│   │   ├── dto/
+│   │   │   ├── create-appointment.dto.ts
+│   │   │   ├── update-appointment.dto.ts
+│   │   │   └── query-appointment.dto.ts
+│   │   └── events/
+│   │       ├── appointment-created.event.ts
+│   │       └── appointment-cancelled.event.ts
+│   │
+│   ├── messaging/                   # WhatsApp Mesajlaşma
+│   │   ├── messaging.module.ts
+│   │   ├── messaging.controller.ts        # Webhook endpoint
+│   │   ├── messaging.service.ts
+│   │   ├── messaging.gateway.ts           # Socket.IO gateway
+│   │   ├── whatsapp/
+│   │   │   ├── whatsapp-client.service.ts # Meta API client (mock)
+│   │   │   └── webhook.processor.ts
+│   │   └── dto/
+│   │
+│   ├── finance/                     # Finans / Tahsilat
+│   │   ├── finance.module.ts
+│   │   ├── finance.controller.ts
+│   │   ├── finance.service.ts
+│   │   └── dto/
+│   │
+│   ├── clinical-note/               # Klinik Notu / Reçete
+│   │   ├── clinical-note.module.ts
+│   │   ├── clinical-note.controller.ts
+│   │   ├── clinical-note.service.ts
+│   │   └── dto/
+│   │
+│   └── audit/                       # Audit Log
+│       ├── audit.module.ts
+│       ├── audit.service.ts
+│       └── audit.controller.ts      # Log görüntüleme (OWNER)
+│
+├── prisma/
+│   ├── schema.prisma
+│   ├── migrations/
+│   └── seed.ts
+│
+└── config/
+    ├── app.config.ts
+    ├── database.config.ts
+    ├── jwt.config.ts
+    └── redis.config.ts
+```
+
+---
+
+## 5. API Endpoint Listesi
+
+Tüm endpoint'ler `/api/v1` prefix'i altındadır. Tenant `clinic_id` JWT token'dan alınır.
+
+### 5.1 Auth
+
+| Method | Endpoint | Açıklama | Erişim |
+|---|---|---|---|
+| POST | `/auth/register` | Klinik + OWNER kaydı | Public |
+| POST | `/auth/login` | Giriş (JWT döner) | Public |
+| POST | `/auth/refresh` | Token yenile | Auth |
+| POST | `/auth/logout` | Çıkış (refresh token iptal) | Auth |
+| GET | `/auth/me` | Mevcut kullanıcı bilgisi | Auth |
+
+### 5.2 Tenant
+
+| Method | Endpoint | Açıklama | Erişim |
+|---|---|---|---|
+| GET | `/clinic` | Klinik bilgisi | Auth |
+| PATCH | `/clinic` | Klinik güncelle | OWNER |
+| GET | `/clinic/settings` | Ayarları getir | OWNER |
+| PATCH | `/clinic/settings` | Ayarları güncelle | OWNER |
+
+### 5.3 Kullanıcı Yönetimi
+
+| Method | Endpoint | Açıklama | Erişim |
+|---|---|---|---|
+| GET | `/users` | Kullanıcıları listele | OWNER, ASSISTANT |
+| POST | `/users` | Kullanıcı ekle | OWNER |
+| GET | `/users/:id` | Kullanıcı detay | OWNER, Self |
+| PATCH | `/users/:id` | Kullanıcı güncelle | OWNER |
+| DELETE | `/users/:id` | Kullanıcı deaktif et | OWNER |
+
+### 5.4 Hasta Yönetimi
+
+| Method | Endpoint | Açıklama | Erişim |
+|---|---|---|---|
+| GET | `/patients` | Hastaları listele & ara | OWNER, DOCTOR, ASSISTANT |
+| POST | `/patients` | Hasta ekle | OWNER, DOCTOR, ASSISTANT |
+| GET | `/patients/:id` | Hasta detay | OWNER, DOCTOR, ASSISTANT |
+| PATCH | `/patients/:id` | Hasta güncelle | OWNER, DOCTOR, ASSISTANT |
+| DELETE | `/patients/:id` | Hasta deaktif et | OWNER |
+| GET | `/patients/:id/appointments` | Hasta randevuları | OWNER, DOCTOR, ASSISTANT |
+| GET | `/patients/:id/payments` | Hasta ödemeleri | OWNER, ACCOUNTANT |
+| GET | `/patients/:id/balance` | Hasta bakiye | OWNER, ACCOUNTANT |
+| POST | `/patients/:id/attachments` | Dosya yükle | OWNER, DOCTOR, ASSISTANT |
+| GET | `/patients/:id/attachments` | Dosyaları listele | OWNER, DOCTOR, ASSISTANT |
+
+### 5.5 Randevu Sistemi ⭐
+
+| Method | Endpoint | Açıklama | Erişim |
+|---|---|---|---|
+| GET | `/appointments` | Randevuları listele (filtreleme) | OWNER, DOCTOR, ASSISTANT |
+| POST | `/appointments` | Randevu oluştur (HOLD) | OWNER, DOCTOR, ASSISTANT |
+| GET | `/appointments/:id` | Randevu detay | OWNER, DOCTOR, ASSISTANT |
+| PATCH | `/appointments/:id/confirm` | HOLD → CONFIRMED | OWNER, DOCTOR, ASSISTANT |
+| PATCH | `/appointments/:id/cancel` | İptal et | OWNER, DOCTOR, ASSISTANT |
+| PATCH | `/appointments/:id/no-show` | No-show işaretle | OWNER, DOCTOR |
+| PATCH | `/appointments/:id/complete` | Tamamlandı | OWNER, DOCTOR |
+| GET | `/appointments/available-slots` | Müsait slotları getir | OWNER, DOCTOR, ASSISTANT |
+| GET | `/doctors/:id/schedule` | Doktor takvimi | OWNER, DOCTOR, ASSISTANT |
+| PUT | `/doctors/:id/schedule` | Doktor takvim güncelle | OWNER, DOCTOR |
+
+### 5.6 WhatsApp Mesajlaşma
+
+| Method | Endpoint | Açıklama | Erişim |
+|---|---|---|---|
+| POST | `/webhooks/whatsapp` | Meta webhook (inbound) | Public (verify) |
+| GET | `/conversations` | Konuşma listesi (inbox) | OWNER, ASSISTANT |
+| GET | `/conversations/:id` | Konuşma detay + mesajlar | OWNER, ASSISTANT |
+| POST | `/conversations/:id/messages` | Mesaj gönder | OWNER, ASSISTANT |
+| PATCH | `/conversations/:id/assign` | Operatöre ata | OWNER, ASSISTANT |
+| PATCH | `/conversations/:id/mode` | BOT ↔ HUMAN mode | OWNER, ASSISTANT |
+
+### 5.7 Finans / Tahsilat
+
+| Method | Endpoint | Açıklama | Erişim |
+|---|---|---|---|
+| GET | `/payments` | Ödemeleri listele | OWNER, ACCOUNTANT |
+| POST | `/payments` | Ödeme kaydet | OWNER, ACCOUNTANT |
+| GET | `/payments/:id` | Ödeme detay | OWNER, ACCOUNTANT |
+| GET | `/payments/summary` | Özet rapor | OWNER, ACCOUNTANT |
+
+### 5.8 Klinik Notu / Reçete
+
+| Method | Endpoint | Açıklama | Erişim |
+|---|---|---|---|
+| GET | `/clinical-notes` | Notları listele | OWNER, DOCTOR |
+| POST | `/clinical-notes` | Not oluştur | DOCTOR |
+| GET | `/clinical-notes/:id` | Not detay | OWNER, DOCTOR |
+| PATCH | `/clinical-notes/:id` | Not güncelle | DOCTOR (kendi) |
+
+### 5.9 Audit Log
+
+| Method | Endpoint | Açıklama | Erişim |
+|---|---|---|---|
+| GET | `/audit-logs` | Logları listele | OWNER |
+| GET | `/audit-logs/:entityType/:entityId` | Entity bazlı log | OWNER |
+
+---
+
+## 6. Randevu Çakışma Algoritması — Detaylı Tasarım
+
+En kritik modül olan randevu sistemi için **3 katmanlı savunma** stratejisi:
+
+### Katman 1: Application-Level Kontrol
+
+```typescript
+// appointment-conflict.service.ts — Pseudocode
+
+async checkAvailability(
+  clinicId: string,
+  doctorId: string,
+  startTime: Date,
+  endTime: Date,
+  excludeAppointmentId?: string
+): Promise<{ available: boolean; conflicts: Appointment[] }> {
+
+  const conflicts = await prisma.appointment.findMany({
+    where: {
+      clinic_id: clinicId,
+      doctor_id: doctorId,
+      status: { in: ['HOLD', 'CONFIRMED'] },
+      id: excludeAppointmentId ? { not: excludeAppointmentId } : undefined,
+      // Overlap kontrolü: A.start < B.end AND A.end > B.start
+      start_time: { lt: endTime },
+      end_time: { gt: startTime },
+    },
+  });
+
+  return {
+    available: conflicts.length === 0,
+    conflicts,
+  };
+}
+```
+
+### Katman 2: PostgreSQL Exclusion Constraint (Nihai Güvenlik)
+
+```sql
+-- Veritabanı seviyesinde overlap kesinlikle engellenir
+ALTER TABLE appointments ADD CONSTRAINT no_overlap_confirmed
+  EXCLUDE USING gist (
+    clinic_id WITH =,
+    doctor_id WITH =,
+    tstzrange(start_time, end_time) WITH &&
+  )
+  WHERE (status IN ('HOLD', 'CONFIRMED'));
+```
+
+Concurrent iki request aynı slota yazarsa, ikincisi **DB exception** alır — uygulama bunu yakalar ve kullanıcıya "slot dolu" yanıtı döner.
+
+### Katman 3: Advisory Lock (Yüksek Yoğunluk Senaryosu)
+
+```typescript
+// Aynı doktor+gün kombinasyonu için serialization
+async createAppointmentSafe(dto: CreateAppointmentDto) {
+  const lockKey = this.generateLockKey(dto.doctorId, dto.startTime);
+
+  return await this.prisma.$transaction(async (tx) => {
+    // 1. Advisory lock al (aynı doktor-gün için seri işlem)
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockKey})`;
+
+    // 2. Application-level kontrol
+    const available = await this.checkAvailability(
+      dto.clinicId, dto.doctorId, dto.startTime, dto.endTime
+    );
+    if (!available) throw new ConflictException('Slot dolu');
+
+    // 3. INSERT (DB constraint son savunma hattı)
+    return await tx.appointment.create({ data: { ...dto, status: 'HOLD' } });
+
+    // 4. Transaction commit → advisory lock otomatik release
+  });
+}
+
+private generateLockKey(doctorId: string, date: Date): number {
+  // UUID'den deterministik integer üret (doktor + gün bazlı)
+  const hash = createHash('md5')
+    .update(`${doctorId}-${date.toISOString().split('T')[0]}`)
+    .digest();
+  return hash.readInt32BE(0);
+}
+```
+
+### Hold → Timeout Akışı
+
+```mermaid
+stateDiagram-v2
+    [*] --> HOLD: Randevu oluştur
+    HOLD --> CONFIRMED: Onayla (hold süresi içinde)
+    HOLD --> CANCELLED: Manuel iptal
+    HOLD --> CANCELLED: Hold süresi doldu (BullMQ job)
+    CONFIRMED --> COMPLETED: Randevu tamamlandı
+    CONFIRMED --> CANCELLED: İptal edildi
+    CONFIRMED --> NO_SHOW: Hasta gelmedi
+    COMPLETED --> [*]
+    CANCELLED --> [*]
+    NO_SHOW --> [*]
+```
+
+**BullMQ Hold Timeout İşleyici:**
+
+```typescript
+// appointment-hold.processor.ts
+@Processor('appointment-hold')
+export class AppointmentHoldProcessor {
+  @Process('expire-hold')
+  async handleHoldExpiry(job: Job<{ appointmentId: string }>) {
+    const appointment = await this.prisma.appointment.findUnique({
+      where: { id: job.data.appointmentId },
+    });
+
+    if (appointment?.status === 'HOLD') {
+      await this.prisma.appointment.update({
+        where: { id: appointment.id },
+        data: { status: 'CANCELLED', cancel_reason: 'HOLD_EXPIRED' },
+      });
+      // Event emit → bildirim gönderilebilir
+      this.eventEmitter.emit('appointment.holdExpired', appointment);
+    }
+  }
+}
+```
+
+Randevu `HOLD` olarak oluşturulduğunda:
+```typescript
+await this.holdQueue.add('expire-hold',
+  { appointmentId: appointment.id },
+  { delay: HOLD_DURATION_MS } // ör: 15 dakika = 900_000 ms
+);
+```
+
+---
+
+## 7. Sprint Bazlı Geliştirme Planı
+
+### Sprint 0 — Altyapı (1 hafta)
+
+- [x] Proje scaffolding (NestJS + Prisma + Docker Compose)
+- [x] PostgreSQL, Redis container'ları
+- [x] Prisma schema + ilk migration
+- [x] Environment config yönetimi
+- [x] Global exception filter, validation pipe
+- [x] Logger (Pino) kurulumu
+- [x] Swagger/OpenAPI kurulumu
+
+### Sprint 1 — Auth & Multi-Tenant (1.5 hafta)
+
+- [ ] JWT auth (access + refresh token)
+- [ ] Klinik (tenant) kaydı
+- [ ] Kullanıcı CRUD
+- [ ] Tenant context interceptor (her request'e `clinic_id` enjekte)
+- [ ] Role-based access guard
+- [ ] Audit log interceptor
+- [ ] Unit testler
+
+### Sprint 2 — Hasta Yönetimi (1 hafta)
+
+- [ ] Hasta CRUD
+- [ ] Arama & filtreleme (isim, telefon)
+- [ ] Pagination
+- [ ] Dosya ek metadata kayıt (upload sonra)
+- [ ] Testler
+
+### Sprint 3 — Randevu Sistemi (2 hafta) ⭐
+
+- [ ] Doktor takvim yönetimi
+- [ ] Müsait slot hesaplama
+- [ ] Randevu oluşturma (HOLD) + çakışma kontrolü
+- [ ] HOLD → CONFIRM akışı
+- [ ] BullMQ hold timeout
+- [ ] İptal, no-show, complete akışları
+- [ ] Exclusion constraint + advisory lock
+- [ ] Concurrency testleri
+- [ ] Integration testler
+
+### Sprint 4 — WhatsApp Mesajlaşma (1.5 hafta)
+
+- [ ] Webhook endpoint + verification
+- [ ] Idempotent mesaj kayıt
+- [ ] Konuşma yönetimi
+- [ ] Mesaj gönderme (mock client)
+- [ ] Socket.IO gateway (realtime inbox)
+- [ ] BOT/HUMAN mode switch
+- [ ] Testler
+
+### Sprint 5 — Finans & Klinik Notu (1 hafta)
+
+- [ ] Ödeme CRUD
+- [ ] Hasta bakiye hesaplama
+- [ ] Randevu-ödeme ilişkilendirme
+- [ ] Klinik notu CRUD
+- [ ] Rol bazlı görünürlük
+- [ ] Testler
+
+### Sprint 6 — Entegrasyon & Polish (1 hafta)
+
+- [ ] End-to-end test senaryoları
+- [ ] Seed data (demo klinik)
+- [ ] API dokümantasyonu tamamlama
+- [ ] Error handling review
+- [ ] Performance test (randevu concurrency)
+- [ ] README + setup dokümantasyonu
+
+**Toplam Tahmini Süre: 8–9 hafta**
+
+---
+
+## 8. Risk Analizi
+
+| # | Risk | Etki | Olasılık | Azaltma Stratejisi |
+|---|---|---|---|---|
+| 1 | **Randevu çakışması (race condition)** | 🔴 Kritik | Orta | 3 katmanlı savunma: app check → advisory lock → DB exclusion constraint |
+| 2 | **Tenant veri sızıntısı** | 🔴 Kritik | Düşük | Tenant guard her request'te çalışır, RLS ikinci savunma, integration test ile doğrulama |
+| 3 | **Webhook duplicate mesajlar** | 🟡 Orta | Yüksek | `wa_message_id` üzerinde unique index, upsert pattern |
+| 4 | **Hold timeout güvenilirliği** | 🟡 Orta | Düşük | Redis persistence, BullMQ retry politikası, cron-based sweep (backup) |
+| 5 | **JWT token çalınması** | 🟡 Orta | Düşük | Kısa access token ömrü (15dk), refresh token rotation, logout'ta blacklist |
+| 6 | **Yanlış timezone hesaplamaları** | 🟡 Orta | Orta | Tüm tarihler UTC, clinic.timezone'a göre sadece display katmanında dönüşüm |
+| 7 | **Meta API rate limit / değişiklik** | 🟡 Orta | Orta | Mock client, retry logic, circuit breaker pattern |
+| 8 | **PostgreSQL connection pool tükenmesi** | 🟠 Düşük | Düşük | PgBouncer (ileride), Prisma connection pool config, advisory lock timeout |
+| 9 | **Dosya depolama ölçeği** | 🟠 Düşük | Düşük | Metadata-first tasarım, storage abstraction layer, S3-ready interface |
+| 10 | **Single point of failure (monolit)** | 🟠 Düşük | Orta | Modül sınırları net, event-driven iletişim, ileride ayrıştırılabilir |
+
+### Azaltıcı Mimari Kararlar
+
+1. **Idempotency**: Webhook'lar ve ödeme işlemleri idempotent key ile korunur.
+2. **Optimistic vs Pessimistic Lock**: Randevu sistemi pessimistic (advisory lock) — çünkü çakışma maliyeti yüksek.
+3. **Graceful Degradation**: WhatsApp servisi çökse bile core randevu sistemi çalışmaya devam eder.
+4. **Backup Cron**: BullMQ job kaybı durumunda, her 5 dakikada `HOLD` süresi dolmuş randevuları tarayan bir cron.
+
+---
+
+## Verification Plan
+
+Bu bir mimari tasarım dokümanı olduğundan, kod seviyesinde test yerine aşağıdaki doğrulama adımları uygulanacaktır:
+
+### Uygulama Sırasında Otomatik Testler
+- Her modül için **unit test** (Jest) — service katmanı
+- Randevu çakışma modülü için **concurrency integration test** — paralel request'lerle race condition testi
+- Tenant izolasyonu için **cross-tenant access test** — farklı tenant token'ları ile yanlış veriye erişilemediğini doğrulama
+- Webhook idempotency için **duplicate message test**
+
+### Manuel Doğrulama
+- Docker Compose ile local ortamda tüm servislerin ayağa kalkması
+- Swagger UI üzerinden tüm endpoint'lerin çağrılabilirliğinin test edilmesi
+- Seed data ile demo klinik oluşturulup, temel akışların (kayıt → giriş → hasta ekle → randevu al → onayla) manuel doğrulanması

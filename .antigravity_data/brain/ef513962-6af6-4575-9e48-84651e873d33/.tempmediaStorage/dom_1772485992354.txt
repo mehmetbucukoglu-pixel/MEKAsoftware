@@ -1,0 +1,67 @@
+KlinikApp
+Demo Diş Kliniği
+[0] (84,143)<a href='/dashboard' />
+	[1] (56,143)<span >Ana Sayfa />
+[2] (84,201)<a href='/appointments' />
+	[3] (49,201)<span >Takvim />
+[4] (84,259)<a href='/tasks' />
+	[5] (9,259)<div  />
+	[6] (60,259)<span >İşler/Panom />
+[7] (84,317)<a href='/messages' />
+	[8] (52,317)<span >Mesajlar />
+	[9] (147,317)<span >3 />
+[10] (84,376)<a href='/patients' />
+	[11] (52,376)<span >Hastalar />
+[12] (84,434)<a href='/finance' />
+	[13] (48,434)<span >Finans />
+[14] (84,492)<a href='/notes' />
+	[15] (47,492)<span >Notlar />
+[16] (84,863)<a href='/settings' />
+	[17] (49,863)<span >Ayarlar />
+A
+Y
+Ahmet
+Yılmaz
+Admin
+[18] (144,943)<button class='btn-icon btn-ghost' title='Çıkış Yap' />
+Demo Diş Kliniği
+İşler/Panom
+[19] (397,37)<button class='btn-icon' />
+	[20] (388,37)<span >Hızlı Arama />
+	[21] (431,37)<span >Ctrl K />
+[22] (973,37)<button class='btn-icon' />
+Bildirimler
+Bildiriminiz bulunmuyor.
+[23] (880,260)<button >Kapat />
+[24] (585,538)<div scrollable='true' />
+	KlinikApp
+	Demo Diş Kliniği
+	[25] (269,251)<a href='/dashboard' />
+		[26] (241,251)<span >Ana Sayfa />
+	[27] (269,309)<a href='/appointments' />
+		[28] (234,309)<span >Takvim />
+	[29] (269,368)<a href='/tasks' />
+		[30] (194,368)<div  />
+		[31] (245,368)<span >İşler/Panom />
+	[32] (269,426)<a href='/messages' />
+		[33] (237,426)<span >Mesajlar />
+		[34] (332,426)<span >3 />
+	[35] (269,484)<a href='/patients' />
+		[36] (237,484)<span >Hastalar />
+	[37] (269,542)<a href='/finance' />
+		[38] (233,542)<span >Finans />
+	[39] (269,601)<a href='/notes' />
+		[40] (232,601)<span >Notlar />
+	[41] (269,972)<a href='/settings' />
+		[42] (234,972)<span >Ayarlar />
+	Demo Diş Kliniği
+	İşler/Panom
+	[43] (582,146)<button class='btn-icon' />
+		[44] (573,146)<span >Hızlı Arama />
+		[45] (615,146)<span >Ctrl K />
+	Panom & İşler
+	Liste
+	Pano (Kanban)
+	Yeni Görev
+	Yapılacaklar
+	Henüz görev bulunmuyor. Yeni bir görev ekleyin.

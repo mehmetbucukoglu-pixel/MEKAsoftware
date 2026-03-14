@@ -1,0 +1,148 @@
+# Codebase Analysis: Cognitive Load & Bug/Performance Fixes
+
+## Part A: Cognitive Load Suggestions (for discussion)
+
+The sidebar currently has **8 navigation items** plus Ayarlar. For a psychotherapy clinic MVP, some can be merged or hidden:
+
+### Suggestion 1: Merge "Notlar" into patient detail
+"Notlar" as a top-level page competes with the patient canvas. Clinical notes are already accessible from each patient's detail page. Removing a standalone Notes page reduces sidebar clutter.
+
+### Suggestion 2: Merge "İstatistikler" and "Finans"
+Both show numeric data. "Finans" has income/expenses and "İstatistikler" has visit analytics. These could become two tabs on a single "Raporlar" (Reports) page, reducing one nav item.
+
+### Suggestion 3: Simplify Dashboard
+Dashboard currently shows 4 KPI cards + 3 sections (today's appointments, quick actions, recent patients). The "Hızlı İşlemler" quick-actions panel duplicates what the sidebar already does. It could be removed, giving more space to today's schedule.
+
+### Suggestion 4: Collapse "Mesajlar" into a modal/drawer
+If messaging is secondary for a psychotherapy clinic, it could live as a floating widget rather than a full page, freeing a nav slot.
+
+### Suggested final sidebar (5 items):
+1. **Ana Sayfa** (Dashboard)
+2. **Takvim** (Appointments)
+3. **Hastalar** (Patients)
+4. **Raporlar** (merged Finance + Statistics, tabbed)
+5. **İşler/Panom** (Tasks)
+
+With Mesajlar as a bottom icon and Notlar accessible only from patient detail.
+
+---
+
+## Part B: Bugs & Performance Fixes (direct plan)
+
+### 🐛 Bugs
+
+---
+
+#### [BUG-1] Hardcoded "Okunmamış Mesajlar" count on Dashboard
+
+[dashboard/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/dashboard/page.tsx#L46)
+
+```typescript
+value: '3', // Mock for now
+```
+
+**Fix:** Fetch actual unread count from messaging API, or remove this card until the backend supports it.
+
+---
+
+#### [BUG-2] `date-fns` import unused: `startOfDay`, `endOfDay`, `subDays` in statistics service
+
+[statistics.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/statistics/statistics.service.ts#L3)
+
+Only `startOfMonth` and `endOfMonth` are used. `startOfDay`, `endOfDay`, `subDays`, and [format](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/statistics/page.tsx#95-98) are imported but [format](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/statistics/page.tsx#95-98) is used; the others may cause lint warnings.
+
+**Fix:** Clean up to `import { format, startOfMonth, endOfMonth } from 'date-fns'`.
+
+---
+
+#### [BUG-3] Finance [getSummary](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#236-237) uses [(this.prisma as any).expense](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#175-176)
+
+[finance.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/finance/finance.service.ts#L64)
+
+The `as any` cast bypasses type checking entirely. If the Expense model changes or is removed, this will silently fail at runtime with no compile-time warning.
+
+**Fix:** Use `this.prisma.expense.findMany(...)` directly (Expense is in the Prisma schema). Remove the `as any` cast.
+
+---
+
+#### [BUG-4] No error handling for invalid date strings in statistics API
+
+[statistics.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/statistics/statistics.service.ts)
+
+[parseDateRange](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/statistics/statistics.service.ts#169-177) calls `new Date(filters.startDate)` without validation. Invalid strings produce `Invalid Date`, causing silent query failures.
+
+**Fix:** Add `isValid` check from date-fns before constructing the range.
+
+---
+
+### ⚡ Performance Inefficiencies
+
+---
+
+#### [PERF-1] [getPatientBalance](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#237-238) fetches ALL payments into memory
+
+[finance.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/finance/finance.service.ts#L34-L43)
+
+Fetches every payment for a patient, then filters in JS. For patients with hundreds of payments, this fetches all rows needlessly.
+
+**Fix:** Use Prisma `aggregate` with conditional sum:
+```typescript
+const [paid, refunded] = await Promise.all([
+    this.prisma.payment.aggregate({
+        where: { clinicId, patientId, paymentType: 'PAYMENT' },
+        _sum: { amount: true },
+    }),
+    this.prisma.payment.aggregate({
+        where: { clinicId, patientId, paymentType: 'REFUND' },
+        _sum: { amount: true },
+    }),
+]);
+```
+
+---
+
+#### [PERF-2] [getSummary](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#236-237) fetches ALL payments & expenses into memory
+
+[finance.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/finance/finance.service.ts#L62-L72)
+
+Same pattern: pulls every record then filters/reduces in JS. As transaction count grows, this becomes O(n) memory.
+
+**Fix:** Use `groupBy` and `aggregate` queries to compute totals at the database level.
+
+---
+
+#### [PERF-3] Statistics [getOverview](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/statistics/statistics.controller.ts#20-28) makes 8 parallel DB queries
+
+[statistics.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/statistics/statistics.service.ts#L21-L63)
+
+8 separate `Promise.all` calls. Some can be combined (e.g., a single `groupBy` on [status](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/patients/%5Bid%5D/page.tsx#142-151) replaces 4 separate `count` queries).
+
+**Fix:** Replace multiple `count` calls with a single `groupBy`:
+```typescript
+const statusCounts = await this.prisma.appointment.groupBy({
+    by: ['status'], where, _count: { id: true },
+});
+```
+
+---
+
+#### [PERF-4] `PatientService.findOne` includes 20 appointments + 20 notes + all attachments
+
+[patient.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.service.ts#L56-L89)
+
+This is a heavy query that fetches data for ALL tabs upfront even though the user typically views only one tab at a time.
+
+**Fix:** Lazy-load tab data: fetch patient base info on initial load, then fetch appointments/notes/payments on tab switch via separate API calls.
+
+---
+
+## Verification Plan
+
+### After Bug Fixes
+- Confirm no TypeScript compile errors: `npx tsc --noEmit`
+- Test each endpoint via Swagger UI
+- Verify dashboard unread count reflects actual data
+
+### After Performance Fixes
+- Compare query plans for balance/summary endpoints before/after
+- Measure response times with `console.time` wrapping

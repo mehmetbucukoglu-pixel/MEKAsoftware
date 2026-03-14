@@ -1,0 +1,43 @@
+# Sprint 2 — Hasta Modülü İyileştirmeleri ✅
+
+## Yapılan Değişiklikler
+
+### 1. TC Kimlik No & Adres Alanları
+- **Veritabanı**: `tc_kimlik` (VARCHAR 11, zorunlu, kliniğe özel benzersiz) ve `address` (TEXT, zorunlu) eklendi
+- **Backend DTO**: 11 hane + sadece rakam validasyonu, adres min 5 karakter
+- **Frontend Form**: TC Kimlik ilk sırada, sadece rakam girişine izin veriyor. Adres textarea olarak eklendi
+
+### 2. Doktor Yetkisi
+- Hasta ekleme: `ADMIN, ASSISTANT` → `ADMIN, ASSISTANT, DOCTOR`
+- Hasta güncelleme: `ADMIN, ASSISTANT` → `ADMIN, ASSISTANT, DOCTOR`
+- Hasta silme: **Sadece ADMIN** (değişmedi)
+
+### 3. TC ile Arama
+- Arama mekanizması: isim, telefon, e-posta + **TC Kimlik No**
+
+### 4. UI Güncellemeleri
+- **Hasta listesi**: E-posta sütunu → TC Kimlik sütunu (monospace font)
+- **Hasta detay**: TC Kimlik (kart ikonu) + Adres (harita ikonu) gösterimi
+
+---
+
+## Değişen Dosyalar
+
+| Dosya | Değişiklik |
+|-------|-----------|
+| [schema.prisma](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/prisma/schema.prisma) | `tcKimlik`, `address`, `@@unique` |
+| [create-patient.dto.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/dto/create-patient.dto.ts) | TC + adres validasyonu |
+| [patient.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.service.ts) | TC arama + create alanları |
+| [patient.controller.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.controller.ts) | DOCTOR yetkisi |
+| [seed.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/prisma/seed.ts) | Demo TC + adres verileri |
+| [api.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts) | TypeScript tipleri |
+| [patient-modal.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/patient-modal.tsx) | TC + adres form alanları |
+| [page.tsx (liste)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/page.tsx) | TC Kimlik sütunu |
+| [page.tsx (detay)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/[id]/page.tsx) | TC + Adres gösterimi |
+
+## Doğrulama
+- ✅ Backend `tsc --noEmit` → 0 hata
+- ✅ `prisma db push --force-reset` → başarılı
+- ✅ `prisma db seed` → 5 demo hasta (TC + adres ile)
+- ✅ Backend çalışıyor: http://localhost:3000
+- ✅ Frontend çalışıyor: http://localhost:3001

@@ -1,0 +1,122 @@
+# Sprint 2 — Hasta Yönetimi Uygulama Planı
+
+Mevcut placeholder hasta sayfasını gerçek API entegrasyonuna geçirme, hasta ekleme/düzenleme formları ve hasta detay sayfası oluşturma.
+
+---
+
+## Mevcut Durum
+
+- **Backend**: `patient.controller.ts` ve `patient.service.ts` — temel CRUD mevcut ama DTO'lar `any` tipinde
+- **Frontend**: Mock data ile placeholder tablo, `patientApi` metotları (`api.ts`'de) hazır
+- **Prisma**: `Patient` modeli tüm alanlarla hazır (firstName, lastName, phone, email, dateOfBirth, gender, notes, metadata)
+
+---
+
+## Proposed Changes
+
+### Backend — DTO & Validation
+
+#### [NEW] [create-patient.dto.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/dto/create-patient.dto.ts)
+- `firstName` (required, string, min 2)
+- `lastName` (required, string, min 2)  
+- `phone` (required, string)
+- `email` (optional, email format)
+- `dateOfBirth` (optional, date string)
+- `gender` (optional, enum: MALE/FEMALE/OTHER)
+- `notes` (optional, string)
+
+#### [NEW] [update-patient.dto.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/dto/update-patient.dto.ts)
+- `PartialType(CreatePatientDto)` — tüm alanlar opsiyonel
+
+---
+
+#### [MODIFY] [patient.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.service.ts)
+- `create()` ve `update()` — `any` → DTO tipi
+- `findAll()` — `email` alanına da arama ekleme
+- `update()` — `updatedAt` güncelleme
+
+#### [MODIFY] [patient.controller.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.controller.ts)
+- `@Body()` parametreleri → DTO tipi
+- `@Roles('ADMIN', 'ASSISTANT')` — create/update için
+- Swagger `@ApiBody` dekoratörleri
+
+---
+
+### Frontend — Hasta Listesi
+
+#### [MODIFY] [page.tsx (patients)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/page.tsx)
+Mevcut mock data sayfası tamamen yeniden yazılacak:
+- `patientApi.list()` ile gerçek API çağrısı
+- Debounced arama (300ms)
+- Sayfalama kontrolü (ileri/geri, toplam sayfa)
+- Loading state (spinner/skeleton)
+- Empty state (hasta yoksa bilgi mesajı)
+- "Yeni Hasta" butonu → modal açar
+- Tablo satırına tıklayınca → `/patients/[id]` detay sayfası
+- Her satırda avatar (isim baş harfleri), ad soyad, telefon, cinsiyet badge, son ziyaret
+
+---
+
+### Frontend — Hasta Ekleme/Düzenleme Modal
+
+#### [NEW] [patient-modal.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/patient-modal.tsx)
+- Overlay + centered modal
+- Form alanları: Ad, Soyad, Telefon, E-posta, Doğum Tarihi, Cinsiyet (select), Notlar (textarea)
+- Client-side validasyon (ad/soyad min 2 char, telefon zorunlu)
+- Düzenleme modunda mevcut veriler doldurulur
+- Submit → `patientApi.create()` veya `patientApi.update()`
+- Başarı/hata toast bildirimi
+- Modal kapandığında liste otomatik yenilenir
+
+---
+
+### Frontend — Hasta Detay Sayfası
+
+#### [NEW] [page.tsx (patient detail)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/[id]/page.tsx)
+- `patientApi.get(id)` ile hasta + ilişkili verileri çek
+- Hasta bilgi kartı (ad, soyad, telefon, email, doğum tarihi, cinsiyet, notlar)
+- Düzenle butonu → modal açar
+- Tab yapısı:
+  - **Randevular**: Geçmiş randevular tablo (tarih, doktor, durum badge)
+  - **Notlar**: Klinik notları listesi (tarih, başlık, not tipi badge)
+- Geri butonu → `/patients`
+
+---
+
+### Frontend — Design System Eklemeleri
+
+#### [MODIFY] [globals.css](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/globals.css)
+- `.modal-overlay` ve `.modal` stilleri (glassmorphism)
+- `.toast` bildirimi (success/error, otomatik kaybolur)
+- `.tabs` ve `.tab-active` stilleri
+- `.pagination` stilleri
+- `.select` form kontrolü
+- `.textarea` form kontrolü
+
+---
+
+### Frontend — API Client
+
+#### [MODIFY] [api.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts)
+- `patientApi.delete()` metodu ekleme (soft delete)
+- TypeScript tipleri: `Patient`, `PatientListResponse` interfaceleri
+
+---
+
+## Verification Plan
+
+### Otomatik Kontroller
+1. **Backend TypeScript derleme**: `cd klinikapp/backend && npx tsc --noEmit`
+2. **Frontend build kontrolü**: `cd klinikapp/frontend && npx next build` (hata yoksa OK)
+
+### Browser Testi (Manuel)
+1. Frontend dev server başlat: `cd klinikapp/frontend && npm run dev -- -p 3001`
+2. `http://localhost:3001/patients` — hasta listesi sayfası açılır
+3. Sayfa açıldığında loading spinner görünür, ardından tablo veya empty state
+4. Arama kutusuna yazarak filtreleme çalışır
+5. "Yeni Hasta" butonu → modal açılır, form doldurulur, kaydet butonuna basılır
+6. Tablo satırına tıklayınca detay sayfası açılır
+7. Detay sayfasında hasta bilgileri, randevular ve notlar tabs olarak görünür
+
+> [!NOTE]
+> Backend bağlantısı olmadan frontend dev server açılabilir, ama API çağrıları hata verir. Tam akış testi için `docker compose up -d` ve `npm run start:dev` ile backend'in çalışması gerekir.

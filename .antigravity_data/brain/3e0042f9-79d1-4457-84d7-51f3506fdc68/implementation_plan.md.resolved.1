@@ -1,0 +1,42 @@
+# Implementation Plan - Agent Stability and Hosting Guidance
+
+This plan addresses the user's concern about "agent termination" and provides a roadmap for "hosting" the KlinikApp project.
+
+## Agent Stability (Termination)
+
+The user noticed that **Gemini 3 Pro High** often terminates while **Gemini 3 Flash** is stable. This is likely because the "Pro" model performs significantly more complex reasoning and can hit output length or timeout limits.
+
+**Proposed Mitigation:**
+- **Incremental Execution**: I will perform only 1-2 tool calls per turn when using heavier models to avoid "exploding" the context or hitting timeouts.
+- **Background Tasks**: Always use `-d` for Docker and avoid `npm run dev` in the foreground.
+
+## Hosting Strategy
+
+As an AI agent, I cannot "host" the application (i.e., provide a public URL) directly. I can only run it on your local machine or help you deploy it to a hosting provider.
+
+### 1. Local Hosting (Development)
+We will ensure the app runs correctly on your machine:
+- **Database/Redis**: `docker-compose up -d`
+- **Backend**: `npm run start:dev` (NestJS)
+- **Frontend**: `npm run dev` (Next.js)
+
+### 2. Remote Hosting (Production)
+If you want others to access it via a URL, I suggest:
+- **Frontend**: Deploy to [Vercel](https://vercel.com) (optimized for Next.js).
+- **Backend/DB**: Deploy to [Render](https://render.com), [Railway](https://railway.app), or a VPS (DigitalOcean/Hetzner).
+
+## Proposed Changes
+
+### [Documentation]
+#### [MODIFY] [README.md](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/README.md)
+Update the README to include frontend setup instructions since it's now part of the project.
+
+## Verification Plan
+
+### Automated Tests
+- No new automated tests planned yet. Existing Prisma migrations and builds will be checked.
+
+### Manual Verification
+1.  **Backend Check**: Run `curl http://localhost:3000/api/docs` (or similar) to ensure NestJS is alive.
+2.  **Frontend Check**: Navigate to `http://localhost:3001` (typical Next.js port if 3000 is taken) to verify the UI.
+3.  **Docker Check**: Run `docker ps` to ensure `klinikapp-db` and `klinikapp-redis` are healthy.

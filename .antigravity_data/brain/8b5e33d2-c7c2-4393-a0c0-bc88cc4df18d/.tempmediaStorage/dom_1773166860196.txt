@@ -1,0 +1,16 @@
+MEKA
+Klinik yönetim paneline giriş yapın
+Giriş başarısız. Bilgilerinizi kontrol edin.
+[0] (500,422)<label class='label'>E-posta />
+[1] (500,473)<input class='input' id='email' placeholder='ornek@klinik.com' />
+[2] (500,536)<label class='label'>Şifre />
+[3] (500,587)<input class='input' id='password' placeholder='••••••••' />
+[4] (600,587)<button  />
+[5] (500,680)<button class='btn btn-primary btn-lg'>Giriş Yap />
+Demo Giriş Bilgileri
+Admin:
+admin@demo.com / Admin123!
+Doktor:
+doctor@demo.com / Doctor123!
+Asistan:
+asistan@demo.com / Assist123!

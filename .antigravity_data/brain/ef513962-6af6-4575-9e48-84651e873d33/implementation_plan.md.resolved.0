@@ -1,0 +1,44 @@
+# Messaging System Fixes
+
+Fix duplicate messages (2x) and cross-chat leakage in the WhatsApp messaging module.
+
+## User Review Required
+
+> [!NOTE]
+> I will be switching to conversation-specific rooms for real-time messages. This will improve performance and eliminate cross-chat leakage.
+
+## Proposed Changes
+
+---
+
+### Backend Components
+
+#### [MODIFY] [socket.gateway.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/common/gateways/socket.gateway.ts)
+- Add room support for specific conversations.
+- Deduplicate emissions where possible.
+
+#### [MODIFY] [messaging.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.service.ts)
+- Refine message emission logic.
+- Separate "list update" events from "new message" events for better isolation.
+- Use conversation rooms for `new_message` events.
+
+---
+
+### Frontend Components
+
+#### [MODIFY] [page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/messages/page.tsx)
+- Join/Leave conversation rooms on selection.
+- Improve message deduplication in [handleSendMessage](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/messages/page.tsx#101-110) and socket listeners.
+- Prevent race conditions between API response and socket events.
+
+## Verification Plan
+
+### Automated Tests
+- No specific automated tests exist for sockets currently, but I will verify via browser interactions.
+
+### Manual Verification
+1.  Open two tabs with the same user.
+2.  Send a message from Tab A.
+3.  Verify Tab A shows 1 message (no duplicate).
+4.  Verify Tab B shows 1 message.
+5.  Switch to a different conversation in Tab B and verify messages from the first conversation do not appear there.

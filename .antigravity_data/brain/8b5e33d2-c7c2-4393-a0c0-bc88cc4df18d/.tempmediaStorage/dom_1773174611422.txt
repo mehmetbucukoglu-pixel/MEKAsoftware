@@ -1,0 +1,94 @@
+<current_dom_explanation>
+This is a temporary snapshot of the current page's DOM structure. The DOM will change if you navigate to or interact with another page. Use a tool like browser_get_dom to capture and preserve the DOM in your trajectory if needed for later reference.
+</current_dom_explanation>
+<current_dom>
+[0] (66,131)<a href='/dashboard' />
+	[1] (56,131)<span >Ana Sayfa />
+[2] (66,189)<a href='/appointments' />
+	[3] (49,189)<span >Takvim />
+[4] (66,247)<a href='/tasks' />
+	[5] (9,247)<div  />
+	[6] (59,247)<span >Workspace />
+[7] (66,306)<a href='/patients' />
+	[8] (52,306)<span >Hastalar />
+[9] (66,364)<a href='/messages' />
+	[10] (52,364)<span >Mesajlar />
+[11] (66,422)<a href='/reports' />
+	[12] (52,422)<span >Raporlar />
+[13] (66,863)<button title='Menüyü Daralt' />
+	[14] (47,863)<span >Daralt />
+[15] (66,943)<button >A
+Y />
+	A
+	Y
+	[16] (72,943)<div  />
+		[17] (72,931)<div >Ahmet
+Yılmaz />
+		[18] (72,956)<div >Admin />
+Workspace
+[19] (281,43)<button class='inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5'>Sidebar'ı Kapat />
+[20] (901,43)<button class='btn-icon' title='Klavye Kısayolları (Ctrl+/)' />
+	[21] (890,43)<span >Kısayollar />
+	[22] (932,43)<kbd >Ctrl+/ />
+[23] (973,43)<button class='btn-icon' />
+[24] (229,123)<input placeholder='Sayfalarda ara...' />
+[25] (229,189)<div  />
+	[26] (193,189)<div  />
+		[27] (196,189)<span >Son Açılanlar />
+		[28] (238,189)<span >3 />
+[29] (229,238)<div role='button' />
+	[30] (149,238)<button class='grip-handle' role='button' />
+	[31] (168,238)<div  />
+	[32] (240,238)<div  />
+		[33] (240,238)<div >Yeni Çalışma Alanı />
+	[34] (308,238)<button class='del-handle' title='Sil' />
+[35] (229,296)<div role='button' />
+	[36] (149,296)<button class='grip-handle' role='button' />
+	[37] (168,296)<div  />
+	[38] (240,296)<div  />
+		[39] (240,296)<div >Yeni Çalışma Alanı />
+	[40] (308,296)<button class='del-handle' title='Sil' />
+[41] (229,354)<div role='button' />
+	[42] (149,354)<button class='grip-handle' role='button' />
+	[43] (168,354)<div  />
+	[44] (240,354)<div  />
+		[45] (240,354)<div >Yeni Çalışma Alanı />
+	[46] (308,354)<button class='del-handle' title='Sil' />
+[47] (229,406)<div  />
+	[48] (171,406)<div  />
+		[49] (175,406)<span >Özel />
+		[50] (194,406)<span >4 />
+	[51] (310,406)<button title='Yeni sayfa' />
+[52] (229,456)<div role='button' />
+	[53] (149,456)<button class='grip-handle' role='button' />
+	[54] (168,456)<div  />
+	[55] (240,456)<div  />
+		[56] (240,456)<div >HASTA TAKIBI />
+	[57] (308,456)<button class='del-handle' title='Sil' />
+[58] (229,514)<div role='button' />
+	[59] (149,514)<button class='grip-handle' role='button' />
+	[60] (168,514)<div  />
+	[61] (240,514)<div  />
+		[62] (240,514)<div >Yeni Çalışma Alanı />
+	[63] (308,514)<button class='del-handle' title='Sil' />
+[64] (229,572)<div role='button' />
+	[65] (149,572)<button class='grip-handle' role='button' />
+	[66] (168,572)<div  />
+	[67] (240,572)<div  />
+		[68] (240,572)<div >Yeni Çalışma Alanı />
+	[69] (308,572)<button class='del-handle' title='Sil' />
+[70] (229,631)<div role='button' />
+	[71] (149,631)<button class='grip-handle' role='button' />
+	[72] (168,631)<div  />
+	[73] (240,631)<div  />
+		[74] (240,631)<div >Yeni Çalışma Alanı />
+	[75] (308,631)<button class='del-handle' title='Sil' />
+[76] (229,689)<button  />
+	[77] (195,689)<span >Yeni Teamspace />
+[78] (229,961)<button >Yeni Sayfa />
+Demo Diş Kliniği
+Sol taraftaki menüden bir doküman seçin veya yeni bir boş çalışma alanı oluşturarak ekibinizle ortak notlar ve görevler eklemeye başlayın.
+[79] (664,664)<button class='inline-flex shrink-0 items-center justify-center text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 py-2 has-[>svg]:px-3 mt-8 rounded-full shadow-md gap-2 px-6'>Hemen Başla />
+[80] (977,951)<button aria-label='Open Tanstack query devtools' class='tsqd-open-btn' />
+
+</current_dom>

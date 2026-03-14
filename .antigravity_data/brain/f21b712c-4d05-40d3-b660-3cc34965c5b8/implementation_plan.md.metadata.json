@@ -1,0 +1,6 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "Updated v2 architecture design for KlinikApp - a multi-tenant clinic management PWA. Incorporates user decisions: 3 roles (ADMIN, DOCTOR, ASSISTANT), direct CONFIRMED status for appointments (HOLD removed), WhatsApp Business API via n8n, dashboard, in-app notifications, Excel patient import, Turkish-only UI. Covers tech stack (NestJS + Next.js + PostgreSQL), database schema (14 tables), module structure, 45+ API endpoints, 3-layer appointment conflict algorithm, n8n integration plan, 7-sprint development plan (~8-9 weeks), and risk analysis.",
+  "updatedAt":  "2026-02-28T20:49:38.555765600Z",
+  "version":  "1"
+}

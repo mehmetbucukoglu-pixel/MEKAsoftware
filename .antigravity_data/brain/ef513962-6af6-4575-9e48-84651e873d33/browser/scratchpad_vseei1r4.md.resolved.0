@@ -1,0 +1,10 @@
+# KlinikApp - Klinik Not Ekleme ve Doğrulama
+- [ ] 1. Navigate to `http://localhost:3001/patients`
+- [ ] 2. Select 'Zeynep Arslan'
+- [ ] 3. Go to 'Klinik Notlar' tab
+- [ ] 4. Click 'Klinik Not Ekle'
+- [ ] 5. Enter Title: 'Rutin Kontrol', Content: 'Hastanın genel durumu iyi. Diş temizliği yapıldı.'
+- [ ] 6. Save the note
+- [ ] 7. Navigate to `http://localhost:3001/notes`
+- [ ] 8. Verify the note 'Rutin Kontrol' for 'Zeynep Arslan' is listed
+- [ ] 9. Capture a screenshot of the global notes page

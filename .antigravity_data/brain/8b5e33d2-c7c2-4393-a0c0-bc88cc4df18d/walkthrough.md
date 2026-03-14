@@ -1,0 +1,62 @@
+# UI Refinements Walkthrough
+
+## Changes Made
+
+### 1. Global Header (64px)
+Increased header height from 56px to 64px across all pages for better visual balance. The header now also renders `headerActions` alongside the title, enabling page-specific controls (toggles, tabs) to live in the header bar.
+
+### 2. Dashboard
+- **Header**: Shows the current date only (e.g. "10 Mart 2026 Salı")
+- **Page**: "Merhaba, Ahmet! 👋" greeting displayed locally in page content
+
+### 3. Patients
+- **Removed**: Top "Yeni Hasta" button bar
+- **Changed**: Empty state "İlk Hastayı Ekle" → "Yeni Hasta" + "Silinen Hastalar" side by side
+
+### March 10, 2026: UI Refinements, Navigation & Performance Fixes
+* **Global Header Centralization**: Moved page titles ("Anasayfa", "Workspace", "Takvim", vb.) into the global header. Relocated page-specific actions (like toggles) to the global header action area.
+* **Workspace Cleanup**: Renamed "İşler/Panom" to "Workspace", removed the secondary sidebar header, and placed the sidebar toggle directly in the top header.
+* **Dashboard KPIs**: Added 5 new KPI card options (Bugünkü Gelir, Bekleyen Ödeme, vs.) to the dashboard and enforced a maximum of 4 selectable cards to reduce cognitive load. The KPI edit button was moved inline with the greeting text.
+* **Onboarding & Accessibility**: Implemented a 5-step `localStorage`-based Onboarding Tour for new users. Replaced the static header Quick Search with a "Kısayollar" (Shortcuts) toggle button that opens a cheat sheet modal (`Ctrl+/`). Shortcuts include `Ctrl+K` (Search), `Alt+N` (New Patient), and `Alt+R` (New Appointment).
+* **Performance Enhancements**: 
+    * Responded to user reports of slow initial loads (lazy load issues) in Dev mode.
+    * **Fixed Hydration Errors**: Discovered a critical `Hydration Error` in the `WorkspaceSidebar` (`<button>` inside `<button>`) which was forcing React to synchronously discard SSR markup and re-render the entire app on the client. Resolving this removed the extreme delays during page transitions.
+    * **Lazy Loading Components**: Used `next/dynamic` (`ssr: false`) to lazy-load the `OnboardingTooltips` and `ShortcutCheatSheet` components in `layout.tsx`. This defers their execution until after the critical page paint is complete, speeding up initial rendering.
+    * Added a basic `manifest.json` to quiet noisy `404` errors in the console. 
+    * Debugged all recent components via the browser subagent to ensure no silent errors were breaking interactivity.
+
+![Verify Header Refactor (Version 2)](/C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/verify_header_refactor_v2_1773167041540.webp)
+![Dashboard Header Verification](/C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/dashboard_header_verification_1773167584314.png)
+![Verify All UI Changes](/C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/verify_all_ui_changes_1773168343821.webp)
+
+### 4. Appointments
+- **Header**: View toggle ("Doktor Sütunları" / "Takvim") moved to header
+- **Removed**: "Yeni Randevu" button
+
+### 5. Workspace (formerly İşler/Panom)
+- **Sidebar**: Renamed "İşler/Panom" → "Workspace"
+- **Header**: Shows "Workspace" title
+- **Page**: Empty state shows clinic name ("Demo Diş Kliniği") instead of "Çalışma Alanı"
+
+### 6. Messages
+- **Header**: Shows "Mesajlar" only, no sub-header/description
+
+### 7. Reports
+- **Header**: Shows "Raporlar" with Finans/İstatistikler tab toggle
+- **Sub-pages**: Finance and Statistics titles rendered locally in page content (no longer override global header)
+
+## Verification
+
+All changes verified in browser at `localhost:3001`:
+
+````carousel
+![Dashboard — date in header, greeting in content](/C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/dashboard_overview.png)
+<!-- slide -->
+![Patients — Yeni Hasta + Silinen Hastalar in empty state](/C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/patients_empty_state.png)
+<!-- slide -->
+![Workspace — clinic name, sidebar renamed](/C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/workspace_clinic_name.png)
+<!-- slide -->
+![Messages — clean header, no sub-header](/C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/messages_clean_header.png)
+<!-- slide -->
+![Reports — Finans/İstatistikler toggle in header](/C:/Users/Lenovo/.gemini/antigravity/brain/8b5e33d2-c7c2-4393-a0c0-bc88cc4df18d/reports_toggle.png)
+````

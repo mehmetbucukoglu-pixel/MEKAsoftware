@@ -1,0 +1,10 @@
+# Task Checklist
+- [ ] Open http://localhost:3001/tasks
+- [ ] Observe UI (content visibility, sidebar overlap, editor background)
+- [ ] Take full-page screenshot
+- [ ] Check console for errors (especially 500 on 'Yeni Döküman')
+- [ ] Summarize findings
+
+# Progress & Findings
+- Attempted to open http://localhost:3001/tasks twice, both timed out with "browser connection is reset".
+- Browser seems to have issues connecting to the local server.

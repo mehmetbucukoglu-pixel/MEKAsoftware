@@ -1,0 +1,12 @@
+KlinikApp
+Klinik yönetim paneline giriş yapın
+E-posta
+Şifre
+Giriş Yap
+Demo Giriş Bilgileri
+Admin:
+admin@demo.com / Admin123!
+Doktor:
+doctor@demo.com / Doctor123!
+Asistan:
+asistan@demo.com / Assist123!

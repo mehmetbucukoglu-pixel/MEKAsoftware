@@ -1,0 +1,24 @@
+# Sprint 5: Finance, Notes, Dashboard (incl. Accountant Access)
+# Sprint 5: Finance & Dashboard Implementation
+- [x] RBAC: Add ACCOUNTANT role and update permissions
+- [x] Sprint 5: Refactoring, UX & Advanced Messaging
+    - [x] Backend: Extract Finance, Expense logic (Sprint 6 preparation)
+    - [x] Backend: Add Clinical notes (Global list support)
+    - [x] Frontend: Create Finance management page
+    - [x] Frontend: Global Clinical notes management page
+    - [x] Frontend: Enhance Patient Detail with history & balances
+    - [x] Verification: Test role isolation and data flow
+- [x] Sprint 6: Advanced Finance Analytics & Expense Management
+    - [x] Database: Update schema with [Expense](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#132-141) model
+    - [x] Backend: Create Expense module (CRUD)
+    - [x] Backend: Update Finance analytics (Weekly, Monthly, 3-Month)
+    - [x] Frontend: Add Expense management UI
+    - [x] Frontend: Implement Advanced Analytics views
+    - [x] Feature: Automated Variable Cost Calculator (Patient/Doctor based)
+- [x] Sprint 7: Team Task Management (Panom / İşler)
+    - [x] Database: Add [Task](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/taskApi.ts#16-35) and [TaskComment](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/taskApi.ts#9-15) models
+    - [x] Backend: Create Task module (CRUD, Assignment)
+    - [x] Backend: Integrate with Notification system
+    - [x] Frontend: Create modern List/Kanban Views
+    - [x] Frontend: Implement Sidebar detail with comments
+    - [x] Frontend: Add Quick task creation UX

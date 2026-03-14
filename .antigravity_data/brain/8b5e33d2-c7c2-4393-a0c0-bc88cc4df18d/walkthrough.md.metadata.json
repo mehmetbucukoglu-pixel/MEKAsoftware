@@ -1,0 +1,6 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_WALKTHROUGH",
+  "summary":  "Walkthrough documenting the UI refinement changes made across the KlinikApp frontend, including header height increase, sidebar rename, and page-specific title/action reorganization.",
+  "updatedAt":  "2026-03-10T18:52:11.417897100Z",
+  "version":  "1"
+}

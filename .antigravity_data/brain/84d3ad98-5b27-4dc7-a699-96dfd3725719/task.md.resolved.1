@@ -1,0 +1,9 @@
+# Patient Detail Page Optimization
+
+- [/] Fix render-time `setActiveTab` causing infinite re-render (line 181)
+- [/] Fix stale closure in drag/resize useEffect (missing deps)
+- [/] Add React.memo to CanvasBlockItem to prevent cascade re-renders
+- [/] Optimize FloatingToolbar (throttle selectionchange)
+- [/] Use useRef for drag/resize onChange to avoid stale closures
+- [/] Optimize canvas save (debounce is good, but avoid triggering during drag)
+- [ ] Verify in browser

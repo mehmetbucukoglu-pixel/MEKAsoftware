@@ -1,0 +1,22 @@
+# Sprint 5: Finance, Notes, Dashboard (incl. Accountant Access)
+
+- [x] Planning
+    - [x] Analyze requirements
+    - [x] Create implementation plan
+- [x] Role Integration
+    - [x] Update `UserRole` in database (ACCOUNTANT)
+    - [/] Review RBAC (Role Based Access Control) for Finance
+- [/] Backend Implementation
+    - [/] Update `RolesGuard` to support `ACCOUNTANT`
+    - [/] Create Finance module (CRUD for payments)
+    - [ ] Create Clinical Notes module (CRUD for doctor notes)
+    - [ ] Implement Dashboard service (Daily summary stats)
+    - [ ] Implement Dashboard service (Daily summary stats)
+- [ ] Frontend Implementation
+    - [ ] Create Finance page (Payment list & record payment)
+    - [ ] Create Patient Clinical History view
+    - [ ] Create Dashboard overview
+- [ ] Verification
+    - [ ] Test payment recording and balance calculation
+    - [ ] Test clinical note creation and visibility
+    - [ ] Verify dashboard statistics

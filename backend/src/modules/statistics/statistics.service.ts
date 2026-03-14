@@ -1,0 +1,188 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { format, startOfMonth, endOfMonth, isValid } from 'date-fns';
+
+interface DateFilter {
+    startDate?: string;
+    endDate?: string;
+    doctorId?: string;
+}
+
+@Injectable()
+export class StatisticsService {
+    constructor(private prisma: PrismaService) { }
+
+    async getOverview(clinicId: string, filters: DateFilter) {
+        const { start, end } = this.parseDateRange(filters);
+        const where: any = {
+            clinicId,
+            startTime: { gte: start, lte: end },
+        };
+        if (filters.doctorId) where.doctorId = filters.doctorId;
+
+        const [
+            statusCounts,
+            activePatients,
+            completedWithTimes,
+            doctorStats,
+        ] = await Promise.all([
+            // Group by status
+            this.prisma.appointment.groupBy({
+                by: ['status'],
+                where,
+                _count: { id: true },
+            }),
+            // Unique patients in range
+            this.prisma.appointment.findMany({
+                where: { ...where, status: { not: 'CANCELLED' } },
+                select: { patientId: true },
+                distinct: ['patientId'],
+            }),
+            // Completed appointments with arrival & completion times (for avg duration)
+            this.prisma.appointment.findMany({
+                where: {
+                    ...where,
+                    status: 'COMPLETED',
+                    arrivedAt: { not: null },
+                    completedAt: { not: null },
+                },
+                select: { arrivedAt: true, completedAt: true },
+            }),
+            // Doctor breakdown
+            this.prisma.appointment.groupBy({
+                by: ['doctorId'],
+                where: { ...where, status: { not: 'CANCELLED' } },
+                _count: { id: true },
+            }),
+        ]);
+
+        let totalAppointments = 0;
+        let arrivedCount = 0;
+        let completedCount = 0;
+        let cancelledCount = 0;
+        let noShowCount = 0;
+
+        for (const group of statusCounts) {
+            const count = group._count.id;
+            totalAppointments += count;
+            if (group.status === 'ARRIVED') arrivedCount += count;
+            if (group.status === 'COMPLETED') completedCount += count;
+            if (group.status === 'CANCELLED') cancelledCount += count;
+            if (group.status === 'NO_SHOW') noShowCount += count;
+        }
+
+        // Calculate average session duration
+        let avgSessionMinutes = 0;
+        if (completedWithTimes.length > 0) {
+            const totalMinutes = completedWithTimes.reduce((sum, apt) => {
+                const diff = (apt.completedAt!.getTime() - apt.arrivedAt!.getTime()) / (1000 * 60);
+                return sum + diff;
+            }, 0);
+            avgSessionMinutes = Math.round(totalMinutes / completedWithTimes.length);
+        }
+
+        // No-show rate
+        const totalNonCancelled = totalAppointments - cancelledCount;
+        const noShowRate = totalNonCancelled > 0 ? Math.round((noShowCount / totalNonCancelled) * 100) : 0;
+
+        // Fetch doctor names
+        const doctorIds = doctorStats.map(d => d.doctorId);
+        const doctors = await this.prisma.user.findMany({
+            where: { id: { in: doctorIds } },
+            select: { id: true, firstName: true, lastName: true },
+        });
+        const doctorMap = new Map(doctors.map(d => [d.id, `${d.firstName} ${d.lastName}`]));
+
+        const doctorBreakdown = doctorStats.map(d => ({
+            doctorId: d.doctorId,
+            doctorName: doctorMap.get(d.doctorId) || 'Bilinmiyor',
+            count: d._count.id,
+        }));
+
+        return {
+            totalAppointments,
+            checkedIn: arrivedCount + completedCount, // total who arrived
+            completed: completedCount,
+            cancelled: cancelledCount,
+            noShow: noShowCount,
+            noShowRate,
+            uniquePatients: activePatients.length,
+            avgSessionMinutes,
+            doctorBreakdown,
+        };
+    }
+
+    async getVisitStats(clinicId: string, filters: DateFilter) {
+        const { start, end } = this.parseDateRange(filters);
+        const where: any = {
+            clinicId,
+            startTime: { gte: start, lte: end },
+            status: { not: 'CANCELLED' },
+        };
+        if (filters.doctorId) where.doctorId = filters.doctorId;
+
+        const appointments = await this.prisma.appointment.findMany({
+            where,
+            select: {
+                startTime: true,
+                status: true,
+                arrivedAt: true,
+                completedAt: true,
+            },
+            orderBy: { startTime: 'asc' },
+        });
+
+        // Daily visit counts
+        const dailyMap = new Map<string, { date: string; visits: number; completed: number; noShow: number }>();
+        for (const apt of appointments) {
+            const dateKey = format(apt.startTime, 'yyyy-MM-dd');
+            const existing = dailyMap.get(dateKey) || { date: dateKey, visits: 0, completed: 0, noShow: 0 };
+            existing.visits++;
+            if (apt.status === 'COMPLETED') existing.completed++;
+            if (apt.status === 'NO_SHOW') existing.noShow++;
+            dailyMap.set(dateKey, existing);
+        }
+
+        // Hourly distribution (0-23)
+        const hourly = new Array(24).fill(0);
+        for (const apt of appointments) {
+            const hour = apt.startTime.getHours();
+            hourly[hour]++;
+        }
+
+        return {
+            daily: Array.from(dailyMap.values()),
+            hourly: hourly.map((count, hour) => ({ hour, count })),
+        };
+    }
+
+    async getRecentVisits(clinicId: string, limit: number) {
+        return this.prisma.appointment.findMany({
+            where: {
+                clinicId,
+                status: { in: ['ARRIVED', 'COMPLETED'] },
+            },
+            include: {
+                patient: { select: { id: true, firstName: true, lastName: true } },
+                doctor: { select: { id: true, firstName: true, lastName: true } },
+            },
+            orderBy: { arrivedAt: { sort: 'desc', nulls: 'last' } },
+            take: limit,
+        });
+    }
+
+    // --- Helpers ---
+
+    private parseDateRange(filters: DateFilter) {
+        if (filters.startDate && filters.endDate) {
+            const startDate = new Date(filters.startDate);
+            const endDate = new Date(filters.endDate);
+            if (isValid(startDate) && isValid(endDate)) {
+                return { start: startDate, end: endDate };
+            }
+        }
+        // Default: current month
+        const now = new Date();
+        return { start: startOfMonth(now), end: endOfMonth(now) };
+    }
+}

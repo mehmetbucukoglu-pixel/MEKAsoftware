@@ -1,0 +1,9 @@
+# Task UI Verification Progress
+
+- [ ] Open `http://localhost:3001/tasks`
+- [ ] Verify `TaskList` and `TaskRow` rendering
+- [ ] Test 'Yeni döküman' button
+- [ ] Test inline task creation ('+ Yeni görev...')
+- [ ] Test task checkbox toggle
+- [ ] Take screenshot of the task panel
+- [ ] Final report

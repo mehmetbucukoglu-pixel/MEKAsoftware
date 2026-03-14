@@ -1,0 +1,53 @@
+# Messaging System Enhancements (Sprint 4)
+
+Enhance the WhatsApp messaging module with error handling, media support, read receipts, search, and bot handoff.
+
+## User Review Required
+
+> [!IMPORTANT]
+> - **Search**: I will implement a search that looks through both patient names and message content.
+> - **Bot Handoff**: Switching back to BOT mode will trigger an automated message to the user.
+> - **Media**: Rendering support for Images, PDFs, and Audio will be added.
+
+## Proposed Changes
+
+---
+
+### Backend Components
+
+#### [MODIFY] [messaging.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.service.ts)
+- Update [getConversations](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.service.ts#17-47) to support `search` query (name, phone, message content).
+- Add `handleStatusUpdate` to update message status (DELIVERED, READ) and emit `message_status_updated` socket event.
+- Update [switchMode](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.service.ts#221-246) to send an automated "Bot Devreye Girdi" message when switching back to BOT.
+
+#### [MODIFY] [messaging.controller.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.controller.ts)
+- Support `@Query('search')` in [getConversations](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.service.ts#17-47).
+- Add `@Post('webhooks/whatsapp/status')` for status updates.
+
+---
+
+### Frontend Components
+
+#### [MODIFY] [page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/messages/page.tsx)
+- Pass search state to `ConversationList`.
+- Implement `message_status_updated` socket listener.
+- Enhance [handleSendMessage](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/messages/page.tsx#120-136) to handle local error state and provide a `retry` mechanism.
+
+#### [MODIFY] [conversation-list.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/messaging/conversation-list.tsx)
+- Add a search input field at the top of the list.
+
+#### [MODIFY] [chat-window.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/messaging/chat-window.tsx)
+- Update message rendering to show `FAILED` status and a retry button.
+- Implement better rendering for non-image media (PDF, Audio, Video).
+- Use blue hooks for `READ` status.
+
+## Verification Plan
+
+### Automated Tests
+- No automated tests currently.
+
+### Manual Verification
+1.  **Search**: Type a name or message fragment in the sidebar search.
+2.  **Error Handling**: Simulate a network failure when sending a message and verify the "Retry" button appears.
+3.  **Bot Handoff**: Switch to HUMAN then back to BOT, verify the auto-message appears.
+4.  **Read Receipts**: Mock a 'READ' status update for a message and verify the ticks turn blue.

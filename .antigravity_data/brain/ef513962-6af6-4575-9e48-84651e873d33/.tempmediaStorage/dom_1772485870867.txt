@@ -1,0 +1,42 @@
+KlinikApp
+Demo Diş Kliniği
+Ana Sayfa
+Takvim
+İşler/Panom
+Mesajlar
+3
+Hastalar
+Finans
+Notlar
+Ayarlar
+A
+Y
+Ahmet
+Yılmaz
+Admin
+Demo Diş Kliniği
+İşler/Panom
+Hızlı Arama
+Ctrl K
+[0] (585,538)<div scrollable='true' />
+	KlinikApp
+	Demo Diş Kliniği
+	Ana Sayfa
+	Takvim
+	İşler/Panom
+	Mesajlar
+	3
+	Hastalar
+	Finans
+	Notlar
+	Ayarlar
+	Demo Diş Kliniği
+	İşler/Panom
+	Hızlı Arama
+	Ctrl K
+	Panom & İşler
+	Liste
+	Pano (Kanban)
+	Yeni Görev
+	Yapılacaklar
+	Henüz görev bulunmuyor. Yeni bir görev ekleyin.

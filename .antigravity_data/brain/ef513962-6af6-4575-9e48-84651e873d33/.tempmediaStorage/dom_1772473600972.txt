@@ -1,0 +1,69 @@
+KlinikApp
+Demo Diş Kliniği
+Ana Sayfa
+Takvim
+Mesajlar
+3
+Hastalar
+Finans
+Notlar
+Ayarlar
+A
+Y
+Ahmet
+Yılmaz
+Admin
+Demo Diş Kliniği
+Finans
+Hızlı Arama
+Ctrl K
+Finans Yönetimi 💰
+Gelir, gider ve tahsilat takibi
+Yeni Tahsilat
+Toplam Tahsilat
+₺
+7.000
+Toplam İade
+₺
+0
+Net Ciro
+₺
+7.000
+Filtrele
+Tarih
+Hasta
+Tür
+Yöntem
+Açıklama
+Tutar
+02 Mar 2026
+Zeynep
+Arslan
+Tahsilat
+Nakit
+-
+₺
+7000
+Yeni İşlem Kaydı
+[0] (381,280)<label >Hasta />
+[1] (500,325)<input class='input' placeholder='Hasta adı, TC veya telefon ile ara...' />
+[2] (500,401)<div  />
+	[3] (386,400)<div >Z
+A />
+	[4] (514,400)<div  />
+		[5] (514,388)<div >Zeynep
+Arslan />
+		[6] (514,414)<div  />
+			[7] (438,414)<span >TC:
+400****0004 />
+			[8] (480,414)<span >• />
+			[9] (526,414)<span >Tel:
+(555) 000 44 44 />
+İşlem Türü
+Ödeme Yöntemi
+[10] (388,500)<label >Tutar (₺) />
+[11] (500,545)<input class='input' placeholder='0,00' />
+[12] (389,612)<label >Açıklama />
+[13] (500,671)<textarea class='input' placeholder='Detaylı bilgi...' />
+[14] (432,779)<button class='btn btn-secondary'>İptal />
+[15] (568,779)<button class='btn btn-primary'>Kaydet />

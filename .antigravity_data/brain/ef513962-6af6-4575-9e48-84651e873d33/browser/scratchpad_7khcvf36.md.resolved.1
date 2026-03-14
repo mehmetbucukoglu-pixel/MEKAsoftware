@@ -1,0 +1,12 @@
+# Tasks
+- [/] Navigate to http://localhost:3001/notes (Empty but navigated)
+- [ ] Verify clinical notes are listed (Failed: API returns 403)
+- [ ] Search for 'Zeynep' and verify filtering
+- [ ] Filter by 'Türler' -> 'Reçeteler' and verify
+- [ ] Verify 'Hastaya Git' link and doctor's name for each note
+- [ ] Capture a screenshot of the notes list
+
+# Findings
+- Navigated to `/notes`, but it shows "Gösterilecek klinik not bulunamadı."
+- Attempted to add a note for patient "Zeynep Arslan", but received a 403 Forbidden error from the backend API `POST /api/v1/clinical-notes`.
+- Logs show both 401 and 403 errors.

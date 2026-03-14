@@ -1,0 +1,28 @@
+# Sprint 5: Finance, Notes, Dashboard (incl. Accountant Access)
+- [x] RBAC: Add ACCOUNTANT role and update permissions
+- [x] Sprint 5: Refactoring, UX & Advanced Messaging
+    - [x] Backend: Extract Finance, Expense logic (Sprint 6 preparation)
+    - [x] Backend: Add Clinical notes (Global list support)
+    - [x] Frontend: Create Finance management page
+    - [x] Frontend: Global Clinical notes management page
+    - [x] Frontend: Enhance Patient Detail with history & balances
+    - [x] Verification: Test role isolation and data flow
+- [x] Sprint 6: Advanced Finance Analytics & Expense Management
+    - [x] Database: Update schema with `Expense` model
+    - [x] Backend: Create Expense module (CRUD)
+    - [x] Backend: Update Finance analytics (Weekly, Monthly, 3-Month)
+    - [x] Frontend: Add Expense management UI
+    - [x] Frontend: Implement Advanced Analytics views
+    - [x] Feature: Automated Variable Cost Calculator (Patient/Doctor based)
+- [x] Sprint 7: Ortak Çalışma Alanı & Aesthetic Fix
+    - [x] Aesthetic Fix: Restore premium dark theme
+    - [x] Database: Add `WorkspaceDocument` model
+    - [x] Backend: Create Document module (CRUD)
+    - [x] Frontend: Document-style workspace UI on `/tasks`
+    - [x] Feature: Link tasks to documents
+    - [x] Verification: Test shared writing and task boards
+- [/] Sprint 7.1: Debugging & Refinement
+    - [/] Debug: Fix document creation issue (Investigating 500 error)
+    - [/] Refine: Fix Workspace layout-height & overlaps
+    - [x] UI Fix: Correct doctor selection layout shift in Calendar
+    - [/] Verify: UI Screenshot & Document-task integration

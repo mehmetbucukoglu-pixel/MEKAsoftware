@@ -1,0 +1,84 @@
+# KlinikApp: Legendary Minimalistic UI Refactor
+
+This plan outlines the transformation of the KlinikApp frontend into a premium, state-of-the-art interface with a "Clinic Coordinator" philosophy. The focus is on high-density information, fluid interactions, and zero-flicker feedback.
+
+## User Review Required
+
+> [!IMPORTANT]
+> This refactor introduces **TanStack Query** as the primary data fetching and state management layer for the Workspace, replacing traditional `useEffect` hooks to enable **Optimistic UI**.
+
+## Proposed Changes
+
+### 🛠️ Infrastructure
+#### [NEW] Dependency Installation
+- Install `@tanstack/react-query` and `@tanstack/react-query-devtools`.
+
+#### [NEW] [query-client.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/query-client.ts)
+- Initialize a global `QueryClient` with standard defaults for a snappy SPA.
+
+#### [MODIFY] [layout.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/layout.tsx)
+- Wrap the application in a `QueryProvider`.
+
+---
+
+### 🎨 Design System
+#### [MODIFY] [globals.css](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/globals.css)
+- Implement a curated HSL/OKLCH color palette for a "premium" feel.
+- Add advanced shadow tokens and glassmorphism utilities (`.glass-morphism`).
+- Add micro-animation classes for smooth transitions.
+
+---
+
+### 🧩 Components
+#### [NEW] [detail-drawer.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/ui/detail-drawer.tsx)
+- A reusable, high-performance slide-over panel for task and patient details.
+
+#### [MODIFY] [TaskRow.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/TaskRow.tsx)
+- Redesign for 36px height (high density).
+- Integrate "Detail Drawer" trigger.
+- Add hover-triggered action buttons.
+
+#### [MODIFY] [TaskList.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/TaskList.tsx)
+- Refine the "Ghost Input" experience: seamless task creation without losing focus.
+
+---
+
+### 📄 Pages
+#### [MODIFY] [tasks/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/tasks/page.tsx)
+- Migrate from `useState` to `useQuery` for fetching documents and tasks.
+- Implement `useMutation` with **Optimistic Updates** for:
+    - Task status toggling (instant feedback).
+    - Task title editing.
+    - New task creation.
+- Implement the "Detail Drawer" as the primary interaction point for task metadata.
+
+## Notion-like Shared Workspace Implementation Plan
+
+The user requested a premium, collaborative workspace with a Notion-like layout:
+1.  **Left Sidebar:** A page menu where pages can be created, dragged & dropped to reorder, icons optionally changed.
+2.  **Right Editor:** A wide, less cramped view for the selected document. The [tasks/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/tasks/page.tsx) layout will be rewritten to be cleaner.
+3.  **Widgets (Right-Click Context Menu):** Inside the document, right-clicking opens a menu to add Widgets:
+    -   **Task Widget:** A "board-like" or simple checklist component bound to the document.
+    -   **Table Widget:** A simple data table for string inputs.
+    -   **Note Widget:** A rich text block.
+    *Implementation strategy:* The `WorkspaceDocument.content` field (currently a text string) will store a JSON structure `[{ id, type, content }]` representing these widgets.
+4.  **Collaboration:** Document creators can share their documents with other users in the clinic.
+
+### 1. Database Schema Changes (Prisma)
+-   **[WorkspaceDocument](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/workspaceApi.ts#3-16)**: Add `icon` (String), `order` (Float) to support sidebar UI. Add `collaborators` (m-n relation to `User`) to support sharing.
+-   **[Task](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/TaskList.tsx#9-15)**: Connect tasks either to the general document or store them purely as JSON inside the document's widget data. *Decision: Keep the Prisma [Task](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/TaskList.tsx#9-15) model connected to [WorkspaceDocument](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/workspaceApi.ts#3-16) but add a `widgetId` or just rely on rendering them in the "Task Widget". For simplicity and offline sync, standardizing the `content` JSON to hold all widget state (including simple tasks) is often better for a flexible canvas, BUT since we want tasks to appear in central dashboards, we should keep the [Task](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/TaskList.tsx#9-15) entity and link it to the Document.*
+
+### 2. Backend API Changes (`workspace` module)
+-   **GET /workspace/documents:** Return documents created by the user OR shared with the user. Order by `order` ASC.
+-   **PATCH /workspace/documents/:id/reorder:** New endpoint to safely update the `order` float value based on drag-and-drop.
+-   **PATCH /workspace/documents/:id/collaborators:** Endpoint to append/remove user IDs from the access list.
+
+### 3. Frontend Component Refactor ([tasks/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/tasks/page.tsx))
+-   **Layout:** Redesign with a fixed 250px left sidebar and a fluid right panel. Remove the current "cramped" 3-pane layout.
+-   **Sidebar (`dnd-kit`):** Implement `SortableContext` for dragging documents.
+-   **Editor Canvas:** Map over the parsed `doc.content` (widget array) to render React components (`NoteWidget`, `TaskWidget`, `TableWidget`).
+-   **Context Menu:** Right-click anywhere in the canvas triggers a Shadcn `ContextMenu` offering "Add Note", "Add Task List", "Add Data Table".
+
+### User Review Required
+> [!IMPORTANT]
+> The document `content` field will be repurposed to store JSON array string representing Widgets. Are you okay with migrating or clearing the current single-string document contents?

@@ -1,0 +1,21 @@
+# KlinikApp Task Strategy Uygulama Durumu
+
+"Klinikapp Task Strategy" dokümanında belirtilen **"Clinic Coordination Layer"** vizyonunun büyük bir kısmı başarıyla uygulandı. İşte mevcut durumun özeti:
+
+## ✅ Uygulanan Özellikler
+
+- **Notion-Inspired UI**: Görevler artık "Ghost Row" (boş satır üzerinden anında ekleme) yapısı ile kolayca oluşturulabiliyor.
+- **Durum Gruplama**: Görevler "Yapılacaklar" ve "Tamamlananlar" olarak kategorize edilmiş durumda.
+- **Detail Drawer (Sidebar)**: Görev detayları ve yorumlar için sağ taraftan açılan modern bir panel (`TaskDetailSidebar`) mevcut.
+- **Yüksek Yoğunluklu Tasarım**: Liste görünümü (36px satır yüksekliği) ve sade görsel dil stratejiye uygun şekilde tasarlandı.
+- **Veritabanı Esnekliği**: `Task` modeli artık dökümanlara bağımlı değil (`documentId` opsiyonel), bağımsız görevler oluşturulabiliyor.
+
+## ⚠️ Devam Eden / Bekleyen Geliştirmeler
+
+- **State Yönetimi**: Strateji dokümanında önerilen **TanStack Query (SWR)** geçişi henüz tamamlanmadı; mevcut sayfa hala standart `useEffect` kullanıyor.
+- **Tam Bağımsızlık**: `tasks/page.tsx` şu an hala döküman odaklı bir "Workspace" sayfası görünümünde. Tüm klinikteki görevleri görebileceğimiz global bir "Task Board" görünümü (Kanban vb.) henüz eklenmedi.
+- **Basitleştirilmiş Öncelik**: "Yüksek/Orta/Düşük" sistemi hala aktif; stratejide bunun daha da sadeleşmesi önerilmişti.
+
+## Kaynaklar
+- Strateji Belgesi: [klinikapp_task_strategy.md](file:///c:/Users/Lenovo/.gemini/antigravity/brain/ef513962-6af6-4575-9e48-84651e873d33/klinikapp_task_strategy.md)
+- Ana Plan: [implementation_plan.md](file:///c:/Users/Lenovo/.gemini/antigravity/brain/ef513962-6af6-4575-9e48-84651e873d33/implementation_plan.md)

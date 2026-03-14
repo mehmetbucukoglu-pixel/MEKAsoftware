@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "Klinikapp Task Redesign Strategy\nA technical and product blueprint for transforming the collaboration layer of Klinikapp. It moves away from enterprise project management towards a lightweight, Notion-inspired 'clinic coordinator' model. Covers code audit, product positioning, and a detailed refactoring plan.",
+  "updatedAt":  "2026-03-03T09:13:37.057123300Z"
+}

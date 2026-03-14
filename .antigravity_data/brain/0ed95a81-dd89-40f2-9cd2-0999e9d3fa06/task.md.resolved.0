@@ -1,0 +1,9 @@
+# Task: Local Hosting KlinikApp
+
+- [ ] Run Infrastructure (Docker) [/]
+- [ ] Install Backend Dependencies
+- [ ] Run Prisma Migrations and Seed
+- [ ] Start Backend Dev Server
+- [ ] Install Frontend Dependencies
+- [ ] Start Frontend Dev Server
+- [ ] Verify Overall Application

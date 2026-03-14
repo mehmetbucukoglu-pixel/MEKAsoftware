@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "Local development setup for KlinikApp.\n    - Start PostgreSQL and Redis via Docker.\n    - Run NestJS Backend on port 3000.\n    - Run Next.js Frontend on port 3001.",
+  "updatedAt":  "2026-03-03T16:15:30.155935100Z"
+}

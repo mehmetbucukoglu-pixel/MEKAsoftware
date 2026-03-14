@@ -1,0 +1,8 @@
+# Task: Verify Workspace Layout and Dark UI
+
+## Checklist
+- [ ] Navigate to http://localhost:3001/tasks
+- [ ] Verify UI is DARK (Premium Dark)
+- [ ] Verify Sidebar on left, "Paper" in center, Tasks on right
+- [ ] Type in the document and click "Kaydet"
+- [ ] Take final screenshot

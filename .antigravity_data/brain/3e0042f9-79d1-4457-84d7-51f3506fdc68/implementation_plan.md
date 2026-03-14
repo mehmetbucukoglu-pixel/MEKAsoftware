@@ -1,0 +1,44 @@
+# Implementation Plan - Sprint 4: Messaging Enhancements
+
+This plan details the performance, security, and UX enhancements for the Messaging module.
+
+## User Review Required
+
+> [!IMPORTANT]
+> - **Webhook Security**: We will implement `X-n8n-Secret` header validation. Please ensure n8n is configured to send this header.
+> - **Audit Logging**: All manual responses from the dashboard will be logged with the staff member's ID.
+
+## Proposed Changes
+
+### [Backend]
+
+#### [MODIFY] [schema.prisma](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/prisma/schema.prisma)
+- Added indexes for performance on `Conversation` and `Message` models.
+
+#### [MODIFY] [messaging.controller.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.controller.ts)
+- Add middleware or guard to verify `X-n8n-Secret` for the WhatsApp webhook endpoint.
+
+#### [MODIFY] [messaging.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.service.ts)
+- Add `senderId` to `sendMessage` to track who sent the message.
+- Implement patient name update logic when the bot (via n8n) sends patient metadata.
+- Integrate with `AuditLog` for manual messaging actions.
+
+### [Frontend]
+
+#### [MODIFY] [chat-window.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/messaging/chat-window.tsx)
+- Add visual status icons (Check/Checks) to each message.
+- Implement **Infinite Scroll**: Load older messages when scrolling to the top.
+- Add basic support for rendering images (if `mediaUrl` or similar is provided).
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- `npm run test:e2e` (Ensure webhook security blocks unauthorized requests).
+
+### Manual Verification
+1.  **Security**: Verify that the webhook returns 401/403 without the correct secret.
+2.  **Performance**: Check that large chat histories load smoothly with infinite scroll.
+3.  **Audit**: Check the `AuditLog` table after sending a manual message.
+4.  **UX**: Confirm status icons change as expected.

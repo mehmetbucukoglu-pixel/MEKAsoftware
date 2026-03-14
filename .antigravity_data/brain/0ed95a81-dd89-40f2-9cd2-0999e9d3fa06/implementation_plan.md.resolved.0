@@ -1,0 +1,28 @@
+# [Local Hosting KlinikApp]
+
+The user wants to host the KlinikApp locally. This involves setting up the backend (PostgreSQL, Redis, NestJS) and the frontend (Next.js).
+
+## Proposed Changes
+
+### Infrastructure
+- Run `docker-compose up -d` to start PostgreSQL and Redis.
+
+### Backend
+- Install dependencies: `npm install`
+- Run Prisma migrations: `npx prisma migrate dev`
+- Seed the database: `npx prisma db seed`
+- Start the backend: `npm run start:dev`
+
+### Frontend
+- Install dependencies: `npm install`
+- Start the frontend: `npm run dev`
+
+## Verification Plan
+
+### Automated Tests
+- Check if backend is running: `curl http://localhost:3000/health` (or similar)
+- Check if frontend is running: `curl http://localhost:3001` (default port for Next.js if 3000 is taken by backend)
+
+### Manual Verification
+- Open `http://localhost:3000/api/docs` for Swagger.
+- Open `http://localhost:3001` for the frontend.

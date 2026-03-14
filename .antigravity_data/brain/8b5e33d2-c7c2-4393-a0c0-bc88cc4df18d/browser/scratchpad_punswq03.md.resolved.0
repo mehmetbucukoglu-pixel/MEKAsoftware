@@ -1,0 +1,10 @@
+# Browser Verification Checklist
+
+- [ ] Login to `localhost:3001`
+- [ ] Verify **Global Header** (64px height)
+- [ ] Verify **Dashboard** (Header date, "Merhaba, [name]! 👋" in content)
+- [ ] Verify **Patients** (Header "Hastalar" + count, no "Yeni Hasta" button in header, empty state with "Yeni Hasta" and "Silinen Hastalar" buttons)
+- [ ] Verify **Appointments** (Header "Randevu Takvimi" + toggle buttons, no "Yeni Randevu" button)
+- [ ] Verify **Workspace** (Sidebar "Workspace", Header "Workspace", empty state with clinic name)
+- [ ] Verify **Messages** (Header "Mesajlar" only)
+- [ ] Verify **Reports** (Header "Raporlar" + Finans/İstatistikler toggle buttons, tab content with local titles)

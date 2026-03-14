@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "Full redesign of the workspace canvas and sidebar:\n1. WorkspaceEditor: Remove header/title bar, add inline document title as first block, convert to a freeform canvas where every line is directly editable. Clicking on blank canvas creates new text block. The page auto-expands vertically and horizontally as blocks are added/dragged.\n2. Widget system: Remove separate note widget concept - instead every block on the canvas defaults to text (Notion-style). Right-click context menu still available to insert task/table widgets anywhere.\n3. Freeform drag-and-drop: Blocks can be dragged to any vertical position. The canvas div uses overflow:auto and min-width/min-height that grow with content.\n4. WorkspaceSidebar: Redesign to match the messaging ConversationList panel: darker background, avatar-style team icons, cleaner document rows with subtle hover states and timestamps, matching the visual style of the messaging sidebar.",
+  "updatedAt":  "2026-03-09T17:40:45.924305500Z"
+}

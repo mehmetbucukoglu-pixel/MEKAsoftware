@@ -1,0 +1,16 @@
+{
+    "name": "KlinikApp",
+    "short_name": "KlinikApp",
+    "description": "Klinik Yönetim Sistemi",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#0891b2",
+    "icons": [
+        {
+            "src": "/favicon.ico",
+            "sizes": "any",
+            "type": "image/x-icon"
+        }
+    ]
+}

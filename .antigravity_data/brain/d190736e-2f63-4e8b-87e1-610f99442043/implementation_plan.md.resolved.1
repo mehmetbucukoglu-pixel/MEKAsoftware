@@ -1,0 +1,145 @@
+# Sprint 2 UX İyileştirmeleri — Implementation Plan
+
+9 özellik, 3 grup halinde uygulanacak: **Backend → Frontend Utility → Frontend UI**
+
+---
+
+## Grup 1: Backend Değişiklikleri
+
+### 1. Silinen Hastalar API
+
+#### [MODIFY] [patient.controller.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.controller.ts)
+- `GET /patients/deleted` — Sadece ADMIN, `isActive=false` hastaları listeler
+- `PATCH /patients/:id/restore` — Sadece ADMIN, hastayı geri aktif eder
+
+#### [MODIFY] [patient.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.service.ts)
+- `findDeleted(clinicId)` — Silinen hastaları listeler
+- `restore(clinicId, patientId)` — `isActive = true` yapar
+
+### 2. TC Duplicate Kontrol API
+
+#### [MODIFY] [patient.controller.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.controller.ts)
+- `GET /patients/check-tc?tc=12345678901` — TC'nin sistemde olup olmadığını kontrol eder
+- Cevap: `{ exists: boolean, patientName?: string }`
+
+### 3. KVKK — TC Kimlik Şifreleme (AES-256)
+
+#### [NEW] [crypto.util.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/common/utils/crypto.util.ts)
+- `encrypt(plainText)` — AES-256-GCM ile şifreler
+- `decrypt(cipherText)` — Şifre çözer
+- `hash(text)` — SHA-256 hash üretir (arama için)
+- [.env](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/.env)'de `ENCRYPTION_KEY` kullanılır (32 byte hex)
+
+#### [MODIFY] [schema.prisma](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/prisma/schema.prisma)
+- `tcKimlik` → şifreli veri (uzun string)
+- `tcKimlikHash` eklenir (arama/unique index için)
+- `@@unique([clinicId, tcKimlikHash])` olarak güncellenir
+
+#### [MODIFY] [patient.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.service.ts)
+- Create/update: TC'yi şifrele + hash hesapla
+- Read: TC'yi deşifrele
+- Search: TC aramasını hash ile yap
+
+> [!IMPORTANT]
+> KVKK şifrelemesi yapıldığında [.env](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/.env)'ye `ENCRYPTION_KEY` eklenmeli. Production'da bu key güvenli bir vault'ta tutulmalıdır.
+
+---
+
+## Grup 2: Frontend Utilities
+
+### 4. Telefon Formatlama
+
+#### [NEW] [format.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/format.ts)
+- `formatPhone("5551234567")` → [(555) 123 45 67](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#100-101)
+- `formatPhoneInput(value)` → Giriş sırasında otomatik formatlar
+- `stripPhone(formatted)` → Kaydederken temiz numara döner
+
+### 5. TC Maskeleme
+
+Aynı `format.ts` dosyasında:
+- `maskTC("12345678901")` → `123****901`
+
+### 6. Son Görüntülenen Hastalar
+
+#### [NEW] [recent-patients.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/recent-patients.ts)
+- `localStorage`'da son 5 hastayı `[{id, name, time}]` olarak tutar
+- `addRecentPatient(patient)` — Detay açıldığında çağrılır
+- `getRecentPatients()` — Dashboard'da gösterilir
+
+---
+
+## Grup 3: Frontend UI
+
+### 7. Ctrl+K Hızlı Arama + Bilgilendirme Popup
+
+#### [NEW] [quick-search.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/quick-search.tsx)
+- `Ctrl+K` ile açılan overlay modal
+- Anlık API çağrısı, hasta listesi gösterir
+- Tıklayınca hasta detaya gider
+- İlk kullanımda "💡 İpucu: Ctrl+K ile herhangi bir sayfadan hasta arayabilirsiniz" popup'ı gösterilir (localStorage ile bir kez gösterilir)
+
+#### [MODIFY] [layout.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/layout.tsx)
+- `QuickSearch` componenti entegre edilir
+- Header'da arama ikonu + "Ctrl+K" kısayol gösterimi eklenir
+
+### 8. Arama Highlight
+
+#### [NEW] [highlight.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/highlight.tsx)
+- `<Highlight text="Ali Korkmaz" query="kor" />` → Ali **Kor**kmaz (rengli)
+
+#### [MODIFY] [page.tsx (hasta listesi)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/page.tsx)
+- Ad Soyad ve TC Kimlik sütunlarında highlight kullanılır
+
+### 9. Silinen Hastalar Admin Paneli
+
+#### [NEW] [deleted/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/deleted/page.tsx)
+- Sadece ADMIN rolünde görünür
+- Silinen hastaları tablo halinde listeler
+- "Geri Al" butonu ile hastayı restore eder
+
+#### [MODIFY] [page.tsx (hasta listesi)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/page.tsx)
+- Admin için "Silinen Hastalar" link eklenir
+
+### 10. Hasta Ekleme Sonrası Yönlendirme
+
+#### [MODIFY] [patient-modal.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/patient-modal.tsx)
+- Ekleme sonrası: "✅ Hasta eklendi! → **Detaya Git** | **Randevu Oluştur** | Kapat" seçenekleri
+
+### 11. TC Duplicate Uyarısı (Form Auto-Complete)
+
+#### [MODIFY] [patient-modal.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/patient-modal.tsx)
+- TC 11 hane girildiğinde otomatik `/patients/check-tc` API çağrısı
+- Varsa: "⚠️ Bu TC ile kayıtlı hasta var: Ali Korkmaz" uyarısı
+
+### 12. Son Görüntülenen Hastalar (Dashboard)
+
+#### [MODIFY] [dashboard/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/dashboard/page.tsx)
+- "Son Görüntülenen Hastalar" kartı eklenir
+
+#### [MODIFY] [patients/[id]/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/[id]/page.tsx)
+- Hasta açıldığında `addRecentPatient()` çağrılır
+
+---
+
+## Frontend API Güncellemeleri
+
+#### [MODIFY] [api.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts)
+- `patientApi.listDeleted()` — Silinen hastaları getir
+- `patientApi.restore(id)` — Geri al
+- `patientApi.checkTC(tc)` — TC duplicate kontrol
+
+---
+
+## Doğrulama Planı
+
+### Otomatik
+- `npx tsc --noEmit` (backend) → 0 hata
+- `npx next build` (frontend) → başarılı derleme
+
+### Manuel
+- TC maskeleme listede doğru görünüyor mu?
+- Telefon formatı doğru mu?
+- Ctrl+K açılıyor mu, arama çalışıyor mu?
+- Popup bir kez gösterildikten sonra bir daha gösterilmiyor mu?
+- Silinen hasta geri alınabiliyor mu?
+- TC duplicate uyarısı çıkıyor mu?

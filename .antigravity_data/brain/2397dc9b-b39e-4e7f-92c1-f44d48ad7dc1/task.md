@@ -1,0 +1,39 @@
+# Task List
+
+- [x] Research previous frontend plans <!-- id: 0 -->
+- [x] Present the "Legendary Minimalistic UI" plan to the user <!-- id: 1 -->
+- [x] Refine the plan based on feedback <!-- id: 2 -->
+    - [x] Research current frontend state <!-- id: 4 -->
+    - [x] Draft new implementation plan <!-- id: 5 -->
+- [x] Start implementation of the approved plan <!-- id: 3 -->
+    - [x] Setup React Query infrastructure <!-- id: 6 -->
+    - [x] Refine Design System (globals.css) <!-- id: 7 -->
+    - [x] Implement Detail Drawer component <!-- id: 8 -->
+    - [x] Refactor Workspace (tasks/page.tsx) with Optimistic UI <!-- id: 9 -->
+- [x] Run application locally <!-- id: 10 -->
+    - [x] Check infrastructure (Docker, DB, Redis) <!-- id: 11 -->
+    - [x] Run Backend development server <!-- id: 12 -->
+    - [x] Run Frontend development server <!-- id: 13 -->
+
+- [/] Notion-like Shared Workspace Feature <!-- id: 14 -->
+    - [x] Update DB Schema (icon, order, collaborators) & Migrate <!-- id: 15 -->
+    - [x] Update Backend API (Workspace share, reorder, update icon) <!-- id: 16 -->
+    - [x] Refactor Frontend Layout (Left Sidebar + Right Document) <!-- id: 17 -->
+    - [x] Implement Drag & Drop Sidebar & Icon Picker <!-- id: 18 -->
+    - [x] Implement Right-Click Widget Context Menu (Task, Note, Table, Board) <!-- id: 19 -->
+    - [x] Implement Widget Renderers (Rich Text, Data Table, KanBan/Task List) <!-- id: 20 -->
+- [x] Implement Document Sharing Modal <!-- id: 21 -->
+
+- [x] Mac-like UI Adjustments & Collapsible Sidebar <!-- id: 22 -->
+
+## Phase 4: Exact Notion Replica & Teamspaces Architecture (March 3, 2026)
+- [x] **Database & Backend** <!-- id: 26 -->
+    - [x] Add `Teamspace` model to Prisma schema & Migrate <!-- id: 27 -->
+    - [x] Update Workspace service/controllers for Teamspaces CRUD <!-- id: 28 -->
+    - [x] Update `findAllDocuments` to group by Private / Teamspaces <!-- id: 29 -->
+- [x] **Frontend Full Replica** <!-- id: 30 -->
+    - [x] Update `workspaceApi.ts` for Teamspaces <!-- id: 31 -->
+    - [x] Rewrite `WorkspaceSidebar` to exact Notion DOM/CSS (`#F7F7F5`, `Recents`, `Private`, `Teamspaces`) <!-- id: 32 -->
+    - [x] Rewrite `SortableNavItem` for flat, no-border Notion styling <!-- id: 33 -->
+    - [x] Add "Create Teamspace" dialog functionality <!-- id: 34 -->
+

@@ -1,0 +1,19 @@
+# [Walkthrough - Local Hosting KlinikApp]
+
+The KlinikApp has been successfully hosted locally.
+
+## What was Accomplished
+- **Infrastructure**: PostgreSQL and Redis are running in Docker containers.
+- **Backend**: NestJS server is running at [http://localhost:3000](http://localhost:3000).
+- **Frontend**: Next.js server is running at [http://localhost:3001](http://localhost:3001).
+- **Database**: Prisma migrations were applied and demo data was seeded (with minor non-critical conflicts resolved).
+
+## Verification Results
+- [x] **Backend Health**: Swagger documentation is accessible at [http://localhost:3000/api/docs](http://localhost:3000/api/docs).
+- [x] **Frontend Health**: Next.js application is serving content at [http://localhost:3001](http://localhost:3001).
+
+## Next Steps
+- You can now log in using the demo credentials:
+  - **Admin**: `admin@demo.com` / `Admin123!`
+  - **Doctor**: `doctor@demo.com` / `Doctor123!`
+  - **Assistant**: `asistan@demo.com` / `Assist123!`

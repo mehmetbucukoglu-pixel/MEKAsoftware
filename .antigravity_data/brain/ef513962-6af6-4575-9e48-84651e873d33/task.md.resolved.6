@@ -1,0 +1,19 @@
+# Messaging Enhancements Tasks
+
+- [/] Planning and Preparation
+    - [x] Analyze requirements
+    - [ ] Create detailed implementation plan
+- [ ] Backend Implementation
+    - [ ] Update [messaging.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.service.ts) for search (name/phone/content)
+    - [ ] Implement `message_status_updated` socket event for read receipts
+    - [ ] Add bot handoff auto-response in [switchMode](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/messaging/messaging.service.ts#221-246)
+    - [ ] Update WhatsApp webhook to handle 'read' status
+- [ ] Frontend Implementation
+    - [ ] Add Search Input to `ConversationList`
+    - [ ] Implement error handling UI in [ChatWindow](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/messaging/chat-window.tsx#30-229) (failed status + retry)
+    - [ ] Improve media rendering (PDF, Audio) in [ChatWindow](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/messaging/chat-window.tsx#30-229)
+    - [ ] Add socket listener for `message_status_updated`
+- [ ] Verification
+    - [ ] Test search functionality
+    - [ ] Test error recovery (failed message -> retry)
+    - [ ] Test status updates (SENT -> DELIVERED -> READ)

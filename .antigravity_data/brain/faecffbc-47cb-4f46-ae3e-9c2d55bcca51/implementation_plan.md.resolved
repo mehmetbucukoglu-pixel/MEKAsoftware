@@ -1,0 +1,148 @@
+# Takvim İyileştirmeleri — Çok Doktor Sütunu, Durum Renkleri, Tarih Aralığı
+
+Kullanıcı taleplerinin özeti:
+1. **Salı dışındaki günlerin randevuları takvimde gözükmüyor** → Backend sadece tek [date](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.controller.ts#66-69) parametresi kabul ediyor; tarih aralığı desteği yok.
+2. **Admin/Sekreter çok-doktor sütun görünümü** → Günlük takvimde her doktorun ayrı bir sütun olarak gösterilmesi.
+3. **Doktorlar kendi takvimlerini mevcut arayüz gibi görsün** → Rol bazlı ayrım.
+4. **Doktor sütun başlıkları farklı renk olsun** → Her doktora benzersiz bir başlık rengi.
+5. **Renk kodlaması:**
+   - 🔵 Mavi = CONFIRMED (Onaylandı, Bekliyor)
+   - 🔴 Kırmızı = CANCELLED (İptal)
+   - 🟢 Açık Yeşil = ARRIVED (Hasta Geldi — "Hasta Geldi" butonuyla)
+   - 🟢 Koyu Yeşil = COMPLETED (Tamamlandı — saat bitince otomatik)
+6. **Okunabilir, temiz arayüz** → FullCalendar stillerinin iyileştirilmesi.
+
+---
+
+## Proposed Changes
+
+### Backend — Tarih Aralığı Filtre Düzeltmesi
+
+#### [MODIFY] [schema.prisma](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/prisma/schema.prisma)
+
+- `AppointmentStatus` enum'a `ARRIVED` değeri eklenir.
+
+```diff
+ enum AppointmentStatus {
+   CONFIRMED
++  ARRIVED
+   CANCELLED
+   NO_SHOW
+   COMPLETED
+ }
+```
+
+#### [MODIFY] [appointment.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts)
+
+- [findAll](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts#9-43) metodu: Tek [date](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.controller.ts#66-69) yerine **`startDate` + `endDate`** kabul eder. Frontend FullCalendar'ın `datesSet` callback'inden gelen tarih aralığı doğrudan kullanılır.
+- Mevcut [date](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.controller.ts#66-69) parametresi geriye uyumluluk için korunur, ama `startDate`/`endDate` varsa onlar tercih edilir.
+
+```diff
+-if (date) {
+-  const dayStart = new Date(date);
+-  const dayEnd = new Date(date);
+-  dayEnd.setDate(dayEnd.getDate() + 1);
+-  where.startTime = { gte: dayStart, lt: dayEnd };
+-}
++if (startDate && endDate) {
++  where.startTime = { gte: new Date(startDate), lt: new Date(endDate) };
++} else if (date) {
++  const dayStart = new Date(date);
++  const dayEnd = new Date(date);
++  dayEnd.setDate(dayEnd.getDate() + 1);
++  where.startTime = { gte: dayStart, lt: dayEnd };
++}
+```
+
+#### [MODIFY] [appointment.controller.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.controller.ts)
+
+- [findAll](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts#9-43) query params'a `startDate`, `endDate` eklenir.
+- `PATCH /appointments/:id/arrived` endpoint eklenir (rol: ADMIN, ASSISTANT, DOCTOR).
+
+---
+
+### Frontend — Tarih Aralığı ve API
+
+#### [MODIFY] [api.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts)
+
+- `Appointment['status']` type'a `ARRIVED` eklenir.
+- `appointmentApi.arrived(id)` helper eklenir.
+
+---
+
+### Frontend — Takvim Sayfası (Ana Değişiklik)
+
+#### [MODIFY] [page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/appointments/page.tsx)
+
+**Bu dosya en büyük değişikliği alacak:**
+
+1. **Tarih aralığı çekimi:** [fetchAppointments](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/appointments/page.tsx#40-75) fonksiyonu `startDate` ve `endDate` ISO string'lerini backend'e gönderir.
+2. **Rol bazlı takvim görünümü:**
+   - `ADMIN` / `ASSISTANT` → Günlük görünümde Custom View: Her doktor bir sütun. FullCalendar'ın ücretsiz sürümünde `resourceTimeGrid` yok, bu yüzden **custom çok-doktor grid** React bileşeni ile gerçekleştirilir. Admin günlük takvimi ayrı bir bileşen olarak yazılacak.
+   - `DOCTOR` → Mevcut tek takvim (timeGridWeek default).
+3. **Renk kodlaması:** Event'lerin `backgroundColor` değeri statüye göre:
+   - `CONFIRMED` → `#3b82f6` (mavi)
+   - `CANCELLED` → `#ef4444` (kırmızı)
+   - `ARRIVED` → `#4ade80` (açık yeşil)
+   - `COMPLETED` → `#16a34a` (koyu yeşil)
+4. **Doktor sütun başlık renkleri:** Her doktora rotate eden bir renk paleti atanır.
+
+#### [NEW] [doctor-day-grid.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/appointments/doctor-day-grid.tsx)
+
+Admin/Sekreter için custom çok-doktor günlük takvim bileşeni:
+- Her doktor bir sütun.
+- Sütun başlıklarında doktor adı + benzersiz renk şeridi.
+- Randevular durum renklerine göre gösterilir.
+- Randevu tıklamasında modal açılır.
+- Saat satırları ve 15 dakikalık slotlar.
+
+---
+
+### Frontend — Randevu Modal
+
+#### [MODIFY] [appointment-modal.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/appointments/appointment-modal.tsx)
+
+- Durum seçeneklerine `ARRIVED` (Hasta Geldi) eklenir.
+- Admin/Asistan/Doktor rolündeki kullanıcılar için **"Hasta Geldi"** butonu eklenir (hızlı durum değişikliği).
+
+---
+
+### CSS
+
+#### [MODIFY] [globals.css](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/globals.css)
+
+- FullCalendar tema override'ları: Koyu tema uyumlu header, slotlar, event kartları.
+- Doctor-day-grid için grid stilleri.
+- `.fc-event` kartlarında okunabilirlik: Padding, font-size, border-radius ayarları.
+- Status badge renkleri.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+
+Projede halihazırda custom test dosyası bulunmuyor. Doğrulama TypeScript derleme ile yapılır:
+
+```bash
+# Backend
+cd C:\Users\Lenovo\.gemini\antigravity\scratch\klinikapp\backend
+npx tsc --noEmit
+
+# Frontend
+cd C:\Users\Lenovo\.gemini\antigravity\scratch\klinikapp\frontend
+npx tsc --noEmit
+```
+
+### Manual Verification
+
+Tarayıcı üzerinden test:
+
+1. **Admin girişi yapın** → Takvim sayfasına gidin
+   - Günlük görünümde tüm doktorların sütun sütun göründüğünü doğrulayın
+   - Her sütun başlığında doktor adı ve farklı renk şeridini kontrol edin
+2. **Haftalık/Aylık görünüme geçin** → Filtrelenmiş tüm randevuların göründüğünü doğrulayın (sadece Salı değil, tüm günler)
+3. **Mevcut bir randevuya tıklayın** → Modal açılır, "Hasta Geldi" butonu görünür
+4. **"Hasta Geldi" butonuna basın** → Randevu rengi açık yeşile döner
+5. **Bir randevuyu iptal edin** → Randevu kırmızıya döner
+6. **Doktor hesabıyla giriş yapın** → Sadece kendi takvimini gördüğünü doğrulayın (sütun yok, mevcut arayüz)

@@ -1,0 +1,562 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// TENANT (KLİNİK)
+// ==========================================
+
+model Clinic {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(255)
+  slug      String   @unique @db.VarChar(100)
+  phone     String?  @db.VarChar(20)
+  address   String?  @db.Text
+  timezone  String   @default("Europe/Istanbul") @db.VarChar(50)
+  settings  Json     @default("{}")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  users              User[]
+  patients           Patient[]
+  appointments       Appointment[]
+  doctorSchedules    DoctorSchedule[]
+  conversations      Conversation[]
+  messages           Message[]
+  payments           Payment[]
+  expenses           Expense[]
+  clinicalNotes      ClinicalNote[]
+  patientAttachments PatientAttachment[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  tasks              Task[]
+  taskComments       TaskComment[]
+  workspaceDocuments WorkspaceDocument[]
+  teamspaces         Teamspace[]
+
+  @@map("clinics")
+}
+
+// ==========================================
+// KULLANICI
+// ==========================================
+
+enum UserRole {
+  ADMIN
+  DOCTOR
+  ASSISTANT
+  ACCOUNTANT
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  clinicId     String   @map("clinic_id") @db.Uuid
+  email        String   @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  firstName    String   @map("first_name") @db.VarChar(100)
+  lastName     String   @map("last_name") @db.VarChar(100)
+  phone        String?  @db.VarChar(20)
+  role         UserRole
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  clinic              Clinic             @relation(fields: [clinicId], references: [id])
+  refreshTokens       RefreshToken[]
+  doctorSchedules     DoctorSchedule[]
+  doctorAppointments  Appointment[]      @relation("DoctorAppointments")
+  createdAppointments Appointment[]      @relation("CreatedByAppointments")
+  assignedConversations Conversation[]
+  uploadedAttachments PatientAttachment[]
+  clinicalNotes       ClinicalNote[]
+  createdPayments     Payment[]
+  createdExpenses     Expense[] @relation("CreatedExpenses")
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  createdTasks        Task[]    @relation("TaskCreator")
+  assignedTasks       Task[]    @relation("TaskAssignee")
+  taskComments        TaskComment[]
+  createdDocuments    WorkspaceDocument[] @relation("DocumentCreator")
+  sharedDocuments     WorkspaceDocument[] @relation("DocumentCollaborators")
+  
+  createdTeamspaces  Teamspace[]         @relation("TeamspaceCreator")
+  teamspaces         Teamspace[]         @relation("TeamspaceMembers")
+
+  @@unique([clinicId, email])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ==========================================
+// HASTA
+// ==========================================
+
+model Patient {
+  id          String   @id @default(uuid()) @db.Uuid
+  clinicId    String   @map("clinic_id") @db.Uuid
+  tcKimlik    String?  @map("tc_kimlik") @db.Text
+  tcKimlikHash String? @map("tc_kimlik_hash") @db.VarChar(64)
+  firstName   String   @map("first_name") @db.VarChar(100)
+  lastName    String   @map("last_name") @db.VarChar(100)
+  phone       String   @db.VarChar(20)
+  email       String?  @db.VarChar(255)
+  address     String?  @db.Text
+  dateOfBirth DateTime? @map("date_of_birth") @db.Date
+  gender      String?  @db.VarChar(10)
+  notes       String?  @db.Text
+  metadata    Json     @default("{}") // Branş spesifik genişleme
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  clinic        Clinic             @relation(fields: [clinicId], references: [id])
+  appointments  Appointment[]
+  conversations Conversation[]
+  payments      Payment[]
+  clinicalNotes ClinicalNote[]
+  attachments   PatientAttachment[]
+
+  @@unique([clinicId, tcKimlikHash])
+  @@unique([clinicId, phone])
+  @@index([clinicId, lastName, firstName], map: "idx_patients_search")
+  @@map("patients")
+}
+
+model PatientAttachment {
+  id         String   @id @default(uuid()) @db.Uuid
+  clinicId   String   @map("clinic_id") @db.Uuid
+  patientId  String   @map("patient_id") @db.Uuid
+  fileName   String   @map("file_name") @db.VarChar(255)
+  fileType   String   @map("file_type") @db.VarChar(50)
+  fileSize   Int      @map("file_size")
+  storageKey String   @map("storage_key") @db.VarChar(500)
+  uploadedBy String   @map("uploaded_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  uploader User   @relation(fields: [uploadedBy], references: [id])
+
+  @@map("patient_attachments")
+}
+
+// ==========================================
+// RANDEVU SİSTEMİ
+// ==========================================
+
+model DoctorSchedule {
+  id           String   @id @default(uuid()) @db.Uuid
+  clinicId     String   @map("clinic_id") @db.Uuid
+  doctorId     String   @map("doctor_id") @db.Uuid
+  dayOfWeek    Int      @map("day_of_week") @db.SmallInt // 0=Pazartesi, 6=Pazar
+  startTime    String   @map("start_time") @db.VarChar(5) // "09:00"
+  endTime      String   @map("end_time") @db.VarChar(5)   // "17:00"
+  breakStart   String?  @map("break_start") @db.VarChar(5) // "12:00"
+  breakEnd     String?  @map("break_end") @db.VarChar(5)   // "13:00"
+  slotDuration Int      @default(30) @map("slot_duration") @db.SmallInt // dakika
+  isActive     Boolean  @default(true) @map("is_active")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+  doctor User   @relation(fields: [doctorId], references: [id])
+
+  @@unique([clinicId, doctorId, dayOfWeek])
+  @@map("doctor_schedules")
+}
+
+enum AppointmentStatus {
+  CONFIRMED
+  ARRIVED
+  CANCELLED
+  NO_SHOW
+  COMPLETED
+}
+
+enum AppointmentSource {
+  MANUAL
+  WHATSAPP
+}
+
+model Appointment {
+  id           String            @id @default(uuid()) @db.Uuid
+  clinicId     String            @map("clinic_id") @db.Uuid
+  doctorId     String            @map("doctor_id") @db.Uuid
+  patientId    String            @map("patient_id") @db.Uuid
+  startTime    DateTime          @map("start_time") @db.Timestamptz()
+  endTime      DateTime          @map("end_time") @db.Timestamptz()
+  durationMin  Int               @map("duration_min") @db.SmallInt
+  status       AppointmentStatus @default(CONFIRMED)
+  source       AppointmentSource @default(MANUAL)
+  cancelReason String?           @map("cancel_reason") @db.Text
+  notes        String?           @db.Text
+  arrivedAt    DateTime?         @map("arrived_at") @db.Timestamptz()
+  completedAt  DateTime?         @map("completed_at") @db.Timestamptz()
+  createdBy    String?           @map("created_by") @db.Uuid // NULL = WhatsApp otomasyon
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  clinic   Clinic  @relation(fields: [clinicId], references: [id])
+  doctor   User    @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  patient  Patient @relation(fields: [patientId], references: [id])
+  creator  User?   @relation("CreatedByAppointments", fields: [createdBy], references: [id])
+  payments Payment[]
+  clinicalNotes ClinicalNote[]
+
+  // Çakışma engelleme DB seviyesinde ayrıca raw SQL migration ile eklenir
+  @@index([clinicId, doctorId, startTime, endTime])
+  @@map("appointments")
+}
+
+// ==========================================
+// WHATSAPP MESAJLAŞMA
+// ==========================================
+
+enum ConversationStatus {
+  BOT
+  HUMAN
+  CLOSED
+}
+
+model Conversation {
+  id            String             @id @default(uuid()) @db.Uuid
+  clinicId      String             @map("clinic_id") @db.Uuid
+  patientId     String?            @map("patient_id") @db.Uuid
+  waPhone       String             @map("wa_phone") @db.VarChar(20)
+  status        ConversationStatus @default(BOT)
+  assignedTo    String?            @map("assigned_to") @db.Uuid
+  lastMessageAt DateTime?          @map("last_message_at") @db.Timestamptz()
+  unreadCount   Int                @default(0) @map("unread_count")
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  clinic     Clinic    @relation(fields: [clinicId], references: [id])
+  patient    Patient?  @relation(fields: [patientId], references: [id])
+  assignee   User?     @relation(fields: [assignedTo], references: [id])
+  messages   Message[]
+
+  @@unique([clinicId, waPhone])
+  @@index([clinicId, lastMessageAt(sort: Desc)])
+  @@index([clinicId, status])
+  @@index([clinicId, assignedTo])
+  @@map("conversations")
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageContentType {
+  TEXT
+  IMAGE
+  DOCUMENT
+  AUDIO
+  VIDEO
+  TEMPLATE
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model Message {
+  id             String             @id @default(uuid()) @db.Uuid
+  clinicId       String             @map("clinic_id") @db.Uuid
+  conversationId String             @map("conversation_id") @db.Uuid
+  waMessageId    String?            @map("wa_message_id") @db.VarChar(255)
+  direction      MessageDirection
+  contentType    MessageContentType @default(TEXT) @map("content_type")
+  body           String?            @db.Text
+  mediaUrl       String?            @map("media_url") @db.VarChar(500)
+  status         MessageStatus      @default(SENT)
+  metadata       Json               @default("{}")
+  createdBy      String?            @map("created_by") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz()
+
+  clinic       Clinic       @relation(fields: [clinicId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@unique([clinicId, waMessageId])
+  @@index([conversationId, createdAt(sort: Desc)], map: "idx_messages_conversation")
+  @@index([clinicId, createdAt(sort: Desc)])
+  @@map("messages")
+}
+
+// ==========================================
+// FİNANS
+// ==========================================
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  BANK_TRANSFER
+  OTHER
+}
+
+enum PaymentType {
+  PAYMENT
+  REFUND
+}
+
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  clinicId      String        @map("clinic_id") @db.Uuid
+  patientId     String        @map("patient_id") @db.Uuid
+  appointmentId String?       @map("appointment_id") @db.Uuid
+  amount        Decimal       @db.Decimal(10, 2)
+  currency      String        @default("TRY") @db.VarChar(3)
+  paymentMethod PaymentMethod @map("payment_method")
+  paymentType   PaymentType   @default(PAYMENT) @map("payment_type")
+  description   String?       @db.Text
+  paidAt        DateTime      @default(now()) @map("paid_at") @db.Timestamptz()
+  createdBy     String        @map("created_by") @db.Uuid
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id])
+  patient     Patient      @relation(fields: [patientId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  creator     User         @relation(fields: [createdBy], references: [id])
+
+  @@index([clinicId, patientId], map: "idx_payments_patient")
+  @@map("payments")
+}
+
+// ==========================================
+// GİDERLER (MASRAFLAR)
+// ==========================================
+
+enum ExpenseCategory {
+  FIXED
+  VARIABLE
+}
+
+model Expense {
+  id          String          @id @default(uuid()) @db.Uuid
+  clinicId    String          @map("clinic_id") @db.Uuid
+  category    ExpenseCategory @default(VARIABLE)
+  amount      Decimal         @db.Decimal(10, 2)
+  currency    String          @default("TRY") @db.VarChar(3)
+  description String?         @db.Text
+  paidAt      DateTime        @default(now()) @map("paid_at") @db.Timestamptz()
+  metadata    Json            @default("{}")
+  createdBy   String          @map("created_by") @db.Uuid
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+
+  clinic  Clinic @relation(fields: [clinicId], references: [id])
+  creator User   @relation("CreatedExpenses", fields: [createdBy], references: [id])
+
+  @@index([clinicId, category, paidAt])
+  @@map("expenses")
+}
+
+// ==========================================
+// KLİNİK NOTU / REÇETE
+// ==========================================
+
+enum NoteType {
+  NOTE
+  PRESCRIPTION
+  DIAGNOSIS
+}
+
+enum NoteVisibility {
+  DOCTOR_ONLY
+  STAFF
+  ALL
+}
+
+model ClinicalNote {
+  id            String         @id @default(uuid()) @db.Uuid
+  clinicId      String         @map("clinic_id") @db.Uuid
+  patientId     String         @map("patient_id") @db.Uuid
+  appointmentId String?        @map("appointment_id") @db.Uuid
+  doctorId      String         @map("doctor_id") @db.Uuid
+  noteType      NoteType       @default(NOTE) @map("note_type")
+  title         String?        @db.VarChar(255)
+  content       String         @db.Text
+  visibility    NoteVisibility @default(DOCTOR_ONLY)
+  metadata      Json           @default("{}") // Branş spesifik
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id])
+  patient     Patient      @relation(fields: [patientId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  doctor      User         @relation(fields: [doctorId], references: [id])
+
+  @@index([clinicId, patientId], map: "idx_clinical_notes_patient")
+  @@map("clinical_notes")
+}
+
+// ==========================================
+// BİLDİRİMLER
+// ==========================================
+
+model Notification {
+  id         String   @id @default(uuid()) @db.Uuid
+  clinicId   String   @map("clinic_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  type       String   @db.VarChar(30) // NEW_APPOINTMENT, NEW_MESSAGE, etc.
+  title      String   @db.VarChar(255)
+  body       String?  @db.Text
+  entityType String?  @map("entity_type") @db.VarChar(50)
+  entityId   String?  @map("entity_id") @db.Uuid
+  isRead     Boolean  @default(false) @map("is_read")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead, createdAt(sort: Desc)], map: "idx_notifications_user")
+  @@map("notifications")
+}
+
+// ==========================================
+// AUDIT LOG
+// ==========================================
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  clinicId   String   @map("clinic_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String   @db.VarChar(50) // CREATE, UPDATE, DELETE, LOGIN
+  entityType String   @map("entity_type") @db.VarChar(50)
+  entityId   String?  @map("entity_id") @db.Uuid
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@index([clinicId, entityType, entityId], map: "idx_audit_logs_entity")
+  @@index([clinicId, createdAt(sort: Desc)], map: "idx_audit_logs_time")
+  @@map("audit_logs")
+}
+
+// ==========================================
+// EKİP İÇİ GÖREV YÖNETİMİ (TASKS)
+// ==========================================
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Task {
+  id          String       @id @default(uuid()) @db.Uuid
+  clinicId    String       @map("clinic_id") @db.Uuid
+  title       String       @db.VarChar(255)
+  description String?      @db.Text
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?    @map("due_date") @db.Timestamptz()
+  creatorId   String       @map("creator_id") @db.Uuid
+  assigneeId  String?      @map("assignee_id") @db.Uuid
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  documentId  String?      @map("document_id") @db.Uuid
+
+  clinic   Clinic             @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  creator  User               @relation("TaskCreator", fields: [creatorId], references: [id])
+  assignee User?              @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  document WorkspaceDocument? @relation(fields: [documentId], references: [id])
+  comments TaskComment[]
+
+  @@index([clinicId, status])
+  @@index([clinicId, assigneeId])
+  @@map("tasks")
+}
+
+model TaskComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  clinicId  String   @map("clinic_id") @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([taskId, createdAt(sort: Asc)])
+  @@map("task_comments")
+}
+
+model WorkspaceDocument {
+  id        String   @id @default(uuid()) @db.Uuid
+  clinicId  String   @map("clinic_id") @db.Uuid
+  title     String   @db.VarChar(255)
+  content   String   @db.Text
+  icon      String?  @db.VarChar(50)
+  order     Float    @default(0)
+  creatorId String   @map("creator_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  clinic        Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  creator       User   @relation("DocumentCreator", fields: [creatorId], references: [id])
+  collaborators User[] @relation("DocumentCollaborators")
+  
+  teamspaceId   String?    @map("teamspace_id") @db.Uuid
+  teamspace     Teamspace? @relation("TeamspaceDocuments", fields: [teamspaceId], references: [id])
+  
+  tasks         Task[]
+
+  @@map("workspace_documents")
+}
+
+// ==========================================
+// TEAMSPACE
+// ==========================================
+
+model Teamspace {
+  id          String   @id @default(uuid()) @db.Uuid
+  clinicId    String   @map("clinic_id") @db.Uuid
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  icon        String?  @db.VarChar(50)
+  creatorId   String   @map("creator_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  clinic      Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  creator     User     @relation("TeamspaceCreator", fields: [creatorId], references: [id])
+  members     User[]   @relation("TeamspaceMembers")
+  documents   WorkspaceDocument[] @relation("TeamspaceDocuments")
+
+  @@index([clinicId])
+  @@map("teamspaces")
+}

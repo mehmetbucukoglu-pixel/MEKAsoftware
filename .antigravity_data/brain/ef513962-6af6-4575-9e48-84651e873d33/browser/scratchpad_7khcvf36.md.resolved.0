@@ -1,0 +1,7 @@
+# Tasks
+- [ ] Navigate to http://localhost:3001/notes
+- [ ] Verify clinical notes are listed
+- [ ] Search for 'Zeynep' and verify filtering
+- [ ] Filter by 'Türler' -> 'Reçeteler' and verify
+- [ ] Verify 'Hastaya Git' link and doctor's name for each note
+- [ ] Capture a screenshot of the notes list

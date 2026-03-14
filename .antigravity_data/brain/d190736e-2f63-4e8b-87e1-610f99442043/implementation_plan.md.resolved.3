@@ -1,0 +1,88 @@
+# Sprint 3 Randevu Sistemi (Appointments) — Implementation Plan
+
+Sprint 3 kapsamında Randevu Sistemi entegrasyonu, klinik hekimlerinin çalışma saatlerinin ayarlanması ve gelişmiş bir Takvim UI arayüzü yapılacaktır.
+Backend altyapısı (Controller, Service, Prisma Schema) halihazırda mevcuttur ve çifre rezervasyonu (double booking conflict) kontrol etmektedir. Geliştirme tamamen **Frontend** odaklı devam edecektir.
+
+---
+
+## Aşama 1: API Tüketicileri (Frontend API Layer)
+
+### [MODIFY] [api.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts)
+- `appointmentApi` objesi eklenecek:
+  - [list(filters)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#179-180)
+  - [get(id)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#162-163)
+  - [create(data)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/clinical-note/clinical-note.service.ts#17-20)
+  - [update(id, data)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#152-153)
+  - [updateStatus(id, status)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#168-174) (CANCELLED, COMPLETED, NO_SHOW vs.)
+  - [getAvailableSlots(doctorId, date)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts#123-182)
+- `doctorScheduleApi` objesi eklenecek:
+  - [get(doctorId)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#162-163)
+  - [update(doctorId, schedules)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#152-153)
+
+---
+
+## Aşama 2: Doktor Çalışma Saatleri (Schedule)
+
+### [NEW] [settings/schedule/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/settings/schedule/page.tsx)
+- Kliniğe bağlı doktorların çalışma saatlerinin yönetileceği Admin paneli sayfası.
+- **Form Yapısı**: Pazartesiden pazara kadar (0-6 index) çalışma ve mola saatleri eklenebilecek (`startTime`, `endTime`, `breakStart`, `breakEnd`, `slotDuration`). 
+- **Zorunlu Alanlar**: Sadece çalışılan günler için `isActive: true` yapılarak kaydedilecek.
+
+---
+
+## Aşama 3: Takvim Modülü ve Randevu Sayfası (Kütüphane)
+
+Kullanıcı deneyimini hızlandırmak ve görselleştirmeyi güçlendirmek için `@fullcalendar/react` kütüphanesi kullanılacaktır. (Gün/Hafta/Ay görünümlerini standart hale getirir).
+
+### [NEW] [appointments/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/appointments/page.tsx)
+- **Görünümler**: Day, Week ve Month butonları eklenecek.
+- **Veri Çekme**: FullCalendar `events` prop'una, API'den dönen `appointments` maplenerek geçirilecek (`title`, `start`, [end](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/patients/page.tsx#86-92), `backgroundColor`).
+- Randevuların durumu renk kodlarına dönüştürülecek (örn. CONFIRMED -> mavi, COMPLETED -> yeşil, CANCELLED -> gri/kırmızı, NO_SHOW -> turuncu).
+- Sürükle-bırak (Drag&Drop) etkinleştirilerek gün/saat değişimi API isteğine (`appointmentApi.update`) bağlanacak.
+- Takvimde boş saate tıklandığında (dateClick) Randevu Ekleme Modalı açılacak.
+
+---
+
+## Aşama 4: Randevu Modal UI (Ekleme/Düzenleme)
+
+### [NEW] [appointment-modal.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/appointments/appointment-modal.tsx)
+- **Hasta Arama**: Mevcut [QuickSearch](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/quick-search.tsx#10-241) mantığı veya bir dropdown/autocomplete bileşeni ile hasta (`patientId`) seçimi.
+- **Doktor Seçimi**: `doctorId` seçimi.
+- **Tarih & Saat Dilimi Seçimi**:
+  - Tarih seçildiğinde `appointmentApi.getAvailableSlots()` çağrılarak doktorun ilgili gündeki uygun slotları getirilecek.
+  - Seçilen saat (`startTime`) ve süre (`durationMin`) backend payload'una eklenecek.
+- **Kaydetme ve Çakışma Yönetimi**: API'den `409 Conflict` gelirse (Bu zaman aralığında doktorun başka bir randevusu var), modal içinde form-error mesajı olarak gösterilecek.
+
+---
+
+## Aşama 5: Dashboard Entegrasyonu
+
+### [MODIFY] [dashboard/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/dashboard/page.tsx)
+- Mevcut `upcomingAppointments` mock değişkeni silinecek.
+- Bugüne ait randevular (`appointmentApi.list({ date: today })`) çekilerek sadece `startTime` itibariyle yaklaşan/henüz geçmemiş olanlar listelenecek.
+- Eğer onaylı ise yeşil `badge` gösterilecek.
+
+---
+
+## Aşama 6: Sprint 3 Ek Geliştirmeleri ve UI/UX (Sprint 3.5)
+
+### [MODIFY] [appointments/page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/appointments/page.tsx)
+- **Doktor Filtresi**: Takvimin üst kismina `select` eklenecek. Seçilen doktora göre randevular filtrelenecek.
+- **Sürükle & Bırak (Drag&Drop)**: FullCalendar'da `editable={true}` yapılarak `eventDrop` event'i yakalanacak. Randevu saati değiştiğinde API üzerinde `appointmentApi.update` çağrılacak. Çakışma durumunda (409) işlem `info.revert()` ile eski haline dönecek ve hata gösterilecek.
+
+### [MODIFY] [appointment-modal.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/appointments/appointment-modal.tsx)
+- **İptal Sebebi (Cancel Reason)**: Randevu durumu `CANCELLED` seçildiğinde bir `textarea` açılarak **iptal sebebi** zorunlu olarak istenecek. Bu bilgi API'ye iletilecek.
+
+---
+
+## Aşama 7: N8N (WhatsApp) Webhook Entegrasyon Altyapısı
+
+N8N'in bizimle, bizim N8N ile konuşabilmesi için çift yönlü bir iletişim kurgulayacağız. N8N, WhatsApp tan gelen "Randevu almak istiyorum" mesajlarını işleyecek; biz de randevu eklendiğinde/iptal edildiğinde N8N'e mesaj atmasını söyleyeceğiz.
+
+1. **Bizden N8N'e (Giden - Webhook / Emitter)**
+   - Backend [AppointmentService](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts#5-213) içine `@nestjs/event-emitter` modülü kurularak `appointment.created`, `appointment.cancelled` gibi event'ler fırlatılacak.
+   - Ayrı bir `Notification/WebhookService` bu event'leri dinleyecek ve N8N'in tetikleyici Webhook URL'sine HTTP POST isteği atılarak (WhatsApp API'sine mesaj attırması için) payload gönderilecek.
+
+2. **N8N'den Bize (Gelen - API)**
+   - N8N oluşturacağımız `POST /appointments/whatsapp` uç noktasına istek atarak WhatsApp üzerinden konuşarak belirlenen saat ve hastayı bize kaydedecek.
+   - Güvenlik için araya bir API Key kimlik doğrulaması eklenebilir.

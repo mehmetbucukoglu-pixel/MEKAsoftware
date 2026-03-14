@@ -1,0 +1,16 @@
+# Task: Verify Header Refactor
+
+## Plan
+1. [ ] Log in to `http://localhost:3001/login` (尝试 `admin@example.com` / `admin123`)
+2. [ ] Verify Dashboard header
+3. [ ] Verify Patients (Hastalar) header
+4. [ ] Verify Appointments (Randevu Takvimi) header
+5. [ ] Verify Finance (Finans Yönetimi) header
+6. [ ] Verify Statistics (İstatistikler) header
+7. [ ] Verify Messages (WhatsApp Inbox) header
+8. [ ] Verify Settings (Ayarlar) header
+9. [ ] Check global top header
+10. [ ] Final report
+
+## Progress
+- Initialized scratchpad.

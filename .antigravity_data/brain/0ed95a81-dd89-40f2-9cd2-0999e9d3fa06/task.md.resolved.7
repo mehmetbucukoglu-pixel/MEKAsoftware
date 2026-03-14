@@ -1,0 +1,28 @@
+# UX Overhaul & Bug/Performance Fixes
+
+## Phase 1: Sidebar & Navigation
+- [ ] Remove "Notlar" from sidebar nav
+- [ ] Merge "Finans" + "İstatistikler" → "Raporlar" (tabbed page)
+- [ ] Move "Ayarlar" to profile dropdown (with clinic name)
+- [ ] Collapsible sidebar (icon-only toggle)
+- [ ] Remove logo border/divider from top-left
+
+## Phase 2: Header & Dashboard
+- [ ] Simplify breadcrumb → just page title
+- [ ] Remove "Hızlı İşlemler" section from dashboard
+- [ ] Editable KPI cards (user picks which to show)
+
+## Phase 3: Appointment Simplification
+- [ ] Simplify status colors (CONFIRMED+ARRIVED → Bekliyor)
+
+## Phase 4: Bug Fixes
+- [ ] BUG-1: Hardcoded unread message count
+- [ ] BUG-2: Unused date-fns imports in statistics
+- [ ] BUG-3: `as any` cast in finance getSummary
+- [ ] BUG-4: No date validation in statistics
+
+## Phase 5: Performance
+- [ ] PERF-1: getPatientBalance → DB aggregate
+- [ ] PERF-2: getSummary → DB aggregate
+- [ ] PERF-3: Statistics overview → single groupBy
+- [ ] PERF-4: Patient detail → lazy-load tabs

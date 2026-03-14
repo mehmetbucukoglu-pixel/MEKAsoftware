@@ -1,0 +1,83 @@
+KlinikApp
+Demo Diş Kliniği
+[0] (84,143)<a href='/dashboard' />
+	[1] (9,143)<div  />
+	[2] (56,143)<span >Ana Sayfa />
+[3] (84,201)<a href='/appointments' />
+	[4] (49,201)<span >Takvim />
+[5] (84,259)<a href='/tasks' />
+	[6] (59,259)<span >İşler/Panom />
+[7] (84,317)<a href='/messages' />
+	[8] (52,317)<span >Mesajlar />
+	[9] (147,317)<span >3 />
+[10] (84,376)<a href='/patients' />
+	[11] (52,376)<span >Hastalar />
+[12] (84,434)<a href='/finance' />
+	[13] (48,434)<span >Finans />
+[14] (84,492)<a href='/notes' />
+	[15] (47,492)<span >Notlar />
+[16] (84,863)<a href='/settings' />
+	[17] (49,863)<span >Ayarlar />
+A
+Y
+Ahmet
+Yılmaz
+Admin
+[18] (144,943)<button class='btn-icon btn-ghost' title='Çıkış Yap' />
+Demo Diş Kliniği
+Ana Sayfa
+[19] (390,37)<button class='btn-icon' />
+	[20] (381,37)<span >Hızlı Arama />
+	[21] (423,37)<span >Ctrl K />
+[22] (973,37)<button class='btn-icon' />
+Merhaba,
+Ahmet
+! 👋
+Demo Diş Kliniği
+—
+3 Mart 2026 Salı
+[23] (281,301)<div  />
+	[24] (213,301)<div  />
+	[25] (278,301)<div  />
+		[26] (278,288)<div >1 />
+		[27] (278,321)<div >Bugünkü Randevular />
+[28] (483,301)<div  />
+	[29] (415,301)<div  />
+	[30] (480,301)<div  />
+		[31] (480,288)<div >3 />
+		[32] (480,321)<div >Okunmamış Mesajlar />
+[33] (686,301)<div  />
+	[34] (618,301)<div  />
+	[35] (669,301)<div  />
+		[36] (669,288)<div >6 />
+		[37] (669,321)<div >Toplam Hasta />
+[38] (888,301)<div  />
+	[39] (820,301)<div  />
+	[40] (872,301)<div  />
+		[41] (872,288)<div >₺7.000 />
+		[42] (872,321)<div >Aylık Net Gelir />
+Bugünkü Randevular
+[43] (399,447)<a href='/appointments'>Tümünü Gör → />
+[44] (314,527)<div  />
+	[45] (222,527)<div >08:30 />
+	[46] (311,527)<div  />
+		[47] (311,515)<div >Zeynep
+Arslan />
+		[48] (311,541)<div >Dr.
+Ahmet
+Yılmaz />
+	[49] (403,527)<span >Onaylı />
+Hızlı İşlemler
+[50] (585,515)<a class='btn btn-primary' href='/appointments'>Yeni Randevu Oluştur />
+[51] (585,585)<a class='btn btn-secondary' href='/patients'>Yeni Hasta Ekle />
+[52] (585,656)<a class='btn btn-secondary' href='/messages'>Mesajları Görüntüle />
+[53] (585,728)<a class='btn btn-secondary' href='/patients'>Hasta Listesi />
+Son Görüntülenenler
+[54] (855,522)<a href='/patients/746f5e6d-c234-4ce5-8f4d-69dc53bc04a6' />
+	[55] (758,522)<div >ZE />
+	[56] (856,522)<div >Zeynep Arslan />
+	[57] (953,522)<span >21:38 />
+[58] (855,598)<a href='/patients/e1caa845-ee5d-441d-8a22-ac0448af5518' />
+	[59] (758,598)<div >EM />
+	[60] (856,598)<div >Emre Yıldız />
+	[61] (953,598)<span >20:41 />

@@ -1,0 +1,12 @@
+# Task: Verify /tasks page appearance
+
+## Checklist
+- [ ] Navigate to http://localhost:3001/tasks
+- [ ] Verify dark mode (background, sidebar, cards)
+- [ ] Verify subtle borders (not white)
+- [ ] Verify teal/cyan "Yeni Görev" button and active menu items
+- [ ] Verify layout (no double sidebars)
+- [ ] Take final screenshot and provide summary
+
+## Findings
+- 

@@ -1,0 +1,6 @@
+# Browser Task Progress
+
+- [ ] Verify doctor selection dropdown alignment at http://localhost:3001/appointments
+- [ ] Verify sidebar-style layout at http://localhost:3001/tasks
+- [ ] Create a "Yeni Döküman" and verify it appears
+- [ ] Take screenshots of the changes

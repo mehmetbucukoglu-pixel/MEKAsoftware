@@ -1,0 +1,93 @@
+# HBYS Patient Visit Tracking & MEKA Rebranding
+
+## What Was Built
+
+### 1. HBYS-Compliant Visit Tracking (Backend)
+- Added `arrivedAt` and `completedAt` timestamp fields to the `Appointment` model
+- Auto-records check-in time when status → `ARRIVED`, check-out time when status → `COMPLETED`
+- New **Statistics Module** with 3 endpoints:
+  - `GET /statistics/overview` — KPIs (total entries, avg session, no-show rate, unique patients, doctor breakdown)
+  - `GET /statistics/visits` — Daily trend + hourly distribution data
+  - `GET /statistics/recent-visits` — Latest patient visits with times
+
+### 2. İstatistikler Page (Frontend)
+- 4 KPI cards: Toplam Giriş, Ort. Seans Süresi, Gelmeme Oranı, Aktif Hasta
+- Area chart for daily visit trends
+- Bar chart for doctor distribution
+- Hourly heatmap for clinic busyness
+- Recent visits table with check-in/check-out times and durations
+- Doctor filter and date range (7 Gün / Bu Ay / 3 Ay) controls
+
+### 3. MEKA Rebranding
+- Login page: replaced Activity icon +# KlinikApp UI/UX Refinement & Optimization Walkthrough
+
+This document summarizes the changes applied to the requested UI simplification, bug fixes, and performance optimizations.
+
+## UI/UX Simplifications
+
+1. **Sidebar Navigation Overhaul**
+   - The navigation menu has been streamlined from 8 items down to 6 core items. 
+   - *Finance* and *Statistics* sections were merged into a single **"Raporlar"** (Reports) page.
+   - Replaced text-heavy clinic name header with an optimized MEKA logo that fills the space.
+   - Introduced a collapsible sidebar capability, saving user preference in `localStorage`. 
+   - Moved the user-profile and settings access to a new user dropdown placed at the bottom-left sidebar.
+
+2. **Dashboard Customization**
+   - Removed unnecessary sections like "Hızlı İşlemler" to reduce cognitive load.
+   - Transformed KPI cards into an editable grid. Users can click "Düzenle" (Edit) and select which KPI cards are relevant to them. Their preferences are persisted in `localStorage`.
+   - Adapted the Dashboard automatically for accountant vs. doctor views, hiding non-relevant KPIs.
+
+3. **Appointment Status Colors**
+   - Consolidated 5 different appointment colors into 3 distinct logical groups in `STATUS_COLOR_MAP`.
+   - Update `StatusLegend` to make calendar interpretation straight-forward.
+
+4. **Header Layout Adjustments**
+   - Removed breadcrumbs (e.g., "Klinik Adı > Sayfa"). Only the current Page Title is displayed.
+   - Based on user feedback, the `QuickSearch` component has been shifted to the far-right corner alongside the notification bell.
+
+## Bug Fixes
+
+- **BUG-1:** Addressed hardcoded unread messages count on the dashboard by feeding dynamic values.
+- **BUG-2/4:** Reviewed and removed unused `date-fns` imports in `statistics.service.ts`. Applied robust date validation parsing using `isValid`.
+- **BUG-3:** Fixed a bug rendering an `(this.prisma as any).expense` hack in `finance.service.ts`, migrating it to properly use TypeScript inference.
+
+## Performance Optimizations
+
+- **PERF-1/2 (Database Aggregation):** Rewrote `getPatientBalance` and `getSummary` logic within `finance.service.ts`. Computations (summations, counts) previously performed in-memory via JavaScript arrays have been moved directly to Prisma's database-level aggregations (`aggregate({ _sum })`).
+- **PERF-3 (Grouping):** Upgraded `StatisticsService.getOverview` to use a single `groupBy` query on the `status` column instead of making 5 independent `count` queries to PostgreSQL.
+- **PERF-4 (Patient Loading Strategies):**
+    - Stopped eager-loading `take: 20` for nested attributes (`appointments`, `clinicalNotes`, `attachments`) in `PatientService.findOne`. Capped at 5 and leveraged `_count` aggregation heavily.
+    - Modified the **"Hastalar"** (Patients List) view to enforce a lazy-rendering approach. The table no longer preloads the entire thousands-row dataset; users must instead hit a 3-character threshold in the search input to load targeted patient records, protecting both client rendering speeds and backend fetching.
+
+## Summary of Files Touched
+```diff
++ layout.tsx (Sidebar rewrite, QuickSearch shift)
++ dashboard/page.tsx (KPIs toggles)
++ appointments/page.tsx (Status groupings)
++ patients/page.tsx & patient.service.ts (Lazy search list)
++ finance.service.ts & statistics.service.ts (DB aggregates, Date validation)
++ reports/page.tsx (New view bridging finance & statistics tabs)
+```ic name, shows only MEKA logo
+- İstatistikler nav item added to sidebar
+
+## Screenshots
+![Login Branding - MEKA Logo](c:\Users\Lenovo\.gemini\antigravity\brain\0ed95a81-dd89-40f2-9cd2-0999e9d3fa06\login_page_branding_1773148636486.png)
+![Statistics Page](c:\Users\Lenovo\.gemini\antigravity\brain\0ed95a81-dd89-40f2-9cd2-0999e9d3fa06\statistics_page_overview_1773148672603.png)
+
+## Files Changed
+
+| File | Change |
+|---|---|
+| `schema.prisma` | Added `arrivedAt`, `completedAt` to Appointment |
+| `appointment.service.ts` | Auto-set timestamps on ARRIVED/COMPLETED |
+| `statistics.module.ts` | New module |
+| `statistics.controller.ts` | New controller with 3 endpoints |
+| `statistics.service.ts` | New service with analytics queries |
+| `app.module.ts` | Registered StatisticsModule |
+| `api.ts` | Added `statisticsApi` + types |
+| `statistics/page.tsx` | New frontend page |
+| `layout.tsx` (app) | Added İstatistikler nav, removed clinic name |
+| `login/page.tsx` | MEKA branding |
+
+## Note
+Data shows zeroes because the `arrivedAt`/`completedAt` fields are newly added. As the clinic uses the check-in/check-out flow (ARRIVED → COMPLETED) going forward, the statistics will populate automatically.

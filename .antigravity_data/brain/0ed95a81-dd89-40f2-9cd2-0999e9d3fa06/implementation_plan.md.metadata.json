@@ -1,0 +1,6 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "Detailed implementation plan for UX cognitive load reduction (sidebar overhaul, dashboard editable KPIs, collapsible sidebar, simplified statuses) and bug/performance fixes across 5 phases.",
+  "updatedAt":  "2026-03-10T13:38:08.934579100Z",
+  "version":  "3"
+}

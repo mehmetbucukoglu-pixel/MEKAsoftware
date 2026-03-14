@@ -1,0 +1,10 @@
+# Task Checklist
+
+- [ ] Analyze [PageHeader](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/page-header.tsx#6-21) usage in all pages <!-- id: 0 -->
+- [ ] Refactor `patients` page actions <!-- id: 1 -->
+- [ ] Refactor `tasks` page actions <!-- id: 2 -->
+- [ ] Refactor `appointments` page actions <!-- id: 3 -->
+- [ ] Refactor `finance` page actions <!-- id: 4 -->
+- [ ] Refactor `dashboard` page actions <!-- id: 5 -->
+- [ ] Clean up [AppLayout](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/layout.tsx#31-541) and [PageHeader](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/page-header.tsx#6-21) if needed <!-- id: 6 -->
+- [ ] Final verification <!-- id: 7 -->

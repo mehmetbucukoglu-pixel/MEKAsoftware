@@ -1,0 +1,86 @@
+# UX Overhaul & Bug/Performance Fix Plan
+
+## Phase 1: Sidebar & Navigation
+
+### [MODIFY] [layout.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/layout.tsx)
+
+**Sidebar nav items** — reduce from 8 to 5:
+```
+Ana Sayfa | Takvim | İşler/Panom | Hastalar | Raporlar
+```
+- Remove "Notlar" and "Mesajlar" keeps its own slot for now
+- Merge "Finans" + "İstatistikler" → single "Raporlar" entry
+- Remove "Ayarlar" from sidebar bottom → move to profile dropdown
+
+**Profile dropdown** (bottom-left user area):
+- Click to expand: clinic name, Ayarlar link, Çıkış Yap
+- Replaces current inline logout button
+
+**Collapsible sidebar**:
+- Toggle button at sidebar bottom to collapse to ~60px icon-only strip
+- State persisted in `localStorage`
+- Smooth CSS transition
+
+**Logo area**:
+- Remove the `borderBottom` divider line under the logo
+
+---
+
+### [NEW] [reports/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/reports/page.tsx)
+
+Tabbed page with two tabs:
+- **Finans** tab — current finance page content
+- **İstatistikler** tab — current statistics page content
+
+---
+
+## Phase 2: Header & Dashboard
+
+### [MODIFY] [layout.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/layout.tsx)
+
+**Header breadcrumb** — replace `Clinic Name > Page` with just the page title.
+
+### [MODIFY] [dashboard/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/dashboard/page.tsx)
+
+- Remove "Hızlı İşlemler" section entirely
+- **Editable KPI cards**: user picks from a pool of available KPIs
+  - Pool: Bugünkü Randevular, Toplam Hasta, Aylık Gelir, Gelmeme Oranı, Ort. Seans Süresi, Okunmamış Mesajlar
+  - Selection persisted in `localStorage`
+  - Small ⚙️ gear icon on KPI row to enter edit mode → checkboxes to toggle cards
+
+---
+
+## Phase 3: Appointment Status Simplification
+
+### [MODIFY] [appointments/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/appointments/page.tsx)
+
+Simplify colors from 5 → 3 visual groups:
+| Status | Visual | Color |
+|--------|--------|-------|
+| CONFIRMED, ARRIVED | **Bekliyor** | Blue |
+| COMPLETED | **Tamamlandı** | Green |
+| CANCELLED, NO_SHOW | **İptal/Gelmedi** | Red/Orange |
+
+---
+
+## Phase 4: Bug Fixes
+
+| ID | File | Fix |
+|----|------|-----|
+| BUG-1 | `dashboard/page.tsx:46` | Remove hardcoded `'3'` → either fetch real count or hide card |
+| BUG-2 | `statistics.service.ts:3` | Remove unused `startOfDay, endOfDay, subDays` imports |
+| BUG-3 | `finance.service.ts:64` | Replace `(this.prisma as any).expense` → `this.prisma.expense` |
+| BUG-4 | `statistics.service.ts` | Add date validation in `parseDateRange` |
+
+## Phase 5: Performance
+
+| ID | File | Fix |
+|----|------|-----|
+| PERF-1 | `finance.service.ts` | `getPatientBalance` → Prisma `aggregate` |
+| PERF-2 | `finance.service.ts` | `getSummary` → DB-level `groupBy`/`aggregate` |
+| PERF-3 | `statistics.service.ts` | 8 queries → single `groupBy` for status counts |
+| PERF-4 | `patient.service.ts` | Lazy-load tab data instead of eager-loading all |
+
+## Verification
+- `npx tsc --noEmit` for type safety
+- Browser test: sidebar collapse, reports page tabs, KPI editing, profile dropdown

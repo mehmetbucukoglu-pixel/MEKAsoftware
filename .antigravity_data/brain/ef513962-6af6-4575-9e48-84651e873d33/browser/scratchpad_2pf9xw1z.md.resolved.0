@@ -1,0 +1,10 @@
+# Task Checklist
+
+- [ ] Go to http://localhost:3001/tasks and confirm the page loads.
+- [ ] Verify the document list and search area have better spacing (no overlaps).
+- [ ] Ensure a document is selected (click "Yeni Döküman Oluştur" or select an existing one).
+- [ ] In the right sidebar, click "Görev Ekle".
+- [ ] Type "Yenilenmiş Görev" and click "Ekle".
+- [ ] Confirm the task is added to the list.
+- [ ] Observe if there are any overlaps in the "DÖKÜMAN BİLGİSİ" header.
+- [ ] Take a screenshot of the final state.

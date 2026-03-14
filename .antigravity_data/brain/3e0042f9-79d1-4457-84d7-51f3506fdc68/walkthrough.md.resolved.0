@@ -1,0 +1,27 @@
+# Walkthrough - Local Hosting Setup
+
+I have successfully set up the local environment for KlinikApp. Here is a summary of the steps taken and the current status of the application.
+
+## 1. Infrastructure (Docker)
+- **PostgreSQL**: Running on `localhost:5432`
+- **Redis**: Running on `localhost:6379`
+- Services started in detached mode using `docker-compose up -d`.
+
+## 2. Database (Prisma)
+- **Schema**: Synchronized with `npx prisma db push`.
+- **Seeding**: Initial data loaded successfully.
+  - **Admin**: `admin@demo.com` / `Admin123!`
+  - **Doctor**: `doctor@demo.com` / `Doctor123!`
+  - **Asistan**: `asistan@demo.com` / `Assist123!`
+
+## 3. Application Services
+- **Backend (NestJS)**: Started on `http://localhost:3000`. You can access the API documentation at `http://localhost:3000/api/docs`.
+- **Frontend (Next.js)**: Started on `http://localhost:3001`.
+
+## Verification
+- [x] Docker containers are healthy.
+- [x] Database seeding completed without errors.
+- [x] Backend and Frontend servers are running in the background.
+
+> [!NOTE]
+> If you need to stop the servers, you can use the terminal to kill the processes or let me know to stop them for you.

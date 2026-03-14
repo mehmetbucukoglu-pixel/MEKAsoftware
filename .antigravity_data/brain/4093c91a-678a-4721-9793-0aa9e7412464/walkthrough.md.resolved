@@ -1,0 +1,37 @@
+# Sprint 2 — Hasta Yönetimi Tamamlandı ✅
+
+## Backend İyileştirmeleri
+
+### Yeni Dosyalar
+- [create-patient.dto.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/dto/create-patient.dto.ts) — 7 alan, class-validator ile validasyon
+- [update-patient.dto.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/dto/update-patient.dto.ts) — `PartialType` ile tüm alanlar opsiyonel
+
+### Güncellenen Dosyalar
+- [patient.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.service.ts) — E-posta araması, `NotFoundException`, soft delete, doktor include'ları, randevu/not sayıları
+- [patient.controller.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.controller.ts) — DTO tipleri, `ParseUUIDPipe`, `@Roles`, `DELETE` endpoint
+
+---
+
+## Frontend
+
+### Yeni / Güncellenen Dosyalar
+
+| Dosya | Açıklama |
+|---|---|
+| [page.tsx (patients)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/page.tsx) | Gerçek API, debounce arama, pagination, loading/empty state |
+| [patient-modal.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/patient-modal.tsx) | Ekleme/düzenleme modal, form validasyon, toast |
+| [page.tsx (detail)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/[id]/page.tsx) | Hasta detay, bilgi kartı, randevu/not tab'leri |
+| [api.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts) | TypeScript tipleri, [delete](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#107-108) metodu |
+| [globals.css](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/globals.css) | Modal, toast, tabs, pagination, select, textarea, detail CSS |
+
+---
+
+## Doğrulama
+
+- ✅ Backend: `tsc --noEmit` → 0 hata
+- ✅ Frontend: `next build` → 12/12 sayfa başarıyla derlendi
+- ✅ `/patients/[id]` dynamic route oluşturuldu
+
+## Sonraki Adım: Sprint 3
+
+**Randevu Sistemi** — FullCalendar entegrasyonu, randevu oluşturma, müsait slot gösterimi, doktor takvim yönetimi.

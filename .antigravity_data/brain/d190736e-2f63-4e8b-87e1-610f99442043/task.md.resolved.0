@@ -1,0 +1,8 @@
+# Local Development Environment Kurulumu
+
+- [x] Docker Desktop yüklendi
+- [/] Docker container'ları başlatılıyor (PostgreSQL + Redis)
+- [ ] Backend bağımlılıkları yükleme (`npm install`)
+- [ ] Prisma migration çalıştırma
+- [ ] Backend'i başlatma ve test etme
+- [ ] Frontend bağımlılıkları yükleme ve başlatma

@@ -1,0 +1,57 @@
+# Sprint 5 Implementation Plan: Finance, Notes, and Dashboard
+
+Building the core management features: Finance (Payments), Clinical Documentation (Notes), and an informative Dashboard.
+
+## Proposed Changes
+
+---
+
+### Backend Components
+
+#### [MODIFY] [finance module]
+- `PaymentService`: CRUD operations for payments.
+- `PaymentController`: API endpoints for recording and listing payments. Access allowed for ADMIN, ASSISTANT, and ACCOUNTANT.
+- Logic to calculate total balance for a patient.
+- Exporting financial data functionality.
+
+#### [NEW] [clinical-note module]
+- `ClinicalNoteService`: CRUD operations for medical notes, prescriptions, and diagnoses.
+- `ClinicalNoteController`: API endpoints for managing notes.
+- Visibility logic (DOCTOR_ONLY, STAFF, ALL).
+
+#### [NEW] [dashboard module]
+- `DashboardService`: Aggregates stats from [Patient](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.service.ts#7-197), `Appointment`, and `Payment` models.
+- `DashboardController`: Returns summary data for the clinic staff.
+
+---
+
+### Frontend Components
+
+#### [NEW] [finance page](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/finance/page.tsx)
+- Unified view for payment history across the clinic.
+- Ability to filter by date and patient.
+
+#### [MODIFY] [patient detail](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/[id]/page.tsx)
+- Integrate Clinical Notes list and "Add Note" form.
+- Display patient's current financial balance.
+
+#### [MODIFY] [dashboard page](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/dashboard/page.tsx)
+- Stats widgets: Appointments Today, New Patients this week, Daily Revenue.
+- Role-based views: Accountants land on a "Financial Summary" dashboard.
+- "Günün Özeti" schedule view (hidden for Accountants).
+
+[!IMPORTANT]
+> - **Accountant (Mali Müşavir) Role**: A new role with restricted access exclusively to financial records and reporting.
+> - **Financial Isolation**: Accountants will not see medical notes or patient's private communication, only payment history and balances.
+> - **Dashboard**: Dashboard will show different stats based on role (Finance stats for Accountants, clinical overview for Doctors).
+
+## Verification Plan
+
+### Automated Tests
+- Integration tests for `Payment` creation.
+- Unit tests for financial calculation logic.
+
+### Manual Verification
+1.  Record a payment for a patient and verify it appears in the finance list.
+2.  Add a clinical note and verify it's visible to the doctor.
+3.  Check the dashboard to see if the new metrics (revenue/counts) update accordingly.

@@ -1,0 +1,90 @@
+# KlinikApp — Sprint 0 Tamamlandı ✅
+
+## Ne Yapıldı?
+
+Sprint 0'da uygulamanın tüm backend altyapısı ve modül yapısı oluşturuldu.
+
+### Oluşturulan Yapı
+
+| Bileşen | Detay |
+|---|---|
+| **Backend Framework** | NestJS + TypeScript (strict) |
+| **Veritabanı Şeması** | Prisma ile 14 model, tüm ilişkiler ve index'ler |
+| **Docker** | PostgreSQL 16 + Redis 7 (docker-compose.yml) |
+| **Modüller** | 10 feature modül (controller + service) |
+| **Auth** | JWT access + refresh token, bcrypt, rol bazlı erişim |
+| **API Docs** | Swagger/OpenAPI otomatik üretim |
+| **Seed Data** | Demo klinik, 3 kullanıcı, 5 hasta, doktor takvimleri |
+
+### Proje Dosya Yapısı
+
+```
+klinikapp/
+├── docker-compose.yml
+├── README.md
+└── backend/
+    ├── .env
+    ├── package.json
+    ├── tsconfig.json
+    ├── prisma/
+    │   ├── schema.prisma          # 14 tablo tanımı
+    │   ├── init.sql               # PostgreSQL extensions
+    │   └── seed.ts                # Demo veri
+    └── src/
+        ├── main.ts                # Swagger, CORS, Validation
+        ├── app.module.ts          # Root module
+        ├── common/
+        │   ├── prisma/            # DB bağlantı servisi
+        │   ├── guards/            # RolesGuard
+        │   ├── decorators/        # @CurrentUser, @Roles
+        │   ├── filters/           # GlobalExceptionFilter
+        │   └── interceptors/      # AuditLogInterceptor
+        └── modules/
+            ├── auth/              # register, login, JWT
+            ├── tenant/            # klinik bilgileri
+            ├── user/              # kullanıcı CRUD
+            ├── patient/           # hasta arama, detay
+            ├── appointment/       # ⭐ randevu + çakışma
+            ├── messaging/         # WhatsApp inbox
+            ├── finance/           # ödeme + bakiye
+            ├── clinical-note/     # doktor notları
+            ├── notification/      # bildirimler
+            └── audit/             # denetim kaydı
+```
+
+### Doğrulama
+
+- ✅ `npx prisma generate` — başarılı
+- ✅ `npx tsc --noEmit` — 0 hata ile derlendi
+- ✅ Tüm modüller import zinciri doğru
+
+## Nasıl Başlatılır?
+
+```bash
+# 1. Docker'ı başlat (PostgreSQL + Redis)
+cd klinikapp
+docker-compose up -d
+
+# 2. Migration oluştur (DB henüz yoksa)
+cd backend
+npx prisma migrate dev --name init
+
+# 3. Demo veri yükle
+npx prisma db seed
+
+# 4. Uygulamayı başlat
+npm run start:dev
+
+# 5. Swagger docs: http://localhost:3000/api/docs
+```
+
+### Demo Giriş Bilgileri
+| Rol | E-posta | Şifre |
+|---|---|---|
+| Admin | admin@demo.com | Admin123! |
+| Doktor | doctor@demo.com | Doctor123! |
+| Asistan | asistan@demo.com | Assist123! |
+
+## Sonraki Adım: Sprint 1
+
+Frontend scaffolding (Next.js + Tailwind + Shadcn/ui), login sayfası, ve Adobe benzeri sidebar layout.

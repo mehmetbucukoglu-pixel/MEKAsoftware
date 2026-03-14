@@ -1,0 +1,68 @@
+<current_dom_explanation>
+This is a temporary snapshot of the current page's DOM structure. The DOM will change if you navigate to or interact with another page. Use a tool like browser_get_dom to capture and preserve the DOM in your trajectory if needed for later reference.
+</current_dom_explanation>
+<current_dom>
+[0] (69,182)<a href='/dashboard' />
+	[1] (56,182)<span >Ana Sayfa />
+[2] (69,240)<a href='/appointments' />
+	[3] (49,240)<span >Takvim />
+[4] (69,299)<a href='/tasks' />
+	[5] (58,299)<span >Workspace />
+[6] (69,357)<a href='/patients' />
+	[7] (52,357)<span >Hastalar />
+[8] (69,415)<a href='/messages' />
+	[9] (52,415)<span >Mesajlar />
+[10] (69,474)<a href='/reports' />
+	[11] (9,474)<div  />
+	[12] (52,474)<span >Raporlar />
+[13] (69,863)<button title='Menüyü Daralt' />
+	[14] (47,863)<span >Daralt />
+[15] (69,943)<button >A
+Y />
+	A
+	Y
+	[16] (76,943)<div  />
+		[17] (76,931)<div >Ahmet
+Yılmaz />
+		[18] (76,956)<div >Admin />
+Raporlar
+[19] (264,43)<button >Finans />
+[20] (333,43)<button >İstatistikler />
+[21] (895,43)<button class='btn-icon' />
+	[22] (886,43)<span >Hızlı Arama />
+	[23] (928,43)<span >Ctrl K />
+[24] (973,43)<button class='btn-icon' />
+Finans Yönetimi
+Gelir, gider ve klinik kar/zarar takibi
+[25] (667,244)<button >Son 7 Gün />
+[26] (733,244)<button >Son 30 Gün />
+[27] (796,244)<button >Son 3 Ay />
+[28] (871,244)<button class='btn btn-primary'>Tahsilat />
+[29] (950,244)<button class='btn btn-secondary'>Gider />
+Toplam Gelir
+₺
+0
+Toplam Gider
+₺
+0
+Net Kar
+₺
+0
+Vergi Matrahı Info
+Sabit: ₺
+0
+Değişken: ₺
+0
+[30] (181,509)<button >Tahsilatlar />
+[31] (284,509)<button >Giderler (Fixed/Variable) />
+[32] (529,616)<input class='input' placeholder='Hasta adı veya açıklama ile ara...' />
+[33] (934,616)<button class='btn btn-secondary'>Filtrele />
+Tarih
+Hasta
+Tür
+Yöntem
+Tutar
+Kayıt seçili periyot için bulunamadı.
+[34] (977,951)<button aria-label='Open Tanstack query devtools' class='tsqd-open-btn' />
+
+</current_dom>

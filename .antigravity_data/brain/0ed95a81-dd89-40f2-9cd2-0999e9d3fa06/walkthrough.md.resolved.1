@@ -1,0 +1,48 @@
+# HBYS Patient Visit Tracking & MEKA Rebranding
+
+## What Was Built
+
+### 1. HBYS-Compliant Visit Tracking (Backend)
+- Added `arrivedAt` and `completedAt` timestamp fields to the [Appointment](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#100-118) model
+- Auto-records check-in time when status → `ARRIVED`, check-out time when status → `COMPLETED`
+- New **Statistics Module** with 3 endpoints:
+  - `GET /statistics/overview` — KPIs (total entries, avg session, no-show rate, unique patients, doctor breakdown)
+  - `GET /statistics/visits` — Daily trend + hourly distribution data
+  - `GET /statistics/recent-visits` — Latest patient visits with times
+
+### 2. İstatistikler Page (Frontend)
+- 4 KPI cards: Toplam Giriş, Ort. Seans Süresi, Gelmeme Oranı, Aktif Hasta
+- Area chart for daily visit trends
+- Bar chart for doctor distribution
+- Hourly heatmap for clinic busyness
+- Recent visits table with check-in/check-out times and durations
+- Doctor filter and date range (7 Gün / Bu Ay / 3 Ay) controls
+
+### 3. MEKA Rebranding
+- Login page: replaced Activity icon + "KlinikApp" with MEKA logo
+- Sidebar: removed clinic name, shows only MEKA logo
+- İstatistikler nav item added to sidebar
+
+## Screenshots
+
+![Dashboard with MEKA branding and İstatistikler nav](file:///C:/Users/Lenovo/.gemini/antigravity/brain/0ed95a81-dd89-40f2-9cd2-0999e9d3fa06/login_page_branding_1773148636486.png)
+
+![Statistics page with KPI cards and chart areas](file:///C:/Users/Lenovo/.gemini/antigravity/brain/0ed95a81-dd89-40f2-9cd2-0999e9d3fa06/statistics_page_overview_1773148672603.png)
+
+## Files Changed
+
+| File | Change |
+|---|---|
+| [schema.prisma](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/prisma/schema.prisma) | Added `arrivedAt`, `completedAt` to Appointment |
+| [appointment.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts) | Auto-set timestamps on ARRIVED/COMPLETED |
+| [statistics.module.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/statistics/statistics.module.ts) | New module |
+| [statistics.controller.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/statistics/statistics.controller.ts) | New controller with 3 endpoints |
+| [statistics.service.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/statistics/statistics.service.ts) | New service with analytics queries |
+| [app.module.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/app.module.ts) | Registered StatisticsModule |
+| [api.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts) | Added `statisticsApi` + types |
+| [statistics/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/statistics/page.tsx) | New frontend page |
+| [layout.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/layout.tsx) (app) | Added İstatistikler nav, removed clinic name |
+| [login/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/login/page.tsx) | MEKA branding |
+
+## Note
+Data shows zeroes because the `arrivedAt`/`completedAt` fields are newly added. As the clinic uses the check-in/check-out flow (ARRIVED → COMPLETED) going forward, the statistics will populate automatically.

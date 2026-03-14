@@ -1,0 +1,77 @@
+# Unifying Page Headers and Actions
+
+The goal is to move page-specific titles and any remaining actions from the global header into the respective page components. This will create a more consistent and flexible UI where each page manages its own header section locally.
+
+## Proposed Changes
+
+### [Frontend] Unify Headers
+
+Move the titles from [PageHeader](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/page-header.tsx#6-21) to local headers in the following pages to match the pattern already used in `appointments` and `tasks`.
+
+#### [MODIFY] [patients/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/page.tsx)
+- Remove `<PageHeader />`.
+- Move the `h1` title and its sub-info into the "Search and Actions" `div` at the top of the page.
+- Wrap title and actions in a flex container for better layout.
+
+#### [MODIFY] [dashboard/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/dashboard/page.tsx)
+- Remove `<PageHeader />`.
+- Add a local header `div` at the top with the "Merhaba, [Name]!" title and date.
+
+#### [MODIFY] [finance/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/finance/page.tsx)
+- Remove `<PageHeader />`.
+- Move "Finans Yönetimi" title into the local actions `div` area.
+
+# Workspace, Dashboard and Onboarding Refinements
+
+Refining the Workspace page layout, adding new KPI cards to the Dashboard, and ensuring Onboarding tooltips behave correctly.
+
+## Proposed Changes
+
+### Dashboard
+
+#### [MODIFY] [page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/dashboard/page.tsx)
+- Add new KPI definitions to `availableKpis`: **Bugünkü Gelir**, **Bekleyen Ödeme**, **Bu Hafta Yeni Hasta**, **Doluluk Oranı**, **Okunmamış Mesaj**.
+- These will now appear in the "Düzenle" (Edit) menu.
+
+### Workspace Page
+
+#### [MODIFY] [page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/tasks/page.tsx)
+- Move the sidebar toggle button from the absolute floating position to the [PageHeader](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/page-header.tsx#6-21) actions (visible when sidebar is closed).
+- Ensure the sidebar toggle is consistent with other pages if applicable.
+
+#### [MODIFY] [WorkspaceSidebar.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/WorkspaceSidebar.tsx)
+- Remove the redundant "Workspace" sidebar header section.
+
+### Onboarding
+
+#### [MODIFY] [onboarding-tooltips.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/onboarding-tooltips.tsx)
+- Verify `localStorage` check is working as intended to show only once.
+
+## Verification Plan
+
+### Manual Verification
+- **Dashboard**: Click "Düzenle" and verify new KPI options are visible. Toggle them (max 4).
+- **Workspace**: Verify sidebar header is gone. Close sidebar and verify "Open" button is in the top header.
+- **Onboarding**: Clear `localStorage` and verify one-time appearance.
+#### [MODIFY] [statistics/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/statistics/page.tsx)
+- Remove `<PageHeader />`.
+- Ensure title is rendered locally above filters.
+
+#### [MODIFY] [messages/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/messages/page.tsx)
+- Remove `<PageHeader />`.
+- Add local title "WhatsApp Inbox".
+
+#### [MODIFY] [settings/page.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/settings/page.tsx)
+- Remove `<PageHeader />`.
+- Add local title "Ayarlar".
+
+#### [MODIFY] [layout.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/layout.tsx)
+- Simplify the global header. Since page-specific titles and actions are now local, the global header can be reduced or kept only for global tools (Search, Notifications, Profile).
+
+## Verification Plan
+
+### Manual Verification
+1. Navigate to "Hastalar", "Takvim", "İşler", "Finans", "Mesajlar", "Raporlar", and "Ayarlar" pages.
+2. Verify that each page has a consistent header layout with its title and action buttons.
+3. Verify that the global top-level header is clean and only shows global elements.
+4. Verify that there is no "double title" effect (one in global header, one in page).

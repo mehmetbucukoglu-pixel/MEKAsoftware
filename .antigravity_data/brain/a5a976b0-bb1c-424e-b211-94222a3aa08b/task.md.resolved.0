@@ -1,0 +1,5 @@
+# Local Hosting Setup
+
+- [ ] Start database and Redis (Docker Compose)
+- [ ] Start backend server (NestJS)
+- [ ] Start frontend server (Next.js)

@@ -1,0 +1,6 @@
+# Task: Preview Login Page
+- [ ] Open http://localhost:3001/login
+- [ ] Wait for page to load
+- [ ] Capture screenshot
+- [ ] Describe visual appearance
+- [ ] Report back to the main agent

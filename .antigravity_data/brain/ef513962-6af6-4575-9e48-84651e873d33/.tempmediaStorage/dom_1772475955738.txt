@@ -1,0 +1,119 @@
+KlinikApp
+Demo Diş Kliniği
+[0] (84,143)<a href='/dashboard' />
+	[1] (56,143)<span >Ana Sayfa />
+[2] (84,201)<a href='/appointments' />
+	[3] (49,201)<span >Takvim />
+[4] (84,259)<a href='/messages' />
+	[5] (52,259)<span >Mesajlar />
+	[6] (147,259)<span >3 />
+[7] (84,317)<a href='/patients' />
+	[8] (9,317)<div  />
+	[9] (52,317)<span >Hastalar />
+[10] (84,376)<a href='/finance' />
+	[11] (48,376)<span >Finans />
+[12] (84,434)<a href='/notes' />
+	[13] (47,434)<span >Notlar />
+[14] (84,863)<a href='/settings' />
+	[15] (49,863)<span >Ayarlar />
+A
+Y
+Ahmet
+Yılmaz
+Admin
+[16] (144,943)<button class='btn-icon btn-ghost' title='Çıkış Yap' />
+Demo Diş Kliniği
+Hastalar
+[17] (382,37)<button class='btn-icon' />
+	[18] (373,37)<span >Hızlı Arama />
+	[19] (415,37)<span >Ctrl K />
+[20] (973,37)<button class='btn-icon' />
+	[21] (983,16)<span  />
+Hastalar
+6 hasta kayıtlı
+[22] (868,154)<button class='btn btn-secondary' title='Silinen Hastalar (Çöp Kutusu)' />
+[23] (940,154)<button class='btn btn-primary'>Yeni Hasta />
+[24] (585,261)<input class='input' placeholder='Hasta ara... (isim, telefon, e-posta, 11 Haneli TC Kimlik)' />
+Ad Soyad
+TC Kimlik
+Telefon
+Cinsiyet
+Son Ziyaret
+[25] (585,418)<tr  />
+	[26] (298,418)<td  />
+		[27] (298,418)<div  />
+			[28] (208,418)<div >D
+T />
+			[29] (271,418)<span >Direct Test Patient />
+	[30] (472,418)<td  />
+	[31] (606,418)<td >(500) 888 77 66 />
+	[32] (723,418)<td  />
+		[33] (694,419)<span >— />
+	[34] (820,418)<td >— />
+	[35] (929,418)<td  />
+		[36] (949,418)<button class='btn btn-ghost btn-sm'>Düzenle />
+[37] (585,501)<tr  />
+	[38] (298,501)<td  />
+		[39] (298,501)<div  />
+			[40] (208,501)<div >E
+Y />
+			[41] (253,501)<span >Emre Yıldız />
+	[42] (472,501)<td >500****0005 />
+	[43] (606,501)<td >(555) 000 55 55 />
+	[44] (723,501)<td  />
+		[45] (694,501)<span >— />
+	[46] (820,501)<td >— />
+	[47] (929,501)<td  />
+		[48] (949,501)<button class='btn btn-ghost btn-sm'>Düzenle />
+[49] (585,583)<tr  />
+	[50] (298,583)<td  />
+		[51] (298,583)<div  />
+			[52] (208,583)<div >Z
+A />
+			[53] (262,583)<span >Zeynep Arslan />
+	[54] (472,583)<td >400****0004 />
+	[55] (606,583)<td >(555) 000 44 44 />
+	[56] (723,583)<td  />
+		[57] (694,584)<span >— />
+	[58] (820,583)<td >— />
+	[59] (929,583)<td  />
+		[60] (949,583)<button class='btn btn-ghost btn-sm'>Düzenle />
+[61] (585,665)<tr  />
+	[62] (298,665)<td  />
+		[63] (298,665)<div  />
+			[64] (208,665)<div >M
+Ö />
+			[65] (264,665)<span >Mehmet Öztürk />
+	[66] (472,665)<td >300****0003 />
+	[67] (606,665)<td >(555) 000 33 33 />
+	[68] (723,665)<td  />
+		[69] (694,666)<span >— />
+	[70] (820,665)<td >— />
+	[71] (929,665)<td  />
+		[72] (949,665)<button class='btn btn-ghost btn-sm'>Düzenle />
+[73] (585,748)<tr  />
+	[74] (298,748)<td  />
+		[75] (298,748)<div  />
+			[76] (208,748)<div >A
+Ş />
+			[77] (253,748)<span >Ayşe Şahin />
+	[78] (472,748)<td >200****0002 />
+	[79] (606,748)<td >(555) 000 22 22 />
+	[80] (723,748)<td  />
+		[81] (707,749)<span >Erkek />
+	[82] (820,748)<td >— />
+	[83] (929,748)<td  />
+		[84] (949,748)<button class='btn btn-ghost btn-sm'>Düzenle />
+[85] (585,830)<tr  />
+	[86] (298,830)<td  />
+		[87] (298,830)<div  />
+			[88] (208,830)<div >A
+K />
+			[89] (256,830)<span >Ali Korkmaz />
+	[90] (472,830)<td >100****0001 />
+	[91] (606,830)<td >(555) 000 11 11 />
+	[92] (723,830)<td  />
+		[93] (694,831)<span >— />
+	[94] (820,830)<td >— />
+	[95] (929,830)<td  />
+		[96] (949,830)<button class='btn btn-ghost btn-sm'>Düzenle />

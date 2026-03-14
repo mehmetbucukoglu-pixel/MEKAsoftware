@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "Proposed technical implementation plan for the n8n WhatsApp integration, including the new Integration module, WebhookService, AuthGuard, and required API endpoints.",
+  "updatedAt":  "2026-03-12T11:05:09.257215300Z"
+}

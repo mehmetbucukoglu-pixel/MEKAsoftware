@@ -1,0 +1,36 @@
+# Workspace Canvas Redesign
+
+Redesign the workspace to feel like a real document editor (Notion-style) with rich text editing, a cleaner sidebar matching the messaging panel aesthetic.
+
+## Proposed Changes
+
+### WorkspaceEditor ([WorkspaceEditor.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/WorkspaceEditor.tsx))
+- **Remove** the sticky `<header>` bar (title input + delete button) from the top
+- **Add** a full-width editable title as the very first block on the canvas (large `contentEditable` h1 or Input, styled like a Notion page title)
+- **Remove** the separate "note widget" concept from the context menu — the canvas itself is a text editor; clicking anywhere creates a text block
+- The canvas `<div>` already uses `overflow-y-auto`. Add `overflow-x-auto` and `min-width: max-content` so blocks can expand horizontally
+- Context menu keeps **Task widget** and **Table widget** insertion (+ converts to text block by default on Enter/click)
+- [WidgetContainer](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/widgets/widget-container.tsx#20-89) grid-drag stays but also expands naturally as blocks overflow the viewport
+
+### WorkspaceSidebar ([WorkspaceSidebar.tsx](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/WorkspaceSidebar.tsx))
+- Replace Notion-light-theme look with **dark panel style** matching the messages `ConversationList`
+- Use `var(--bg-surface)` / `var(--bg-elevated)` / `var(--border)` CSS variables (same as the main app sidebar)  
+- Each document row: icon avatar on left, document name + last-edited timestamp on right, active highlight with `var(--primary-muted)`
+- Team/Teamspace rows: Use icon badge (emoji) + bold team name + member count, collapsible with chevron
+- Remove the separate "Home / Inbox / Library" top-level items (not used in the app)
+- Simplify search to a compact search bar matching the messages panel
+
+### [widgets/types.ts](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/widgets/types.ts)
+- No change needed to types — [WidgetType](file:///c:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/components/workspace/widgets/types.ts#1-2) stays as `'note' | 'task' | 'table'`
+
+## Verification Plan
+
+### Manual Verification
+1. Open [http://localhost:3001](http://localhost:3001) and log in with `admin@demo.com / Admin123!`
+2. Navigate to **İşler/Panom** → click **Workspace** section in the sidebar
+3. Open any document — verify there is **no sticky title header** at the top, just the canvas
+4. Click anywhere on the dark grid canvas → verify a text block appears inline and is directly typeable
+5. Right-click anywhere on the canvas → verify context menu shows **Görev Listesi** and **Veri Tablosu** (no note option)
+6. Add a task widget → verify it renders correctly and is draggable (grab handle on hover)
+7. Verify the document title is editable at the top of the canvas as a large heading
+8. Check the left sidebar: verify it uses the dark app styling (not the old off-white Notion look), document rows show icons + names + timestamps

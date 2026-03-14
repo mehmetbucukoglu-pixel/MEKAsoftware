@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_TASK",
+  "summary":  "Initial task breakdown for n8n WhatsApp integration, covering DB changes, webhook handling, outbound event triggers, and API authentication.",
+  "updatedAt":  "2026-03-12T11:04:42.729088900Z"
+}

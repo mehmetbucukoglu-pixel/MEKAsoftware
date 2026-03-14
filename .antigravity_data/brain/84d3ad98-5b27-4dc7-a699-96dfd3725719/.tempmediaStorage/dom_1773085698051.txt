@@ -1,0 +1,107 @@
+Demo Diş Kliniği
+[0] (70,188)<a href='/dashboard' />
+	[1] (56,188)<span >Ana Sayfa />
+[2] (70,246)<a href='/appointments' />
+	[3] (49,246)<span >Takvim />
+[4] (70,305)<a href='/tasks' />
+	[5] (59,305)<span >İşler/Panom />
+[6] (70,363)<a href='/messages' />
+	[7] (52,363)<span >Mesajlar />
+	[8] (119,363)<span >3 />
+[9] (70,421)<a href='/patients' />
+	[10] (9,421)<div  />
+	[11] (52,421)<span >Hastalar />
+[12] (70,479)<a href='/finance' />
+	[13] (48,479)<span >Finans />
+[14] (70,538)<a href='/notes' />
+	[15] (47,538)<span >Notlar />
+[16] (70,863)<a href='/settings' />
+	[17] (49,863)<span >Ayarlar />
+A
+Y
+Ahmet
+Yılmaz
+Admin
+[18] (116,943)<button class='btn-icon btn-ghost' title='Çıkış Yap' />
+Demo Diş Kliniği
+Hastalar
+[19] (353,37)<button class='btn-icon' />
+	[20] (345,37)<span >Hızlı Arama />
+	[21] (387,37)<span >Ctrl K />
+[22] (973,37)<button class='btn-icon' />
+Hastalar
+5 hasta kayıtlı
+[23] (868,154)<button class='btn btn-secondary' title='Silinen Hastalar (Çöp Kutusu)' />
+[24] (940,154)<button class='btn btn-primary'>Yeni Hasta />
+[25] (570,261)<input class='input' placeholder='Hasta ara... (isim, telefon, e-posta, 11 Haneli TC Kimlik)' />
+Ad Soyad
+TC Kimlik
+Telefon
+Cinsiyet
+Son Ziyaret
+[26] (570,418)<tr  />
+	[27] (266,418)<td  />
+		[28] (266,418)<div  />
+			[29] (179,418)<div >E
+Y />
+			[30] (225,418)<span >Emre Yıldız />
+	[31] (439,418)<td >500****0005 />
+	[32] (582,418)<td >(555) 000 55 55 />
+	[33] (706,418)<td  />
+		[34] (676,419)<span >— />
+	[35] (809,418)<td >— />
+	[36] (925,418)<td  />
+		[37] (949,418)<button class='btn btn-ghost btn-sm'>Düzenle />
+[38] (570,501)<tr  />
+	[39] (266,501)<td  />
+		[40] (266,501)<div  />
+			[41] (179,501)<div >Z
+A />
+			[42] (233,501)<span >Zeynep Arslan />
+	[43] (439,501)<td >400****0004 />
+	[44] (582,501)<td >(555) 000 44 44 />
+	[45] (706,501)<td  />
+		[46] (676,501)<span >— />
+	[47] (809,501)<td >— />
+	[48] (925,501)<td  />
+		[49] (949,501)<button class='btn btn-ghost btn-sm'>Düzenle />
+[50] (570,583)<tr  />
+	[51] (266,583)<td  />
+		[52] (266,583)<div  />
+			[53] (179,583)<div >M
+Ö />
+			[54] (236,583)<span >Mehmet Öztürk />
+	[55] (439,583)<td >300****0003 />
+	[56] (582,583)<td >(555) 000 33 33 />
+	[57] (706,583)<td  />
+		[58] (676,584)<span >— />
+	[59] (809,583)<td >— />
+	[60] (925,583)<td  />
+		[61] (949,583)<button class='btn btn-ghost btn-sm'>Düzenle />
+[62] (570,665)<tr  />
+	[63] (266,665)<td  />
+		[64] (266,665)<div  />
+			[65] (179,665)<div >A
+Ş />
+			[66] (225,665)<span >Ayşe Şahin />
+	[67] (439,665)<td >200****0002 />
+	[68] (582,665)<td >(555) 000 22 22 />
+	[69] (706,665)<td  />
+		[70] (676,666)<span >— />
+	[71] (809,665)<td >— />
+	[72] (925,665)<td  />
+		[73] (949,665)<button class='btn btn-ghost btn-sm'>Düzenle />
+[74] (570,748)<tr  />
+	[75] (266,748)<td  />
+		[76] (266,748)<div  />
+			[77] (179,748)<div >A
+K />
+			[78] (227,748)<span >Ali Korkmaz />
+	[79] (439,748)<td >100****0001 />
+	[80] (582,748)<td >(555) 000 11 11 />
+	[81] (706,748)<td  />
+		[82] (676,748)<span >— />
+	[83] (809,748)<td >— />
+	[84] (925,748)<td  />
+		[85] (949,748)<button class='btn btn-ghost btn-sm'>Düzenle />
+[86] (977,951)<button aria-label='Open Tanstack query devtools' class='tsqd-open-btn' />

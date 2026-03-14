@@ -1,0 +1,30 @@
+# KlinikApp: Ortak Çalışma Alanı ve Görsel İyileştirmeler
+
+Kullandığımız Shadcn sisteminin yol açtığı beyazlıkları temizledik ve projemizi o çok sevdiğiniz şık, koyu (premium dark) temasına geri döndürdük. Ayrıca "İşler" sayfasını tamamen yenileyerek ekibin birlikte çalışabileceği döküman odaklı bir yapıya taşıdık.
+
+### Neler Yapıldı?
+
+#### 1. Premium Koyu Tema Geri Geldi 🌑
+- Shadcn kurulumu sonrası oluşan beyaz çerçeveler ve açık renkli arka planlar kaldırıldı.
+- Uygulama genelinde koyu mod (`dark mode`) zorunlu hale getirildi. 
+- Teal/Cyan marka renklerinin her yerde (butonlar, ikonlar, aktif menüler) doğru ve parlak görünmesi sağlandı.
+
+#### 2. Yeni Nesil Ortak Çalışma Alanı 📝
+- **Sidebar Düzeni**: Dökümanlarınızı sol menüden kolayca yönetebileceğiniz, temiz ve sidebar tabanlı bir arayüze geçtik.
+- **Odaklanmış Editör**: Yazı alanı artık daha geniş, "kağıt" hissi veren ve dikkatinizi dağıtmayan bir tasarıma sahip.
+- **Otomatik Düzeltme**: Döküman oluştururken yaşanan teknik aksaklıklar (boş içerik hatası vb.) giderildi.
+
+#### 3. Takvim ve Görsel İyileştirmeler 📅
+- **Takvim Kayması Giderildi**: Doktor seçimi ve görünüm değiştirme butonlarındaki küçük hizalama hataları (layout shift) düzeltildi.
+- **Performans**: Sayfa geçişleri ve döküman yükleme hızları optimize edildi.
+
+#### 3. Altyapı Güncellemeleri ⚙️
+- **Veritabanı Desteği**: Ortak dökümanların kaydedilmesi ve klinik bazlı paylaşılması için gerekli teknik altyapı kuruldu.
+- **Hızlı Kayıt**: Döküman başlığını ve içeriğini yazıp anında kaydedebileceğiniz bir akış oluşturuldu.
+
+### Son Durum
+
+Şu an sistemde:
+1. Sol menüdeki **İşler/Panom** sekmesine tıkladığınızda yeni **Çalışma Alanı** karşınıza çıkacak.
+2. Ekranın bembeyaz olması sorunu tamamen çözüldü; uygulama o eski, derin ve kaliteli koyu görünümüne kavuştu.
+3. Bildirim butonu ve diğer temel fonksiyonlar bu yeni tasarım sistemiyle uyumlu çalışacak şekilde güncellendi.

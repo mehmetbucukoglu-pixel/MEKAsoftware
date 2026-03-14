@@ -1,0 +1,28 @@
+# Görev Yönetimi ve Bildirim Sistemi Yayında! 🚀
+
+Tüm geliştirme süreci başarıyla tamamlandı. Artık ekibinizle görev paylaşımı yapabilir, yorumlar üzerinden haberleşebilir ve tüm bunları anlık bildirimlerle takip edebilirsiniz.
+
+## Neler Yapıldı?
+
+### 1. Ekip İçi Görev Yönetimi (Panom / İşler)
+- **Modern Arayüz**: Hem Liste hem de Kanban (Pano) görünümü eklendi.
+- **Hızlı İş Akışı**: Sadece Enter'a basarak saniyeler içinde görev ekleyebileceğiniz "Quick Add" özelliği.
+- **Detay Paneli**: Görevlere tıkladığınızda sağdan açılan panel ile açıklama ekleyebilir, yorumlar yazabilir ve durumu güncelleyebilirsiniz.
+
+### 2. Gelişmiş Bildirim Sistemi
+- **Entegre Zil**: Üst barın sağ kısmına bildirim zili eklendi.
+- **Anlık Takip**: Bir görev atandığında veya görevinize yorum geldiğinde anında bildirim alırsınız.
+- **Okunmadı Sayacı**: Okunmamış bildirimleriniz direkt ikona yansır.
+
+### 3. Teknik İyileştirmeler
+- **Build Hataları Giderildi**: Eksik olan `sonner` ve `shadcn` kütüphaneleri projeye dahil edildi.
+- **Layout Fix**: Sayfa içindeki iç içe geçmiş menü (double layout) sorunu çözülerek tertemiz bir görünüm sağlandı.
+- **Import Fixes**: API bağlantılarındaki uyumsuzluklar giderildi.
+
+## Kullanım Testi
+Aşağıdaki kayıtta yeni sistemin nasıl çalıştığını, liste/pano arası geçişleri ve görev ekleme akışını görebilirsiniz:
+
+![verify_tasks_page](file:///C:/Users/Lenovo/.gemini/antigravity/brain/ef513962-6af6-4575-9e48-84651e873d33/verify_tasks_page_1772485804992.webp)
+
+---
+*İşler sayfasını yenileyerek bu yeni özellikleri hemen kullanmaya başlayabilirsiniz!*

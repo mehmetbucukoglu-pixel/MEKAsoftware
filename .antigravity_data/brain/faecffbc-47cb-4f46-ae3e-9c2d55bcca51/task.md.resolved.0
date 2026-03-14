@@ -1,0 +1,38 @@
+# Takvim İyileştirmeleri — Çok Doktor Sütunu, Durum Renkleri, Tarih Aralığı
+
+## 1. Backend: Tarih Aralığı Filtresi
+- [ ] [appointment.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts) → [findAll](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.controller.ts#21-24) metoduna `startDate`/`endDate` params ekle (tek [date](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts#114-135) yerine)
+- [ ] [appointment.controller.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.controller.ts) → [findAll](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.controller.ts#21-24) query params güncelle
+
+## 2. Backend: `ARRIVED` Durum Eklenmesi
+- [ ] [schema.prisma](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/prisma/schema.prisma) → `AppointmentStatus` enum'a `ARRIVED` ekle
+- [ ] [appointment.controller.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.controller.ts) → `PATCH /appointments/:id/arrived` endpoint ekle
+- [ ] [appointment.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/appointment/appointment.service.ts) → [updateStatus](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#173-179) ARRIVED desteği  
+- [ ] `prisma db push` ile DB sync
+
+## 3. Frontend: API Katmanı Güncellemesi
+- [ ] [api.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts) → `Appointment.status` type'a `ARRIVED` ekle
+- [ ] [api.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts) → `appointmentApi.arrived()` metodu ekle
+
+## 4. Frontend: Takvim — Çok Doktor Sütun Görünümü
+- [ ] [page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/page.tsx) → Admin/Assistant için günlük görünümde doktor sütun (resource) yapısı
+- [ ] [page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/page.tsx) → Doctor rolü için tek takvim (mevcut hali)
+- [ ] Farklı doktor sütun başlıkları için farklı renkler
+
+## 5. Frontend: Durum Renk Kodlaması
+- [ ] Mavi → CONFIRMED (Onaylandı, Bekliyor)
+- [ ] Kırmızı → CANCELLED (İptal)
+- [ ] Açık Yeşil → ARRIVED (Hasta Geldi)
+- [ ] Koyu Yeşil → COMPLETED (Tamamlandı)
+- [ ] [globals.css](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/globals.css) → FullCalendar override stilleri
+
+## 6. Frontend: Randevu Modal — "Hasta Geldi" Butonu
+- [ ] [appointment-modal.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/appointments/appointment-modal.tsx) → ARRIVED durumu + "Hasta Geldi" butonu
+
+## 7. Frontend: Tarih Aralığı ile Randevu Çekme
+- [ ] [page.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/page.tsx) → [fetchAppointments](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/%28app%29/appointments/page.tsx#40-75) startDate/endDate göndersin
+
+## 8. Doğrulama
+- [ ] Backend TypeScript derleme (`tsc --noEmit`)
+- [ ] Frontend TypeScript derleme (`tsc --noEmit`)
+- [ ] Tarayıcı testi: farklı roller ile takvim görünümü kontrolü

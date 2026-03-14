@@ -1,0 +1,56 @@
+<current_dom_explanation>
+This is a temporary snapshot of the current page's DOM structure. The DOM will change if you navigate to or interact with another page. Use a tool like browser_get_dom to capture and preserve the DOM in your trajectory if needed for later reference.
+</current_dom_explanation>
+<current_dom>
+KlinikApp
+Demo Diş Kliniği
+Ana Sayfa
+Takvim
+Mesajlar
+3
+Hastalar
+Finans
+Notlar
+Ayarlar
+A
+Y
+Ahmet
+Yılmaz
+Admin
+Demo Diş Kliniği
+Hastalar
+Hızlı Arama
+Ctrl K
+[0] (585,538)<div scrollable='true' />
+	Hastalar
+	Z
+	A
+	Zeynep
+	Arslan
+	Kayıt:
+	02 Mart 2026
+	Düzenle
+	TC Kimlik
+	400****0004
+	Telefon
+	(555) 000 44 44
+	E-posta
+	—
+	Doğum Tarihi
+	—
+	Randevular
+	Klinik Notları
+	Finansal Hareketler
+	1
+	Klinik Not Ekle
+	Henüz klinik notu yok
+	Klinik Not Ekle
+	[1] (365,290)<label >Başlık />
+	[2] (500,335)<input class='input' placeholder='Örn: İlk Muayene, Kontrol vb.' />
+	[3] (364,402)<label >İçerik />
+	[4] (500,504)<textarea class='input' placeholder='Klinik bulgular, notlar...' />
+	[5] (378,637)<label >Görünürlük />
+	[6] (500,680)<select class='input' />
+	[7] (424,768)<button class='btn btn-secondary'>İptal />
+
+</current_dom>

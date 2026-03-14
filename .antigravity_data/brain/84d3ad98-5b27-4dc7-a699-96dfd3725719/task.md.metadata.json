@@ -1,0 +1,6 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_TASK",
+  "summary":  "Task checklist for workspace sidebar and editor overhaul — removing dates, adding delete to sidebar, widening sidebar, and converting editor to canvas-style drag-and-drop.",
+  "updatedAt":  "2026-03-09T20:42:34.191712600Z",
+  "version":  "2"
+}

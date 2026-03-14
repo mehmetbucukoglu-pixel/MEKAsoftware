@@ -1,0 +1,110 @@
+# Sprint 2 — Hasta Modülü İyileştirmeleri
+
+## Klinik Notları Nasıl Ekleniyor?
+
+Şu an klinik not modülü backend'de **iskelet** olarak var:
+- Doktor, API üzerinden (`POST /api/v1/clinical-notes`) bir not gönderebilir
+- Ancak **frontend'de henüz not ekleme formu/butonu yok** — sadece varolan notlar hasta detay sayfasında listeleniyor
+- **Sprint 4'te** klinik not ekleme/düzenleme formu, hasta detay sayfasına entegre edilecek
+
+> [!IMPORTANT]
+> Bu sprint'te klinik not ekleme ekranı gelmiyor. Şimdi sadece **hasta modülü iyileştirmeleri** yapılacak. Klinik not formu Sprint 4'te gelecek.
+
+---
+
+## Yapılacak Değişiklikler
+
+### 1. Veritabanı — TC Kimlik No ve Adres Alanları
+
+#### [MODIFY] [schema.prisma](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/prisma/schema.prisma)
+
+Patient modeline 2 yeni alan eklenecek:
+- `tcKimlik` — 11 haneli TC Kimlik No (zorunlu, kliniğe özel benzersiz)
+- `address` — Adres (zorunlu, serbest metin)
+
+```diff
+ model Patient {
+   id          String   @id @default(uuid()) @db.Uuid
+   clinicId    String   @map("clinic_id") @db.Uuid
++  tcKimlik    String   @map("tc_kimlik") @db.VarChar(11)
+   firstName   String   @map("first_name") @db.VarChar(100)
+   lastName    String   @map("last_name") @db.VarChar(100)
+   phone       String   @db.VarChar(20)
+   email       String?  @db.VarChar(255)
++  address     String   @db.Text
+   ...
++  @@unique([clinicId, tcKimlik])
+   @@unique([clinicId, phone])
+```
+
+Yeni bir migration (`add-tc-address`) oluşturulacak.
+
+---
+
+### 2. Backend — DTO ve Servis Güncellemeleri
+
+#### [MODIFY] [create-patient.dto.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/dto/create-patient.dto.ts)
+
+- `tcKimlik` alanı eklenir — zorunlu, tam 11 karakter, sadece rakam
+- `address` alanı eklenir — zorunlu, en az 5 karakter
+
+#### [MODIFY] [update-patient.dto.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/dto/update-patient.dto.ts)
+
+- `PartialType` zaten kullanılıyor, otomatik olarak TC ve adres güncelleme de desteklenecek
+
+#### [MODIFY] [patient.service.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.service.ts)
+
+- [findAll](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.service.ts#10-43) arama sorgusuna `tcKimlik` eklenir
+- [create](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#105-106) metodunda `tcKimlik` ve `address` alanları eklenir
+
+#### [MODIFY] [patient.controller.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/src/modules/patient/patient.controller.ts)
+
+- `@Roles` kısıtlaması `ADMIN, ASSISTANT` → `ADMIN, ASSISTANT, DOCTOR` olarak güncellenir (ekleme ve düzenleme için)
+- Silme yetkisi sadece `ADMIN`'de kalır
+
+---
+
+### 3. Frontend — Tip, Form ve Sayfa Güncellemeleri
+
+#### [MODIFY] [api.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts)
+
+- [Patient](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#55-73) tipine `tcKimlik` ve `address` eklenir
+- [CreatePatientInput](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/lib/api.ts#82-91) tipine `tcKimlik` ve `address` eklenir
+
+#### [MODIFY] [patient-modal.tsx](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/patient-modal.tsx)
+
+- Forma **TC Kimlik No** alanı eklenir (zorunlu, 11 hane kontrolü)
+- Forma **Adres** alanı eklenir (zorunlu, textarea)
+- Validasyon güncellenir
+
+#### [MODIFY] [page.tsx (hasta listesi)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/page.tsx)
+
+- Tablo sütunlarına **TC Kimlik** eklenir (telefon yanına)
+
+#### [MODIFY] [page.tsx (hasta detay)](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/frontend/src/app/(app)/patients/[id]/page.tsx)
+
+- Bilgi kartına **TC Kimlik No** ve **Adres** eklenir
+
+---
+
+### 4. Seed Data Güncelleme
+
+#### [MODIFY] [seed.ts](file:///C:/Users/Lenovo/.gemini/antigravity/scratch/klinikapp/backend/prisma/seed.ts)
+
+- Demo hastalara `tcKimlik` ve `address` değerleri eklenir
+
+---
+
+## Doğrulama Planı
+
+### Otomatik Testler
+- `npx tsc --noEmit` — Backend TypeScript derleme kontrolü (backend klasöründen)
+- `npx next build` — Frontend derleme kontrolü (frontend klasöründen)
+- `npx prisma migrate dev --name add-tc-address` — Migration başarıyla çalıştığını doğrulama
+
+### Manuel Doğrulama
+1. http://localhost:3001 adresine gidip demo hesapla giriş yapın
+2. **Hastalar** sayfasında tabloda yeni **TC Kimlik** sütunu görünmeli
+3. **"Yeni Hasta"** butonuna tıklayıp formda TC ve Adres alanlarının zorunlu olduğunu doğrulayın
+4. TC kimlik no arama çubuğuna yazılarak hasta aranabilmeli
+5. **Doktor hesabıyla** (`doctor@demo.com` / `Doctor123!`) giriş yapıp hasta eklenebildiğini doğrulayın
