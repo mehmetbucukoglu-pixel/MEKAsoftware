@@ -2,16 +2,21 @@ import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@ne
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { N8nWebhookGuard } from '../../common/guards/n8n-webhook.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { AppointmentService } from './appointment.service';
+import { SocketGateway } from '../../common/gateways/socket.gateway';
 
 @ApiTags('Appointments')
 @Controller()
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @ApiBearerAuth()
 export class AppointmentController {
-    constructor(private appointmentService: AppointmentService) { }
+    constructor(
+        private appointmentService: AppointmentService,
+        private socketGateway: SocketGateway,
+    ) { }
 
     @Get('appointments')
     @ApiOperation({ summary: 'Randevuları listele' })
@@ -28,32 +33,30 @@ export class AppointmentController {
     @Roles('ADMIN' as any, 'ASSISTANT' as any)
     @ApiOperation({ summary: 'Manuel randevu oluştur' })
     async create(@CurrentUser() user: CurrentUserPayload, @Body() data: any) {
-        console.log("🔥 [CREATE_APPOINTMENT] Controller hit!");
-        console.log("🔥 [CREATE_APPOINTMENT] Request User:", user);
-        console.log("🔥 [CREATE_APPOINTMENT] Request Body:", data);
-
-        try {
-            const result = await this.appointmentService.create(user.clinicId, {
-                ...data,
-                source: 'MANUAL',
-                createdBy: user.userId,
-            });
-            console.log("🔥 [CREATE_APPOINTMENT] Success!");
-            return result;
-        } catch (error) {
-            console.error("🔥 [CREATE_APPOINTMENT] ERROR CAUGHT IN CONTROLLER:", error);
-            throw error;
-        }
+        const result = await this.appointmentService.create(user.clinicId, {
+            ...data,
+            source: 'MANUAL',
+            createdBy: user.userId,
+        });
+        this.socketGateway.emitToStaff(user.clinicId, 'appointment_created', result);
+        return result;
     }
 
     @Post('appointments/whatsapp')
+    @UseGuards(N8nWebhookGuard)
     @ApiOperation({ summary: 'WhatsApp (n8n) üzerinden randevu oluştur' })
-    createFromWhatsApp(@Body() data: any) {
-        // API Key validation will be added via guard
-        return this.appointmentService.create(data.clinicId, {
-            ...data,
-            source: 'WHATSAPP',
-        });
+    async createFromWhatsApp(@Body() data: {
+        clinicId: string;
+        patientName: string;
+        patientPhone: string;
+        doctorName: string;
+        startTime: string;
+        durationMin: number;
+        notes?: string;
+    }) {
+        const result = await this.appointmentService.createFromWhatsApp(data.clinicId, data);
+        this.socketGateway.emitToStaff(data.clinicId, 'appointment_created', result);
+        return result;
     }
 
     @Get('appointments/:id')

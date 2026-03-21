@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AppointmentStatus, AppointmentSource } from '@prisma/client';
 
@@ -216,6 +216,62 @@ export class AppointmentService {
             });
         });
         return this.getDoctorSchedule(clinicId, doctorId);
+    }
+
+    // --- n8n / WhatsApp Integration ---
+
+    async createFromWhatsApp(clinicId: string, data: {
+        patientName: string;
+        patientPhone: string;
+        doctorName: string;
+        startTime: any;
+        durationMin: number;
+        notes?: string;
+    }) {
+        // 1. Normalize phone: strip non-digits, ensure leading +
+        const phone = data.patientPhone.replace(/[^\d+]/g, '');
+
+        // 2. Upsert patient — find by phone, create if not found
+        let patient = await this.prisma.patient.findFirst({
+            where: { clinicId, phone },
+        });
+
+        if (!patient) {
+            const nameParts = data.patientName.trim().split(' ');
+            const firstName = nameParts[0];
+            const lastName = nameParts.slice(1).join(' ') || '-';
+            patient = await this.prisma.patient.create({
+                data: { clinicId, firstName, lastName, phone } as any,
+            });
+        }
+
+        // 3. Find doctor by name (firstName + lastName match)
+        const doctorNameParts = data.doctorName.trim().split(' ');
+        const doctorFirstName = doctorNameParts[0];
+        const doctorLastName = doctorNameParts.slice(1).join(' ');
+
+        const doctor = await this.prisma.user.findFirst({
+            where: {
+                clinicId,
+                role: 'DOCTOR',
+                firstName: { contains: doctorFirstName, mode: 'insensitive' },
+                ...(doctorLastName && { lastName: { contains: doctorLastName, mode: 'insensitive' } }),
+            },
+        });
+
+        if (!doctor) {
+            throw new BadRequestException(`Doktor bulunamadı: "${data.doctorName}"`);
+        }
+
+        // 4. Create the appointment
+        return this.create(clinicId, {
+            doctorId: doctor.id,
+            patientId: patient.id,
+            startTime: data.startTime,
+            durationMin: data.durationMin,
+            notes: data.notes,
+            source: 'WHATSAPP',
+        });
     }
 
     // --- Private ---

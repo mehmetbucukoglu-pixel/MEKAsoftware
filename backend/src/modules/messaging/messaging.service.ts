@@ -1,4 +1,5 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SocketGateway } from '../../common/gateways/socket.gateway';
 import { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
@@ -11,7 +12,8 @@ export class MessagingService {
     constructor(
         private prisma: PrismaService,
         private socketGateway: SocketGateway,
-        private auditService: AuditService
+        private auditService: AuditService,
+        private configService: ConfigService,
     ) { }
 
     async getConversations(user: CurrentUserPayload) {
@@ -124,6 +126,12 @@ export class MessagingService {
         const conv = await this.prisma.conversation.findUnique({ where: { id: conversationId } });
         if (conv?.assignedTo && conv.assignedTo !== userId) {
             this.socketGateway.emitToUser(conv.assignedTo, 'new_message', message);
+        }
+
+        // --- Outbound WhatsApp relay via n8n ---
+        // Only send if conversation is in HUMAN mode (bot handles BOT mode itself)
+        if (conv?.status === 'HUMAN') {
+            await this.relayToWhatsApp(conv.waPhone, body, mediaUrl);
         }
 
         return message;
@@ -243,4 +251,38 @@ export class MessagingService {
 
         return result;
     }
+
+    // --- Private Helpers ---
+
+    /**
+     * Calls n8n outbound webhook to send a WhatsApp message via Meta Cloud API.
+     * Gracefully degrades: if not configured or call fails, logs error but does not throw.
+     */
+    private async relayToWhatsApp(waPhone: string, body?: string, mediaUrl?: string) {
+        const webhookUrl = this.configService.get<string>('N8N_OUTBOUND_WEBHOOK_URL');
+        const secret = this.configService.get<string>('N8N_WEBHOOK_SECRET');
+
+        if (!webhookUrl) {
+            console.warn('[Messaging] N8N_OUTBOUND_WEBHOOK_URL not configured — skipping WhatsApp relay.');
+            return;
+        }
+
+        try {
+            const response = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-n8n-secret': secret || '',
+                },
+                body: JSON.stringify({ to: waPhone, message: body, mediaUrl }),
+            });
+
+            if (!response.ok) {
+                console.error(`[Messaging] n8n outbound relay failed: ${response.status} ${await response.text()}`);
+            }
+        } catch (err) {
+            console.error('[Messaging] n8n outbound relay error:', err);
+        }
+    }
 }
+
