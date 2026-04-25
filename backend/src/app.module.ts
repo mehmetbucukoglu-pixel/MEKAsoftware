@@ -16,6 +16,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { TaskModule } from './modules/task/task.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -27,6 +28,10 @@ import { StatisticsModule } from './modules/statistics/statistics.module';
 
     // Database
     PrismaModule,
+
+    // Cron
+    ScheduleModule.forRoot(),
+
 
     // Feature modules
     AuthModule,

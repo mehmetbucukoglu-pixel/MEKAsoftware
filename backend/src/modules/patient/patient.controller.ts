@@ -20,13 +20,15 @@ export class PatientController {
     @ApiQuery({ name: 'search', required: false, description: 'İsim, soyisim, telefon veya e-posta ile arama' })
     @ApiQuery({ name: 'page', required: false, description: 'Sayfa numarası', example: 1 })
     @ApiQuery({ name: 'limit', required: false, description: 'Sayfa başına kayıt', example: 20 })
+    @ApiQuery({ name: 'registrationStatus', required: false, description: 'Kayıt durumu filtresi (FULL | PRE_REGISTERED)' })
     findAll(
         @CurrentUser() user: CurrentUserPayload,
         @Query('search') search?: string,
         @Query('page') page?: number,
         @Query('limit') limit?: number,
+        @Query('registrationStatus') registrationStatus?: string,
     ) {
-        return this.patientService.findAll(user.clinicId, search, page, limit);
+        return this.patientService.findAll(user.clinicId, search, page, limit, registrationStatus);
     }
 
     @Get('deleted')

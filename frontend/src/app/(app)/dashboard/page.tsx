@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/lib/auth-store';
-import { Calendar, Users, TrendingUp, Clock, Loader2, DollarSign, Settings2, X, UserX, Timer, LayoutDashboard, UserPlus, PieChart, MessageSquare } from 'lucide-react';
+import { Calendar, Users, TrendingUp, Clock, Loader2, DollarSign, Settings2, X, UserX, Timer, LayoutDashboard, UserPlus, PieChart, MessageSquare, ExternalLink } from 'lucide-react';
 import { getRecentPatients, RecentPatient } from '@/lib/recent-patients';
-import { dashboardApi, DashboardData, Appointment, statisticsApi } from '@/lib/api';
+import { dashboardApi, DashboardData, ExtendedKpis, Appointment, statisticsApi } from '@/lib/api';
 import { PageHeader } from '@/lib/page-header';
 
 const KPI_SELECTION_KEY = 'dashboard_kpi_selection';
@@ -77,7 +77,7 @@ const ALL_KPIS: KpiDefinition[] = [
         icon: Clock,
         color: '#f97316',
         bg: 'rgba(249,115,22,0.12)',
-        getValue: () => '₺12.800', // Placeholder for now
+        getValue: (_d, extra) => extra?.extKpis?.pendingPayment?.toString() || '0',
     },
     {
         id: 'weeklyNewPatients',
@@ -85,7 +85,7 @@ const ALL_KPIS: KpiDefinition[] = [
         icon: UserPlus,
         color: '#06b6d4',
         bg: 'rgba(6,182,212,0.12)',
-        getValue: () => '8', // Placeholder for now
+        getValue: (_d, extra) => extra?.extKpis?.weeklyNewPatients?.toString() || '0',
     },
     {
         id: 'occupancyRate',
@@ -93,7 +93,7 @@ const ALL_KPIS: KpiDefinition[] = [
         icon: PieChart,
         color: '#ec4899',
         bg: 'rgba(236,72,153,0.12)',
-        getValue: () => '%72', // Placeholder for now
+        getValue: (_d, extra) => `%${extra?.extKpis?.occupancyRate ?? 0}`,
     },
     {
         id: 'unreadMessages',
@@ -101,7 +101,7 @@ const ALL_KPIS: KpiDefinition[] = [
         icon: MessageSquare,
         color: '#3b82f6',
         bg: 'rgba(59,130,246,0.12)',
-        getValue: () => '5', // Placeholder for now
+        getValue: (_d, extra) => extra?.extKpis?.unreadMessages?.toString() || '0',
     },
 ];
 
@@ -153,12 +153,16 @@ export default function DashboardPage() {
                 ]);
                 setData(dashRes.data);
 
-                // Try fetching statistics for extra KPIs
+                // Fetch statistics + extended KPIs
                 try {
-                    const statsRes = await statisticsApi.getOverview({});
+                    const [statsRes, extKpisRes] = await Promise.all([
+                        statisticsApi.getOverview({}),
+                        dashboardApi.getExtendedKpis(),
+                    ]);
                     setExtraStats({
                         noShowRate: statsRes.data.noShowRate,
                         avgDuration: statsRes.data.avgSessionMinutes,
+                        extKpis: extKpisRes.data,
                     });
                 } catch { }
             } catch (error) {
@@ -363,12 +367,43 @@ export default function DashboardPage() {
                                                 {timeStr}
                                             </div>
                                             <div style={{ flex: 1 }}>
-                                                <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>{apt.patient?.firstName} {apt.patient?.lastName}</div>
+                                                <div style={{ fontSize: '0.875rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <a href={`/patients/${apt.patientId}`} style={{ color: 'inherit', textDecoration: 'none' }}
+                                                        onMouseEnter={(e) => { e.currentTarget.style.textDecoration = 'underline'; }}
+                                                        onMouseLeave={(e) => { e.currentTarget.style.textDecoration = 'none'; }}
+                                                    >
+                                                        {apt.patient?.firstName} {apt.patient?.lastName}
+                                                    </a>
+                                                    {apt.patient?.registrationStatus === 'PRE_REGISTERED' && (
+                                                        <span style={{
+                                                            fontSize: '0.65rem',
+                                                            background: 'var(--warning-muted)',
+                                                            color: 'var(--warning)',
+                                                            padding: '1px 5px',
+                                                            borderRadius: '4px',
+                                                            fontWeight: 600
+                                                        }}>
+                                                            Ön Kayıt
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                                     Dr. {apt.doctor?.firstName} {apt.doctor?.lastName}
                                                 </div>
                                             </div>
-                                            <span className={`badge ${statusClass}`}>{statusText}</span>
+
+                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                {apt.patient?.phone && (
+                                                    <a href={`/messages?phone=${apt.patient.phone}`} title="Mesajları Aç"
+                                                        style={{ color: 'var(--text-muted)', padding: '4px', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+                                                        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; }}
+                                                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                                                    >
+                                                        <MessageSquare size={14} />
+                                                    </a>
+                                                )}
+                                                <span className={`badge ${statusClass}`}>{statusText}</span>
+                                            </div>
                                         </div>
                                     );
                                 })

@@ -8,10 +8,14 @@ import { CryptoUtil } from '../../common/utils/crypto.util';
 export class PatientService {
     constructor(private prisma: PrismaService) { }
 
-    async findAll(clinicId: string, search?: string, page = 1, limit = 20) {
+    async findAll(clinicId: string, search?: string, page = 1, limit = 20, registrationStatus?: string) {
         const skip = (Number(page) - 1) * Number(limit);
         const take = Number(limit);
         const where: any = { clinicId, isActive: true };
+
+        if (registrationStatus) {
+            where.registrationStatus = registrationStatus;
+        }
 
         if (search) {
             where.OR = [

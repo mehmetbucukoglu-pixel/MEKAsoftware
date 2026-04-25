@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { appointmentApi, patientApi, doctorScheduleApi, userApi, Patient, Appointment } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth-store';
-import { X, Search, Clock, Calendar, FileText, Check, Loader2, AlertCircle } from 'lucide-react';
+import { X, Search, Clock, Calendar, FileText, Check, Loader2, AlertCircle, ExternalLink, MessageSquare } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 interface AppointmentModalProps {
@@ -17,6 +18,7 @@ interface AppointmentModalProps {
 
 export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, initialEndDate, existingAppointment }: AppointmentModalProps) {
     const { clinic, user } = useAuthStore();
+    const router = useRouter();
     const isEdit = !!existingAppointment;
 
     // Form State
@@ -283,11 +285,35 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
                                     <div style={{ fontWeight: 500 }}>
                                         {selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : 'Yükleniyor...'}
                                     </div>
-                                    {!isEdit && (
-                                        <button type="button" onClick={() => { setSelectedPatient(null); setPatientId(''); }} className="btn-icon" style={{ padding: '4px' }}>
-                                            <X size={16} />
-                                        </button>
-                                    )}
+                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                        {isEdit && selectedPatient && (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { onClose(); router.push(`/patients/${selectedPatient.id}`); }}
+                                                    title="Hasta Profilini Aç"
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '4px', display: 'flex', alignItems: 'center' }}
+                                                >
+                                                    <ExternalLink size={15} />
+                                                </button>
+                                                {selectedPatient.phone && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { onClose(); router.push(`/messages?phone=${selectedPatient.phone}`); }}
+                                                        title="Mesajları Aç"
+                                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '4px', display: 'flex', alignItems: 'center' }}
+                                                    >
+                                                        <MessageSquare size={15} />
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+                                        {!isEdit && (
+                                            <button type="button" onClick={() => { setSelectedPatient(null); setPatientId(''); }} className="btn-icon" style={{ padding: '4px' }}>
+                                                <X size={16} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             ) : (
                                 <div style={{ position: 'relative' }}>

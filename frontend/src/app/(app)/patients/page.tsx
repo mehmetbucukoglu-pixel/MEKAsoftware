@@ -224,9 +224,22 @@ export default function PatientsPage() {
                                                 }}>
                                                     {p.firstName[0]}{p.lastName[0]}
                                                 </div>
-                                                <span style={{ fontWeight: 500 }}>
+                                                <span style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                     <Highlight text={`${p.firstName} ${p.lastName}`} query={search} />
+                                                    {p.registrationStatus === 'PRE_REGISTERED' && (
+                                                        <span style={{
+                                                            fontSize: '0.6rem',
+                                                            background: 'var(--warning-muted)',
+                                                            color: 'var(--warning)',
+                                                            padding: '1px 5px',
+                                                            borderRadius: '4px',
+                                                            fontWeight: 600
+                                                        }}>
+                                                            Ön Kayıt
+                                                        </span>
+                                                    )}
                                                 </span>
+
                                             </div>
                                         </td>
                                         <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.875rem', fontFamily: 'monospace' }}>

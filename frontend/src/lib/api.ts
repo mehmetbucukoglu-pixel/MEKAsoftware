@@ -66,7 +66,9 @@ export interface Patient {
     notes?: string;
     createdAt: string;
     updatedAt?: string;
+    registrationStatus?: 'FULL' | 'PRE_REGISTERED';
     appointments?: Appointment[];
+
     clinicalNotes?: any[];
     attachments?: any[];
     payments?: Payment[];
@@ -150,6 +152,15 @@ export interface DashboardData {
     dailySchedule: Appointment[];
 }
 
+export interface ExtendedKpis {
+    weeklyNewPatients: number;
+    occupancyRate: number;
+    pendingPayment: number;
+    unreadMessages: number;
+    preRegisteredCount: number;
+}
+
+
 export interface PatientListResponse {
     data: Patient[];
     total: number;
@@ -185,8 +196,10 @@ export const userApi = {
 
 // ========== Patient API ==========
 export const patientApi = {
-    list: (params?: { search?: string; page?: number; limit?: number }) =>
+    list: (params?: { search?: string; page?: number; limit?: number; registrationStatus?: string }) =>
         api.get<PatientListResponse>('/patients', { params }),
+    listPreRegistered: () =>
+        api.get<PatientListResponse>('/patients', { params: { registrationStatus: 'PRE_REGISTERED', limit: 50 } }),
     get: (id: string) => api.get<Patient>(`/patients/${id}`),
     create: (data: CreatePatientInput) => api.post<Patient>('/patients', data),
     update: (id: string, data: Partial<CreatePatientInput>) => api.patch<Patient>(`/patients/${id}`, data),
@@ -255,6 +268,7 @@ export const clinicalNoteApi = {
 // ========== Dashboard API ==========
 export const dashboardApi = {
     get: () => api.get<DashboardData>('/dashboard'),
+    getExtendedKpis: () => api.get<ExtendedKpis>('/dashboard/extended-kpis'),
 };
 
 // ========== Statistics API ==========

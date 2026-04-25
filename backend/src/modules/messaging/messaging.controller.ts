@@ -1,11 +1,10 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Ip, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Ip, Headers, UsePipes, ValidationPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { N8nWebhookGuard } from '../../common/guards/n8n-webhook.guard';
 import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { MessagingService } from './messaging.service';
-import { WhatsappWebhookDto } from './dto/whatsapp-webhook.dto';
 
 @ApiTags('Messaging')
 @Controller()
@@ -14,8 +13,9 @@ export class MessagingController {
 
     @Post('webhooks/whatsapp')
     @UseGuards(N8nWebhookGuard)
+    @UsePipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true }))
     @ApiOperation({ summary: 'WhatsApp webhook (inbound mesaj)' })
-    handleWebhook(@Body() data: WhatsappWebhookDto) {
+    handleWebhook(@Body() data: any) {
         return this.messagingService.handleInboundWebhook(data);
     }
 

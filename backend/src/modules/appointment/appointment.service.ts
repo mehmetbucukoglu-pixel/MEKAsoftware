@@ -1,10 +1,17 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { AppointmentStatus, AppointmentSource } from '@prisma/client';
+import { AppointmentStatus, AppointmentSource, UserRole } from '@prisma/client';
+import { NotificationService } from '../notification/notification.service';
+import { SocketGateway } from '../../common/gateways/socket.gateway';
 
 @Injectable()
 export class AppointmentService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private notificationService: NotificationService,
+        private socketGateway: SocketGateway,
+    ) { }
+
 
     async findAll(clinicId: string, filters: { doctorId?: string; date?: string; startDate?: string; endDate?: string; status?: AppointmentStatus; page?: any; limit?: any }) {
         const { doctorId, date, startDate, endDate, status, page = 1, limit = 50 } = filters;
@@ -23,36 +30,33 @@ export class AppointmentService {
             where.startTime = { gte: dayStart, lt: dayEnd };
         }
 
-        const [data, total] = await Promise.all([
+        const [total, items] = await Promise.all([
+            this.prisma.appointment.count({ where }),
             this.prisma.appointment.findMany({
                 where,
                 include: {
-                    patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
-                    doctor: { select: { id: true, firstName: true, lastName: true } },
+                    patient: { select: { firstName: true, lastName: true, phone: true } },
+                    doctor: { select: { firstName: true, lastName: true } },
                 },
-                orderBy: { startTime: 'asc' },
+                orderBy: { startTime: 'desc' },
                 skip: (pageNum - 1) * limitNum,
                 take: limitNum,
             }),
-            this.prisma.appointment.count({ where })
         ]);
 
-        return {
-            data,
-            meta: { total, page: pageNum, limit: limitNum }
-        };
+        return { items, total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) };
     }
 
     async findOne(clinicId: string, appointmentId: string) {
-        return this.prisma.appointment.findFirst({
+        const appointment = await this.prisma.appointment.findFirst({
             where: { id: appointmentId, clinicId },
             include: {
                 patient: true,
-                doctor: { select: { id: true, firstName: true, lastName: true } },
-                clinicalNotes: true,
-                payments: true,
+                doctor: true,
             },
         });
+        if (!appointment) throw new NotFoundException('Randevu bulunamadı');
+        return appointment;
     }
 
     async create(clinicId: string, data: {
@@ -64,84 +68,65 @@ export class AppointmentService {
         source?: AppointmentSource;
         createdBy?: string;
     }) {
-        const startDateTime = new Date(data.startTime);
-        const endTime = new Date(startDateTime);
-        endTime.setMinutes(endTime.getMinutes() + data.durationMin);
+        const startTime = new Date(data.startTime);
+        const endTime = new Date(startTime.getTime() + data.durationMin * 60000);
 
-        // Layer 1: Application-level conflict check
-        const conflict = await this.checkConflict(clinicId, data.doctorId, startDateTime, endTime);
-        if (conflict) {
-            throw new ConflictException('Bu zaman aralığında doktorun başka bir randevusu var');
-        }
+        // Check for conflicts
+        const hasConflict = await this.checkConflict(clinicId, data.doctorId, startTime, endTime);
+        if (hasConflict) throw new ConflictException('Bu saatte doktorun başka bir randevusu var');
 
-        // Layer 2: DB-level insert with exclusion constraint as safety net
-        try {
-            return await this.prisma.appointment.create({
-                data: {
-                    clinicId,
-                    doctorId: data.doctorId,
-                    patientId: data.patientId,
-                    startTime: startDateTime,
-                    endTime,
-                    durationMin: data.durationMin,
-                    notes: data.notes,
-                    source: data.source || 'MANUAL',
-                    createdBy: data.createdBy,
-                    status: 'CONFIRMED',
-                },
-                include: {
-                    patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
-                    doctor: { select: { id: true, firstName: true, lastName: true } },
-                },
-            });
-        } catch (error: any) {
-            // Catch DB exclusion constraint violation (race condition safety)
-            if (error.code === 'P2002' || error.message?.includes('no_overlap')) {
-                throw new ConflictException('Bu zaman aralığında doktorun başka bir randevusu var');
-            }
-            throw error;
-        }
+        const referenceCode = await this.generateReferenceCode();
+
+        return this.prisma.appointment.create({
+            data: {
+                clinicId,
+                doctorId: data.doctorId,
+                patientId: data.patientId,
+                startTime,
+                endTime,
+                durationMin: data.durationMin,
+                notes: data.notes,
+                source: data.source || 'MANUAL',
+                status: 'CONFIRMED',
+                referenceCode,
+                createdBy: data.createdBy,
+            },
+        });
     }
 
     async updateStatus(clinicId: string, appointmentId: string, status: AppointmentStatus, cancelReason?: string) {
-        const appointment = await this.prisma.appointment.findFirst({ where: { id: appointmentId, clinicId } });
-        if (!appointment) throw new NotFoundException('Randevu bulunamadı');
-
-        const data: any = { status, cancelReason };
-
-        // HBYS: Record check-in/check-out timestamps
-        if (status === 'ARRIVED') {
-            data.arrivedAt = new Date();
-        } else if (status === 'COMPLETED') {
-            data.completedAt = new Date();
-        }
-
+        const appointment = await this.findOne(clinicId, appointmentId);
         return this.prisma.appointment.update({
             where: { id: appointmentId },
-            data,
+            data: { status, cancelReason },
         });
     }
 
     async update(clinicId: string, appointmentId: string, data: { startTime?: Date; durationMin?: number; notes?: string }) {
-        const appointment = await this.prisma.appointment.findFirst({ where: { id: appointmentId, clinicId } });
-        if (!appointment) throw new NotFoundException('Randevu bulunamadı');
+        const appointment = await this.findOne(clinicId, appointmentId);
 
-        const updateData: any = { ...data };
-        if (data.startTime && data.durationMin) {
-            const startDateTime = new Date(data.startTime);
-            const endTime = new Date(startDateTime);
-            endTime.setMinutes(endTime.getMinutes() + data.durationMin);
-            updateData.startTime = startDateTime;
-            updateData.endTime = endTime;
+        let startTime = appointment.startTime;
+        let durationMin = appointment.durationMin;
 
-            // Check conflict for updated time
-            const conflict = await this.checkConflict(clinicId, appointment.doctorId, startDateTime, endTime, appointmentId);
-            if (conflict) {
-                throw new ConflictException('Bu zaman aralığında doktorun başka bir randevusu var');
-            }
+        if (data.startTime) startTime = new Date(data.startTime);
+        if (data.durationMin) durationMin = data.durationMin;
+
+        const endTime = new Date(startTime.getTime() + durationMin * 60000);
+
+        if (data.startTime || data.durationMin) {
+            const hasConflict = await this.checkConflict(clinicId, appointment.doctorId, startTime, endTime, appointmentId);
+            if (hasConflict) throw new ConflictException('Bu saatte doktorun başka bir randevusu var');
         }
 
-        return this.prisma.appointment.update({ where: { id: appointmentId }, data: updateData });
+        return this.prisma.appointment.update({
+            where: { id: appointmentId },
+            data: {
+                startTime,
+                endTime,
+                durationMin,
+                notes: data.notes,
+            },
+        });
     }
 
     async getAvailableSlots(clinicId: string, doctorId: string, date: string) {
@@ -166,6 +151,7 @@ export class AppointmentService {
         const slots: { startTime: Date; endTime: Date; available: boolean }[] = [];
         const [startH, startM] = schedule.startTime.split(':').map(Number);
         const [endH, endM] = schedule.endTime.split(':').map(Number);
+
         const breakStart = schedule.breakStart ? schedule.breakStart.split(':').map(Number) : null;
         const breakEnd = schedule.breakEnd ? schedule.breakEnd.split(':').map(Number) : null;
 
@@ -175,29 +161,41 @@ export class AppointmentService {
         const dayEndTime = new Date(dayStart);
         dayEndTime.setHours(endH, endM, 0, 0);
 
+        const slotDuration = schedule.slotDuration > 0 ? schedule.slotDuration : 60;
+
+        let iterations = 0;
         while (current < dayEndTime) {
-            const slotEnd = new Date(current);
-            slotEnd.setMinutes(slotEnd.getMinutes() + schedule.slotDuration);
+            iterations++;
+            if (iterations > 500) break; // Safety guard
+
+            const slotEnd = new Date(current.getTime() + slotDuration * 60000);
 
             // Skip break time
             if (breakStart && breakEnd) {
-                const breakStartTime = new Date(dayStart);
-                breakStartTime.setHours(breakStart[0], breakStart[1], 0, 0);
-                const breakEndTime = new Date(dayStart);
-                breakEndTime.setHours(breakEnd[0], breakEnd[1], 0, 0);
+                const bStart = new Date(current);
+                bStart.setHours(breakStart[0], breakStart[1], 0, 0);
+                const bEnd = new Date(current);
+                bEnd.setHours(breakEnd[0], breakEnd[1], 0, 0);
 
-                if (current >= breakStartTime && current < breakEndTime) {
-                    current = new Date(breakEndTime);
+                if (current >= bStart && current < bEnd) {
+                    current = bEnd;
                     continue;
                 }
             }
 
-            // Check if slot overlaps with any appointment
-            const isOccupied = appointments.some(
-                (apt) => apt.startTime < slotEnd && apt.endTime > current,
-            );
+            // Check if slot is taken
+            const isTaken = appointments.some(appt => {
+                const apptStart = new Date(appt.startTime);
+                const apptEnd = new Date(appt.endTime);
+                return (current < apptEnd && slotEnd > apptStart);
+            });
 
-            slots.push({ startTime: new Date(current), endTime: new Date(slotEnd), available: !isOccupied });
+            slots.push({
+                startTime: new Date(current),
+                endTime: new Date(slotEnd),
+                available: !isTaken,
+            });
+
             current = slotEnd;
         }
 
@@ -205,20 +203,21 @@ export class AppointmentService {
     }
 
     async getDoctorSchedule(clinicId: string, doctorId: string) {
-        return this.prisma.doctorSchedule.findMany({ where: { clinicId, doctorId }, orderBy: { dayOfWeek: 'asc' } });
+        return this.prisma.doctorSchedule.findMany({
+            where: { clinicId, doctorId },
+            orderBy: { dayOfWeek: 'asc' },
+        });
     }
 
     async updateDoctorSchedule(clinicId: string, doctorId: string, schedules: any[]) {
-        await this.prisma.$transaction(async (tx) => {
-            await tx.doctorSchedule.deleteMany({ where: { clinicId, doctorId } });
-            await tx.doctorSchedule.createMany({
-                data: schedules.map((s) => ({ clinicId, doctorId, ...s })),
-            });
+        await this.prisma.doctorSchedule.deleteMany({
+            where: { clinicId, doctorId },
         });
-        return this.getDoctorSchedule(clinicId, doctorId);
-    }
 
-    // --- n8n / WhatsApp Integration ---
+        return this.prisma.doctorSchedule.createMany({
+            data: schedules.map(s => ({ ...s, clinicId, doctorId })),
+        });
+    }
 
     async createFromWhatsApp(clinicId: string, data: {
         patientName: string;
@@ -228,65 +227,274 @@ export class AppointmentService {
         durationMin: number;
         notes?: string;
     }) {
-        // 1. Normalize phone: strip non-digits, ensure leading +
-        const phone = data.patientPhone.replace(/[^\d+]/g, '');
+        console.log('--- WHATSAPP APPT CREATION STARTED (v3) ---');
 
-        // 2. Upsert patient — find by phone, create if not found
-        let patient = await this.prisma.patient.findFirst({
-            where: { clinicId, phone },
+        // 1. Normalize phone
+        const normalizedPhone = data.patientPhone.replace(/\D/g, '');
+        const phone = normalizedPhone.startsWith('+') ? normalizedPhone : `+${normalizedPhone}`;
+
+        // 2. Patient Recognition Logic
+        let patientId: string | null = null;
+        let isNewPatient = false;
+
+        // A. Check PhonePatientLink
+        const link = await this.prisma.phonePatientLink.findUnique({
+            where: { clinicId_waPhone: { clinicId, waPhone: phone } },
+            include: { patient: true }
         });
 
-        if (!patient) {
+        if (link) {
+            patientId = link.patientId;
+            console.log('Found patient via PhonePatientLink:', patientId);
+        } else {
+            // B. Search by name (Fuzzy ILIKE-ish)
             const nameParts = data.patientName.trim().split(' ');
             const firstName = nameParts[0];
             const lastName = nameParts.slice(1).join(' ') || '-';
-            patient = await this.prisma.patient.create({
-                data: { clinicId, firstName, lastName, phone } as any,
+
+            const existingPatient = await this.prisma.patient.findFirst({
+                where: {
+                    clinicId,
+                    firstName: { equals: firstName, mode: 'insensitive' },
+                    lastName: { equals: lastName, mode: 'insensitive' }
+                }
             });
+
+            if (existingPatient) {
+                patientId = existingPatient.id;
+                console.log('Found patient via Name Search:', patientId);
+                // Create link for future
+                await this.prisma.phonePatientLink.create({
+                    data: { clinicId, waPhone: phone, patientId }
+                });
+            } else {
+                // C. Create PRE_REGISTERED patient
+                const newPatient = await this.prisma.patient.create({
+                    data: {
+                        clinicId,
+                        firstName,
+                        lastName,
+                        phone,
+                        registrationStatus: 'PRE_REGISTERED'
+                    }
+                });
+                patientId = newPatient.id;
+                isNewPatient = true;
+                console.log('Created NEW PRE_REGISTERED patient:', patientId);
+                // Create link
+                await this.prisma.phonePatientLink.create({
+                    data: { clinicId, waPhone: phone, patientId }
+                });
+            }
         }
 
-        // 3. Find doctor by name (firstName + lastName match)
-        const doctorNameParts = data.doctorName.trim().split(' ');
-        const doctorFirstName = doctorNameParts[0];
-        const doctorLastName = doctorNameParts.slice(1).join(' ');
-
-        const doctor = await this.prisma.user.findFirst({
-            where: {
-                clinicId,
-                role: 'DOCTOR',
-                firstName: { contains: doctorFirstName, mode: 'insensitive' },
-                ...(doctorLastName && { lastName: { contains: doctorLastName, mode: 'insensitive' } }),
-            },
+        // 3. Find Doctor
+        const normalizedDoctorInput = data.doctorName.replace(/^Dr\.?\s*/i, '').trim().toLowerCase();
+        const doctors = await this.prisma.user.findMany({ where: { clinicId, role: 'DOCTOR' } });
+        const doctor = doctors.find(d => {
+            const fullName = `${d.firstName} ${d.lastName}`.toLowerCase();
+            return fullName.includes(normalizedDoctorInput) || normalizedDoctorInput.includes(fullName);
         });
 
-        if (!doctor) {
-            throw new BadRequestException(`Doktor bulunamadı: "${data.doctorName}"`);
-        }
+        if (!doctor) throw new BadRequestException(`Doktor bulunamadı: "${data.doctorName}"`);
 
-        // 4. Create the appointment
-        return this.create(clinicId, {
+        // 4. Create Appointment
+        const appointment = await this.create(clinicId, {
             doctorId: doctor.id,
-            patientId: patient.id,
+            patientId: patientId!,
             startTime: data.startTime,
-            durationMin: data.durationMin,
+            durationMin: Number(data.durationMin) || 60,
             notes: data.notes,
             source: 'WHATSAPP',
         });
+
+        // 5. Notifications
+        const patient = await this.prisma.patient.findUnique({ where: { id: patientId! } });
+        const patientName = `${patient?.firstName} ${patient?.lastName}`;
+        const dateStr = new Date(data.startTime).toLocaleString('tr-TR', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' });
+
+        const apptMsg = `📅 Yeni WA randevusu: ${patientName} — ${dateStr}`;
+
+        // Notify Doctor
+        await this.notificationService.create(clinicId, doctor.id, {
+            type: 'NEW_APPOINTMENT',
+            title: 'Yeni Randevu (WhatsApp)',
+            body: apptMsg,
+            entityType: 'APPOINTMENT',
+            entityId: appointment.id
+        });
+        this.socketGateway.emitToUser(doctor.id, 'notification', { message: apptMsg });
+
+        // Notify All Assistants
+        const assistants = await this.prisma.user.findMany({ where: { clinicId, role: 'ASSISTANT' } });
+        for (const assistant of assistants) {
+            await this.notificationService.create(clinicId, assistant.id, {
+                type: 'NEW_APPOINTMENT',
+                title: 'Yeni Randevu (WhatsApp)',
+                body: apptMsg,
+                entityType: 'APPOINTMENT',
+                entityId: appointment.id
+            });
+            this.socketGateway.emitToUser(assistant.id, 'notification', { message: apptMsg });
+        }
+
+        // Additional notification for NEW patient
+        if (isNewPatient) {
+            const preRegMsg = `⚠️ Yeni ön-kayıt: ${patientName} — TC eksik`;
+            await this.notificationService.create(clinicId, doctor.id, {
+                type: 'PRE_REGISTERED_PATIENT',
+                title: 'Yeni Ön-Kayıt',
+                body: preRegMsg,
+                entityType: 'PATIENT',
+                entityId: patientId!
+            });
+            for (const assistant of assistants) {
+                await this.notificationService.create(clinicId, assistant.id, {
+                    type: 'PRE_REGISTERED_PATIENT',
+                    title: 'Yeni Ön-Kayıt',
+                    body: preRegMsg,
+                    entityType: 'PATIENT',
+                    entityId: patientId!
+                });
+            }
+        }
+
+        return { ...appointment, isNewPatient };
     }
 
-    // --- Private ---
 
-    private async checkConflict(clinicId: string, doctorId: string, startTime: Date, endTime: Date, excludeId?: string) {
-        const where: any = {
-            clinicId,
-            doctorId,
-            status: 'CONFIRMED',
-            startTime: { lt: endTime },
-            endTime: { gt: startTime },
+    async findByReferenceOrPhone(clinicId: string, query: { referenceCode?: string; phone?: string }) {
+        if (query.referenceCode) {
+            return this.prisma.appointment.findFirst({
+                where: { clinicId, referenceCode: query.referenceCode },
+                include: { patient: true, doctor: true },
+            });
+        }
+
+        if (query.phone) {
+            const normalizedPhone = query.phone.replace(/\D/g, '');
+            const phone = normalizedPhone.startsWith('+') ? normalizedPhone : `+${normalizedPhone}`;
+
+            return this.prisma.appointment.findMany({
+                where: { clinicId, patient: { phone } },
+                include: { patient: true, doctor: true },
+                orderBy: { startTime: 'desc' },
+                take: 5,
+            });
+        }
+
+        return null;
+    }
+
+    async findAvailabilityByDoctorName(clinicId: string, doctorName: string, date: string) {
+        const normalizedInput = doctorName.replace(/^Dr\.?\s*/i, '').trim().toLowerCase();
+        const doctors = await this.prisma.user.findMany({
+            where: { clinicId, role: 'DOCTOR' },
+        });
+
+        const doctor = doctors.find(d => {
+            const fullName = `${d.firstName} ${d.lastName}`.toLowerCase();
+            const simpleInput = normalizedInput.replace(/\s+/g, '');
+            const simpleFull = fullName.replace(/\s+/g, '');
+            return simpleFull.includes(simpleInput) || simpleInput.includes(simpleFull);
+        });
+
+        if (!doctor) throw new BadRequestException(`Doktor bulunamadı: "${doctorName}"`);
+
+        const slots = await this.getAvailableSlots(clinicId, doctor.id, date);
+
+        const pad = (n: number) => n.toString().padStart(2, '0');
+
+        return {
+            doctorId: doctor.id,
+            doctorName: `${doctor.firstName} ${doctor.lastName}`,
+            availableSlots: slots.filter(s => s.available).map(s => {
+                const d = new Date(s.startTime);
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            }),
         };
-        if (excludeId) where.id = { not: excludeId };
+    }
 
-        const conflict = await this.prisma.appointment.findFirst({ where });
-        return conflict;
+    async updateFromWhatsApp(clinicId: string, appointmentId: string, data: { startTime?: string; durationMin?: number }) {
+        const appointment = await this.findOne(clinicId, appointmentId);
+        if (appointment.status === 'CANCELLED') throw new BadRequestException('İptal edilmiş randevu güncellenemez');
+
+        return this.update(clinicId, appointmentId, {
+            startTime: data.startTime ? new Date(data.startTime) : undefined,
+            durationMin: data.durationMin ? Number(data.durationMin) : undefined,
+        });
+    }
+
+    async cancelFromWhatsApp(clinicId: string, appointmentId: string) {
+        const appointment = await this.findOne(clinicId, appointmentId);
+        if (appointment.status === 'CANCELLED') throw new BadRequestException('Bu randevu zaten iptal edilmiş');
+
+        return this.prisma.appointment.update({
+            where: { id: appointmentId },
+            data: { status: 'CANCELLED', cancelReason: 'WhatsApp üzerinden iptal' },
+            include: {
+                patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
+                doctor: { select: { id: true, firstName: true, lastName: true } },
+            },
+        });
+    }
+
+    async getTomorrowAppointments(clinicId: string) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+
+        const dayEnd = new Date(tomorrow);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+
+        return this.prisma.appointment.findMany({
+            where: {
+                clinicId,
+                startTime: { gte: tomorrow, lt: dayEnd },
+                status: 'CONFIRMED',
+            },
+            include: {
+                patient: true,
+                doctor: true,
+            },
+        });
+    }
+
+    async completePastAppointments(clinicId: string) {
+        const now = new Date();
+        return this.prisma.appointment.updateMany({
+            where: {
+                clinicId,
+                endTime: { lt: now },
+                status: 'CONFIRMED',
+            },
+            data: {
+                status: 'COMPLETED',
+            },
+        });
+    }
+
+    async generateReferenceCode(): Promise<string> {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 6; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+    }
+
+    async checkConflict(clinicId: string, doctorId: string, startTime: Date, endTime: Date, excludeId?: string) {
+        const conflict = await this.prisma.appointment.findFirst({
+            where: {
+                clinicId,
+                doctorId,
+                id: excludeId ? { not: excludeId } : undefined,
+                status: 'CONFIRMED',
+                OR: [
+                    { startTime: { lt: endTime }, endTime: { gt: startTime } },
+                ],
+            },
+        });
+        return !!conflict;
     }
 }

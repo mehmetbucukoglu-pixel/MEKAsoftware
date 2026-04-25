@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
+import { startOfDay, endOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subDays } from 'date-fns';
 
 @Injectable()
 export class DashboardService {
@@ -40,7 +40,7 @@ export class DashboardService {
             .filter(p => p.paymentType === 'REFUND')
             .reduce((sum, p) => sum + Number(p.amount), 0);
 
-        // Get daily schedule (top 5 upcoming)
+        // Get daily schedule (top 10 upcoming)
         const dailySchedule = await this.prisma.appointment.findMany({
             where: {
                 clinicId,
@@ -64,4 +64,63 @@ export class DashboardService {
             dailySchedule
         };
     }
+
+    async getExtendedKpis(clinicId: string) {
+        const today = new Date();
+        const weekAgo = subDays(today, 7);
+
+        const [
+            weeklyNewPatients,
+            bookedSlots,
+            pendingPayments,
+            unreadMessages,
+            preRegisteredCount,
+            doctorCount
+        ] = await Promise.all([
+            // Weekly new patients
+            this.prisma.patient.count({
+                where: { clinicId, createdAt: { gte: weekAgo } }
+            }),
+            // Today's booked slots
+            this.prisma.appointment.count({
+                where: {
+                    clinicId,
+                    startTime: { gte: startOfDay(today), lte: endOfDay(today) },
+                    status: { not: 'CANCELLED' },
+                }
+            }),
+            // Pending payments (simplified)
+            this.prisma.appointment.count({
+                where: {
+                    clinicId,
+                    status: 'COMPLETED',
+                    startTime: { gte: startOfMonth(today), lte: endOfMonth(today) },
+                }
+            }),
+            // Unread messages
+            this.prisma.conversation.count({
+                where: { clinicId, unreadCount: { gt: 0 } }
+            }).catch(() => 0),
+            // Pre-registered patients
+            this.prisma.patient.count({
+                where: { clinicId, registrationStatus: 'PRE_REGISTERED', isActive: true }
+            }),
+            // Doctor count
+            this.prisma.user.count({
+                where: { clinicId, role: 'DOCTOR' }
+            })
+        ]);
+
+        const dailyCapacity = doctorCount * 10;
+        const occupancyRate = dailyCapacity > 0 ? Math.round((bookedSlots / dailyCapacity) * 100) : 0;
+
+        return {
+            weeklyNewPatients,
+            occupancyRate: Math.min(occupancyRate, 100),
+            pendingPayment: pendingPayments,
+            unreadMessages,
+            preRegisteredCount,
+        };
+    }
 }
+

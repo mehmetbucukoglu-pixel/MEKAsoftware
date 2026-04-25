@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/lib/auth-store';
-import { notificationApi } from '@/lib/api';
+import { notificationApi, dashboardApi, patientApi, Patient } from '@/lib/api';
+
 import {
     LayoutDashboard, Calendar, MessageSquare, Users,
     Bell, Settings, LogOut, ChevronRight, ListTodo, CheckCircle2,
-    PieChart, PanelLeftClose, PanelLeft, ChevronUp, Building2, Keyboard
+    PieChart, PanelLeftClose, PanelLeft, ChevronUp, Building2, Keyboard,
+    Edit2, ExternalLink, X as XIcon, Loader2
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { useHeaderStore } from '@/lib/header-store';
@@ -17,6 +19,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { queryClient } from '@/lib/query-client';
 import dynamic from 'next/dynamic';
 import { useKeyboardShortcuts } from '@/components/keyboard-shortcuts';
+import { useRealtimeNotifications } from '@/lib/use-realtime-notifications';
 
 const OnboardingTooltips = dynamic(
     () => import('@/components/onboarding-tooltips').then((mod) => mod.OnboardingTooltips),
@@ -51,6 +54,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const headerTitle = useHeaderStore(s => s.title);
     const headerActions = useHeaderStore(s => s.actions);
     const { showCheatSheet, setShowCheatSheet } = useKeyboardShortcuts();
+    useRealtimeNotifications();
 
     // Sidebar collapse
     const [collapsed, setCollapsed] = useState(false);
@@ -93,23 +97,56 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }
     }, [isLoading, isAuthenticated, router]);
 
-    // Fetch Notifications Logic
-    const fetchNotifications = async () => {
+    const [preRegCount, setPreRegCount] = useState(0);
+    const [showPreRegPanel, setShowPreRegPanel] = useState(false);
+    const [preRegPatients, setPreRegPatients] = useState<Patient[]>([]);
+    const [preRegLoading, setPreRegLoading] = useState(false);
+    const preRegRef = useRef<HTMLDivElement>(null);
+
+    const fetchPreRegPatients = useCallback(async () => {
+        setPreRegLoading(true);
         try {
-            const { data } = await notificationApi.list();
-            setNotifications(data);
+            const res = await patientApi.listPreRegistered();
+            setPreRegPatients(res.data.data);
+        } catch { setPreRegPatients([]); }
+        finally { setPreRegLoading(false); }
+    }, []);
+
+    useEffect(() => {
+        if (showPreRegPanel) fetchPreRegPatients();
+    }, [showPreRegPanel, fetchPreRegPatients]);
+
+    // Close pre-reg panel on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (preRegRef.current && !preRegRef.current.contains(e.target as Node)) setShowPreRegPanel(false);
+        };
+        if (showPreRegPanel) document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showPreRegPanel]);
+
+    // Fetch Notifications & Pre-Reg Logic
+    const fetchGlobalStats = async () => {
+        try {
+            const [notifRes, extKpisRes] = await Promise.all([
+                notificationApi.list(),
+                dashboardApi.getExtendedKpis()
+            ]);
+            setNotifications(notifRes.data);
+            setPreRegCount(extKpisRes.data.preRegisteredCount || 0);
         } catch (error) {
-            console.error('Failed to fetch notifications', error);
+            console.error('Failed to fetch global stats', error);
         }
     };
 
     useEffect(() => {
         if (isAuthenticated) {
-            fetchNotifications();
-            const interval = setInterval(fetchNotifications, 60000);
+            fetchGlobalStats();
+            const interval = setInterval(fetchGlobalStats, 60000);
             return () => clearInterval(interval);
         }
     }, [isAuthenticated]);
+
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -457,6 +494,100 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 Ctrl+/
                             </kbd>
                         </button>
+                        {/* Pre-Registered Patients Badge + Panel */}
+                        {preRegCount > 0 && (
+                            <div style={{ position: 'relative' }} ref={preRegRef}>
+                                <button
+                                    onClick={() => setShowPreRegPanel(!showPreRegPanel)}
+                                    title={`${preRegCount} Hasta Kayıt Bekliyor`}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                        background: showPreRegPanel ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.1)',
+                                        border: '1px solid rgba(245, 158, 11, 0.2)',
+                                        color: '#d97706', cursor: 'pointer', padding: '4px 10px',
+                                        borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 600,
+                                        transition: 'all 0.15s',
+                                        marginRight: '8px'
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(245, 158, 11, 0.2)'; }}
+                                    onMouseLeave={(e) => { if (!showPreRegPanel) e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)'; }}
+                                >
+                                    <Users size={14} />
+                                    <span>{preRegCount} Ön Kayıt</span>
+                                </button>
+
+                                {/* Pre-Reg Slide Panel */}
+                                {showPreRegPanel && (
+                                    <div style={{
+                                        position: 'absolute', top: '100%', right: 0, marginTop: '8px',
+                                        width: '380px', backgroundColor: 'var(--bg-surface)',
+                                        border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+                                        boxShadow: 'var(--shadow-lg)', zIndex: 50, overflow: 'hidden',
+                                        display: 'flex', flexDirection: 'column',
+                                    }}>
+                                        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600 }}>Ön Kayıt Bekleyenler</h3>
+                                            <button onClick={() => setShowPreRegPanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px' }}>
+                                                <XIcon size={16} />
+                                            </button>
+                                        </div>
+                                        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                            {preRegLoading ? (
+                                                <div style={{ padding: '24px', textAlign: 'center' }}>
+                                                    <Loader2 size={20} className="spin" style={{ color: 'var(--primary)' }} />
+                                                </div>
+                                            ) : preRegPatients.length === 0 ? (
+                                                <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                                                    Ön kayıt bekleyen hasta yok.
+                                                </div>
+                                            ) : (
+                                                preRegPatients.map((p) => (
+                                                    <div key={p.id} style={{
+                                                        padding: '10px 16px', borderBottom: '1px solid var(--border)',
+                                                        display: 'flex', alignItems: 'center', gap: '10px',
+                                                    }}>
+                                                        <div style={{
+                                                            width: '32px', height: '32px', borderRadius: '50%',
+                                                            background: 'rgba(245,158,11,0.15)', color: '#d97706',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            fontSize: '0.7rem', fontWeight: 600, flexShrink: 0,
+                                                        }}>
+                                                            {p.firstName?.[0]}{p.lastName?.[0]}
+                                                        </div>
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontSize: '0.8125rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                {p.firstName} {p.lastName}
+                                                            </div>
+                                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                                                {p.phone || '—'}
+                                                            </div>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                                                            <button
+                                                                onClick={() => { setShowPreRegPanel(false); router.push(`/patients/${p.id}`); }}
+                                                                title="Profili Aç"
+                                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: '4px' }}
+                                                            >
+                                                                <ExternalLink size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                        <div style={{ padding: '8px', borderTop: '1px solid var(--border)', textAlign: 'center', backgroundColor: 'var(--bg-base)' }}>
+                                            <button
+                                                onClick={() => { setShowPreRegPanel(false); router.push('/patients'); }}
+                                                style={{ fontSize: '0.75rem', color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
+                                            >
+                                                Tüm Hastaları Gör →
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div style={{ position: 'relative' }} ref={notifRef}>
                             <button
                                 className="btn-icon"
@@ -581,6 +712,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <OnboardingTooltips />
             <ShortcutCheatSheet open={showCheatSheet} onClose={() => setShowCheatSheet(false)} />
             <QuickSearch hideButton />
-        </div>
+        </div >
     );
 }

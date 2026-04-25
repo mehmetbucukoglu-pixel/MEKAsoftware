@@ -3,11 +3,15 @@ import { MessagingController } from './messaging.controller';
 import { MessagingService } from './messaging.service';
 import { SocketGateway } from '../../common/gateways/socket.gateway';
 import { AuditModule } from '../audit/audit.module';
+import { NotificationModule } from '../notification/notification.module';
+import { HumanModeTimeoutTask } from './tasks/human-mode-timeout.task';
+import { MessageCleanupTask } from './tasks/message-cleanup.task';
 
 @Module({
-    imports: [AuditModule],
+    imports: [AuditModule, NotificationModule],
     controllers: [MessagingController],
-    providers: [MessagingService, SocketGateway],
+    providers: [MessagingService, SocketGateway, HumanModeTimeoutTask, MessageCleanupTask],
     exports: [MessagingService, SocketGateway],
 })
 export class MessagingModule { }
+

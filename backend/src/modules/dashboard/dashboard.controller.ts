@@ -17,4 +17,10 @@ export class DashboardController {
     async getDashboardData(@CurrentUser() user: CurrentUserPayload) {
         return this.dashboardService.getDashboardData(user.clinicId);
     }
+
+    @Get('extended-kpis')
+    @ApiOperation({ summary: 'Genişletilmiş KPI verilerini getir' })
+    async getExtendedKpis(@CurrentUser() user: CurrentUserPayload) {
+        return this.dashboardService.getExtendedKpis(user.clinicId);
+    }
 }

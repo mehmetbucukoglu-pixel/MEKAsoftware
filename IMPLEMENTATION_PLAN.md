@@ -19,7 +19,7 @@ We have modified the KlinikApp backend to securely handle inbound webhooks from 
 5.  **Environment Variables Template:**
     *   Created `.env.example` defining `N8N_WEBHOOK_SECRET` and `N8N_OUTBOUND_WEBHOOK_URL` to guide the configuration.
 
-## Phase 2: Exposing the Local Backend (🔄 Pending)
+## Phase 2: Exposing the Local Backend (⏳ In Testing Stage)
 
 n8n is running in the cloud and needs a public URL to talk to the backend running currently on `localhost:3001`.
 
@@ -29,7 +29,7 @@ n8n is running in the cloud and needs a public URL to talk to the backend runnin
     *   *Goal:* Obtain the temporary `https://<hash>.ngrok.app` URL to configure n8n.
     *   *Note:* This is a temporary solution for testing and MVP onboarding day. A permanent deployment (Phase 5) is highly recommended immediately after MVP testing.
 
-## Phase 3: n8n Workflow Configuration (🔄 Pending)
+## Phase 3: n8n Workflow Configuration (⏳ In Testing Stage)
 
 This phase requires access to the n8n workspace to modifying the logical flows to communicate with the updated KlinikApp backend.
 

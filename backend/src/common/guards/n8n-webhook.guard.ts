@@ -7,13 +7,15 @@ export class N8nWebhookGuard implements CanActivate {
 
     canActivate(context: ExecutionContext): boolean {
         const request = context.switchToHttp().getRequest();
-        const secret = request.headers['x-n8n-secret'];
+        const secret = request.headers['x-n8n-secret'] || request.query['token'];
         const expectedSecret = this.configService.get<string>('N8N_WEBHOOK_SECRET');
 
-        if (!secret || secret !== expectedSecret) {
-            throw new UnauthorizedException('Invalid n8n webhook secret');
-        }
+        const secretTrimmed = secret ? String(secret).trim() : '';
+        const expectedTrimmed = expectedSecret ? expectedSecret.trim() : '';
 
-        return true;
+        if (secretTrimmed && secretTrimmed === expectedTrimmed) {
+            return true;
+        }
+        throw new UnauthorizedException('Invalid n8n webhook secret');
     }
 }

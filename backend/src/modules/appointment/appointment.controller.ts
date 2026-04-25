@@ -119,4 +119,5 @@ export class AppointmentController {
     updateDoctorSchedule(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string, @Body() schedules: any[]) {
         return this.appointmentService.updateDoctorSchedule(user.clinicId, id, schedules);
     }
+
 }

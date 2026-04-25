@@ -10,6 +10,7 @@ interface Conversation {
     lastMessageAt: string | null;
     unreadCount: number;
     status: 'BOT' | 'HUMAN' | 'CLOSED';
+    escalationReason?: string | null;
     patient?: {
         firstName: string;
         lastName: string;
@@ -23,6 +24,12 @@ interface ConversationListProps {
 }
 
 export function ConversationList({ conversations, selectedId, onSelect }: ConversationListProps) {
+    const getBadgeStyle = (conv: Conversation) => {
+        if (conv.status === 'HUMAN' && conv.escalationReason) return { bg: 'var(--error-muted)', text: 'var(--error)', label: 'ESCALATED', icon: '⚠️' };
+        if (conv.status === 'HUMAN') return { bg: 'var(--warning-muted)', text: 'var(--warning)', label: 'HUMAN', icon: '👤' };
+        return { bg: 'var(--primary-muted)', text: 'var(--primary)', label: 'BOT', icon: '🤖' };
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', borderRight: '1px solid var(--border)' }}>
             <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
@@ -48,66 +55,76 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
                         <p style={{ fontSize: '0.875rem' }}>Konuşma bulunamadı</p>
                     </div>
                 ) : (
-                    conversations.map((conv) => (
-                        <div
-                            key={conv.id}
-                            onClick={() => onSelect(conv.id)}
-                            style={{
-                                padding: '12px 16px',
-                                cursor: 'pointer',
-                                borderBottom: '1px solid var(--border)',
-                                background: selectedId === conv.id ? 'var(--primary-muted)' : 'transparent',
-                                display: 'flex',
-                                gap: '12px',
-                                transition: 'background 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                                if (selectedId !== conv.id) e.currentTarget.style.background = 'var(--bg-hover)';
-                            }}
-                            onMouseLeave={(e) => {
-                                if (selectedId !== conv.id) e.currentTarget.style.background = 'transparent';
-                            }}
-                        >
-                            <div style={{
-                                width: '44px', height: '44px', borderRadius: 'var(--radius-full)',
-                                background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0
-                            }}>
-                                <User size={20} style={{ color: 'var(--text-muted)' }} />
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                    <span style={{ fontWeight: 600, fontSize: '0.9375rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {conv.patient ? `${conv.patient.firstName} ${conv.patient.lastName}` : conv.waPhone}
-                                    </span>
-                                    {conv.lastMessageAt && (
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                            {formatDistanceToNow(new Date(conv.lastMessageAt), { addSuffix: false, locale: tr })}
-                                        </span>
-                                    )}
+                    conversations.map((conv) => {
+                        const badge = getBadgeStyle(conv);
+                        return (
+                            <div
+                                key={conv.id}
+                                onClick={() => onSelect(conv.id)}
+                                style={{
+                                    padding: '12px 16px',
+                                    cursor: 'pointer',
+                                    borderBottom: '1px solid var(--border)',
+                                    background: selectedId === conv.id ? 'var(--primary-muted)' : 'transparent',
+                                    display: 'flex',
+                                    gap: '12px',
+                                    transition: 'background 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (selectedId !== conv.id) e.currentTarget.style.background = 'var(--bg-hover)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (selectedId !== conv.id) e.currentTarget.style.background = 'transparent';
+                                }}
+                            >
+                                <div style={{
+                                    width: '44px', height: '44px', borderRadius: 'var(--radius-full)',
+                                    background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    flexShrink: 0
+                                }}>
+                                    <User size={20} style={{ color: 'var(--text-muted)' }} />
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
-                                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                        <span style={{ fontWeight: 600, fontSize: '0.9375rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {conv.patient ? `${conv.patient.firstName} ${conv.patient.lastName}` : conv.waPhone}
+                                        </span>
+                                        {conv.lastMessageAt && (
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                {formatDistanceToNow(new Date(conv.lastMessageAt), { addSuffix: false, locale: tr })}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', alignItems: 'center' }}>
                                         <span style={{
-                                            width: '6px', height: '6px', borderRadius: '50%',
-                                            background: conv.status === 'HUMAN' ? 'var(--warning)' : 'var(--primary)'
-                                        }} />
-                                        {conv.status === 'HUMAN' ? 'Müşteri Temsilcisi' : 'Bot'}
-                                    </span>
-                                    {conv.unreadCount > 0 && (
-                                        <span style={{
-                                            background: 'var(--primary)', color: '#fff', borderRadius: '10px',
-                                            padding: '2px 6px', fontSize: '0.75rem', fontWeight: 600
+                                            fontSize: '0.65rem',
+                                            fontWeight: 700,
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            background: badge.bg,
+                                            color: badge.text,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
                                         }}>
-                                            {conv.unreadCount}
+                                            <span>{badge.icon}</span> {badge.label}
                                         </span>
-                                    )}
+                                        {conv.unreadCount > 0 && (
+                                            <span style={{
+                                                background: 'var(--primary)', color: '#fff', borderRadius: '10px',
+                                                padding: '2px 6px', fontSize: '0.75rem', fontWeight: 600
+                                            }}>
+                                                {conv.unreadCount}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </div>
     );
 }
+

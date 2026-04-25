@@ -9,11 +9,12 @@ async function main() {
 
     // Demo Klinik
     const clinic = await prisma.clinic.upsert({
-        where: { slug: 'demo-klinik' },
+        where: { slug: 'feneryolu-psikiyatri' },
         update: {},
         create: {
-            name: 'Demo Diş Kliniği',
-            slug: 'demo-klinik',
+            id: '135460d3-f612-457f-89e8-8ead3181c562',
+            name: 'Feneryolu Psikiyatri',
+            slug: 'feneryolu-psikiyatri',
             phone: '+905551234567',
             address: 'Ankara, Çankaya',
             timezone: 'Europe/Istanbul',
@@ -21,39 +22,39 @@ async function main() {
     });
     console.log(`✅ Klinik: ${clinic.name} (${clinic.id})`);
 
-    // Admin kullanıcı
-    const adminPassword = await bcrypt.hash('Admin123!', 12);
-    const admin = await prisma.user.upsert({
-        where: { clinicId_email: { clinicId: clinic.id, email: 'admin@demo.com' } },
+    // Doktor 1 (Ayşe Pınar Vural)
+    const doctor1Password = await bcrypt.hash('Doctor123!', 12);
+    const doctor1 = await prisma.user.upsert({
+        where: { clinicId_email: { clinicId: clinic.id, email: 'ayse@demo.com' } },
         update: {},
         create: {
             clinicId: clinic.id,
-            email: 'admin@demo.com',
-            passwordHash: adminPassword,
-            firstName: 'Ahmet',
-            lastName: 'Yılmaz',
-            phone: '+905551234567',
-            role: UserRole.ADMIN,
-        },
-    });
-    console.log(`✅ Admin: ${admin.email}`);
-
-    // Doktor
-    const doctorPassword = await bcrypt.hash('Doctor123!', 12);
-    const doctor = await prisma.user.upsert({
-        where: { clinicId_email: { clinicId: clinic.id, email: 'doctor@demo.com' } },
-        update: {},
-        create: {
-            clinicId: clinic.id,
-            email: 'doctor@demo.com',
-            passwordHash: doctorPassword,
-            firstName: 'Fatma',
-            lastName: 'Kaya',
+            email: 'ayse@demo.com',
+            passwordHash: doctor1Password,
+            firstName: 'Ayşe Pınar',
+            lastName: 'Vural',
             phone: '+905559876543',
             role: UserRole.DOCTOR,
         },
     });
-    console.log(`✅ Doktor: ${doctor.email}`);
+    console.log(`✅ Doktor 1: ${doctor1.email}`);
+
+    // Doktor 2 (Ece Yılmaz)
+    const doctor2Password = await bcrypt.hash('Doctor123!', 12);
+    const doctor2 = await prisma.user.upsert({
+        where: { clinicId_email: { clinicId: clinic.id, email: 'ece@demo.com' } },
+        update: {},
+        create: {
+            clinicId: clinic.id,
+            email: 'ece@demo.com',
+            passwordHash: doctor2Password,
+            firstName: 'Ece',
+            lastName: 'Yılmaz',
+            phone: '+905558887766',
+            role: UserRole.DOCTOR,
+        },
+    });
+    console.log(`✅ Doktor 2: ${doctor2.email}`);
 
     // Asistan
     const assistantPassword = await bcrypt.hash('Assist123!', 12);
@@ -75,31 +76,27 @@ async function main() {
     // Doktor çalışma takvimi (Pazartesi-Cuma)
     for (let day = 0; day < 5; day++) {
         await prisma.doctorSchedule.upsert({
-            where: { clinicId_doctorId_dayOfWeek: { clinicId: clinic.id, doctorId: admin.id, dayOfWeek: day } },
+            where: { clinicId_doctorId_dayOfWeek: { clinicId: clinic.id, doctorId: doctor1.id, dayOfWeek: day } },
             update: {},
             create: {
                 clinicId: clinic.id,
-                doctorId: admin.id,
+                doctorId: doctor1.id,
                 dayOfWeek: day,
                 startTime: '09:00',
-                endTime: '17:00',
-                breakStart: '12:00',
-                breakEnd: '13:00',
-                slotDuration: 30,
+                endTime: '23:00', // AI Agent'ın çalışma saatlerine uygun
+                slotDuration: 60,
             },
         });
         await prisma.doctorSchedule.upsert({
-            where: { clinicId_doctorId_dayOfWeek: { clinicId: clinic.id, doctorId: doctor.id, dayOfWeek: day } },
+            where: { clinicId_doctorId_dayOfWeek: { clinicId: clinic.id, doctorId: doctor2.id, dayOfWeek: day } },
             update: {},
             create: {
                 clinicId: clinic.id,
-                doctorId: doctor.id,
+                doctorId: doctor2.id,
                 dayOfWeek: day,
-                startTime: '10:00',
-                endTime: '18:00',
-                breakStart: '13:00',
-                breakEnd: '14:00',
-                slotDuration: 30,
+                startTime: '09:00',
+                endTime: '23:00',
+                slotDuration: 60,
             },
         });
     }
@@ -179,7 +176,7 @@ async function main() {
                 patientId: mehmet.id,
                 waPhone: mehmet.phone,
                 status: 'HUMAN',
-                assignedTo: admin.id,
+                assignedTo: assistant.id,
                 lastMessageAt: new Date(),
                 messages: {
                     create: [

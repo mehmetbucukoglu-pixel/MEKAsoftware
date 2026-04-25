@@ -8,11 +8,12 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import trLocale from '@fullcalendar/core/locales/tr';
-import { Calendar as CalendarIcon, Loader2, Plus, Users, LayoutGrid } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, LayoutGrid, Users, DollarSign, Clock, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { AppointmentModal } from './appointment-modal';
 import { DoctorDayGrid } from './doctor-day-grid';
 import { PageHeader } from '@/lib/page-header';
+import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
 
 /* ── Durum Renkleri (Gruplanmış) ── */
 const STATUS_COLOR_MAP: Record<string, string> = {
@@ -38,10 +39,6 @@ export default function AppointmentsPage() {
     const [doctors, setDoctors] = useState<any[]>([]);
     const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
 
-    /* Görünüm Modu: Doktor ise normal FullCalendar, Admin/Asistan ise seçebilir */
-    const isStaff = user?.role === 'ADMIN' || user?.role === 'ASSISTANT';
-    const [viewMode, setViewMode] = useState<'calendar' | 'doctor-grid'>(isStaff ? 'doctor-grid' : 'calendar');
-
     /* Doktor grid günlük tarih — hafta sonu ise Pazartesiye atla */
     const [gridDate, setGridDate] = useState<Date>(() => {
         const now = new Date();
@@ -50,6 +47,19 @@ export default function AppointmentsPage() {
         return now;
     });
 
+    /* Görünüm Modu: 'individual' (Bireysel) | 'corporate' (Kurumsal) */
+    const [viewMode, setViewMode] = useState<'individual' | 'corporate'>('individual');
+
+    // Update view mode once user is loaded
+    useEffect(() => {
+        if (user?.role === 'ADMIN' || user?.role === 'ASSISTANT') {
+            setViewMode('corporate');
+        } else {
+            setViewMode('individual');
+        }
+    }, [user?.role]);
+
+    const isStaff = user?.role === 'ADMIN' || user?.role === 'ASSISTANT';
     /* Tarih aralığı (FullCalendar'dan veya grid'den gelen) */
     const [dateRange, setDateRange] = useState<{ start: Date; end: Date } | null>(null);
 
@@ -82,7 +92,7 @@ export default function AppointmentsPage() {
                 limit: 500
             });
 
-            const eventsData = res.data?.data || [];
+            const eventsData = res.data?.items || res.data?.data || [];
             setAllAppointments(eventsData);
 
             const formattedEvents = eventsData.map((apt: Appointment) => {
@@ -93,6 +103,7 @@ export default function AppointmentsPage() {
                     start: apt.startTime,
                     end: apt.endTime,
                     docId: apt.doctorId,
+                    resourceId: apt.doctorId,
                     backgroundColor: color,
                     borderColor: 'transparent',
                     textColor: '#fff',
@@ -109,17 +120,7 @@ export default function AppointmentsPage() {
         }
     };
 
-    /* Grid modu tarih değişince randevuları yenile */
-    useEffect(() => {
-        if (viewMode === 'doctor-grid') {
-            const dayStart = new Date(gridDate);
-            dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(gridDate);
-            dayEnd.setDate(dayEnd.getDate() + 1);
-            dayEnd.setHours(0, 0, 0, 0);
-            fetchAppointments(dayStart, dayEnd);
-        }
-    }, [gridDate, viewMode]);
+    // FullCalendar handles date changes via datesSet event
 
     const handleDateSelect = (selectInfo: any) => {
         setSelectedDate(selectInfo.start);
@@ -193,14 +194,7 @@ export default function AppointmentsPage() {
 
     /* Ortak refresh fonksiyonu */
     const handleRefresh = () => {
-        if (viewMode === 'doctor-grid') {
-            const dayStart = new Date(gridDate);
-            dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(gridDate);
-            dayEnd.setDate(dayEnd.getDate() + 1);
-            dayEnd.setHours(0, 0, 0, 0);
-            fetchAppointments(dayStart, dayEnd);
-        } else if (calendarRef.current) {
+        if (calendarRef.current) {
             const api = calendarRef.current.getApi();
             fetchAppointments(api.view.activeStart, api.view.activeEnd);
         }
@@ -257,38 +251,38 @@ export default function AppointmentsPage() {
                         border: '1px solid var(--border)', overflow: 'hidden',
                     }}>
                         <button
-                            onClick={() => setViewMode('doctor-grid')}
+                            onClick={() => setViewMode('individual')}
                             style={{
                                 padding: '6px 14px', border: 'none', cursor: 'pointer',
                                 fontSize: '0.8125rem', fontWeight: 500,
                                 display: 'flex', alignItems: 'center', gap: '6px',
-                                background: viewMode === 'doctor-grid' ? 'var(--primary-muted)' : 'transparent',
-                                color: viewMode === 'doctor-grid' ? 'var(--primary)' : 'var(--text-muted)',
+                                background: viewMode === 'individual' ? 'var(--primary-muted)' : 'transparent',
+                                color: viewMode === 'individual' ? 'var(--primary)' : 'var(--text-muted)',
                                 transition: 'all 0.15s',
                             }}
                         >
-                            <LayoutGrid size={14} /> Doktor Sütunları
+                            <User size={14} /> Bireysel
                         </button>
                         <button
-                            onClick={() => setViewMode('calendar')}
+                            onClick={() => setViewMode('corporate')}
                             style={{
                                 padding: '6px 14px', border: 'none', cursor: 'pointer',
                                 fontSize: '0.8125rem', fontWeight: 500,
                                 display: 'flex', alignItems: 'center', gap: '6px',
-                                background: viewMode === 'calendar' ? 'var(--primary-muted)' : 'transparent',
-                                color: viewMode === 'calendar' ? 'var(--primary)' : 'var(--text-muted)',
+                                background: viewMode === 'corporate' ? 'var(--primary-muted)' : 'transparent',
+                                color: viewMode === 'corporate' ? 'var(--primary)' : 'var(--text-muted)',
                                 borderLeft: '1px solid var(--border)',
                                 transition: 'all 0.15s',
                             }}
                         >
-                            <CalendarIcon size={14} /> Takvim
+                            <LayoutGrid size={14} /> Kurumsal
                         </button>
                     </div>
                 ) : undefined}
             />
 
-            {/* Doctor filter (calendar mode only) */}
-            {viewMode === 'calendar' && (
+            {/* Doctor filter (calendar mode only for staff) */}
+            {viewMode === 'individual' && isStaff && (
                 <div style={{ marginBottom: '16px' }}>
                     <div className="input-with-icon" style={{ minWidth: '220px', maxWidth: '320px' }}>
                         <Users size={16} />
@@ -306,14 +300,12 @@ export default function AppointmentsPage() {
                 </div>
             )}
 
-            {/* Durum Lejandı — Takvim modunda */}
-            {viewMode === 'calendar' && (
-                <div style={{ marginBottom: '12px', paddingLeft: '4px' }}>
-                    <StatusLegend />
-                </div>
-            )}
+            {/* Durum Lejandı */}
+            <div style={{ marginBottom: '12px', paddingLeft: '4px' }}>
+                <StatusLegend />
+            </div>
 
-            <div className="card" style={{ flex: 1, padding: viewMode === 'doctor-grid' ? '0' : '20px', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+            <div className="card" style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
                 {isLoading && (
                     <div style={{
                         position: 'absolute', inset: 0, zIndex: 10,
@@ -324,85 +316,73 @@ export default function AppointmentsPage() {
                     </div>
                 )}
 
-                {/* ── DOKTOR GRID MODU (Admin / Asistan) ── */}
-                {viewMode === 'doctor-grid' && (
-                    <DoctorDayGrid
-                        doctors={doctors}
-                        appointments={allAppointments}
-                        currentDate={gridDate}
-                        onDateChange={(d) => setGridDate(d)}
-                        onEventClick={handleGridEventClick}
-                        onSlotClick={handleGridSlotClick}
-                    />
-                )}
-
-                {/* ── STANDART TAKVİM MODU ── */}
-                {viewMode === 'calendar' && (
-                    <div style={{ flex: 1, minHeight: 0 }}>
-                        <FullCalendar
-                            ref={calendarRef}
-                            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                            headerToolbar={{
-                                left: 'prev,next today',
-                                center: 'title',
-                                right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                            }}
-                            initialView="timeGridWeek"
-                            locale={trLocale}
-                            firstDay={1}
-                            initialDate={(() => {
-                                const now = new Date();
-                                // Pazar günü ise (getDay() === 0) ertesi güne (Pazartesi) atla
-                                if (now.getDay() === 0) {
-                                    const nextMonday = new Date(now);
-                                    nextMonday.setDate(nextMonday.getDate() + 1);
-                                    return nextMonday;
-                                }
-                                return now;
-                            })()}
-                            slotDuration="00:15:00"
-                            slotMinTime="08:00:00"
-                            slotMaxTime="20:00:00"
-                            allDaySlot={false}
-                            selectable={true}
-                            selectMirror={true}
-                            dayMaxEvents={true}
-                            weekends={false}
-                            editable={true}
-                            eventDurationEditable={true}
-                            events={filteredEvents}
-                            select={handleDateSelect}
-                            eventClick={handleEventClick}
-                            eventDrop={handleEventDrop}
-                            eventResize={handleEventResize}
-                            height="100%"
-                            datesSet={(arg) => fetchAppointments(arg.start, arg.end)}
-                            slotLabelFormat={{
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: false
-                            }}
-                            eventContent={(arg) => {
-                                const apt = arg.event.extendedProps as Appointment;
-                                return (
-                                    <div style={{
-                                        padding: '2px 6px', overflow: 'hidden',
-                                        fontSize: '0.75rem', lineHeight: 1.4,
-                                    }}>
-                                        <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            {apt.patient?.firstName} {apt.patient?.lastName}
-                                        </div>
-                                        {apt.doctor && (
-                                            <div style={{ fontSize: '0.6875rem', opacity: 0.85 }}>
-                                                Dr. {apt.doctor.firstName} {apt.doctor.lastName}
-                                            </div>
-                                        )}
+                <div style={{ flex: 1, minHeight: 0 }}>
+                    <FullCalendar
+                        key={viewMode} // Force remount on view mode change
+                        ref={calendarRef}
+                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, resourceTimeGridPlugin]}
+                        headerToolbar={{
+                            left: 'prev,next today',
+                            center: 'title',
+                            right: viewMode === 'corporate'
+                                ? 'resourceTimeGridDay'
+                                : 'dayGridMonth,timeGridWeek,timeGridDay'
+                        }}
+                        initialView={viewMode === 'corporate' ? "resourceTimeGridDay" : "timeGridWeek"}
+                        locale={trLocale}
+                        firstDay={1}
+                        resources={viewMode === 'corporate' ? doctors.map(d => ({ id: d.id, title: `Dr. ${d.firstName} ${d.lastName}` })) : undefined}
+                        events={viewMode === 'corporate' ? events : filteredEvents}
+                        initialDate={(() => {
+                            const now = new Date();
+                            if (now.getDay() === 0) {
+                                const nextMonday = new Date(now);
+                                nextMonday.setDate(nextMonday.getDate() + 1);
+                                return nextMonday;
+                            }
+                            return now;
+                        })()}
+                        slotDuration="00:15:00"
+                        slotMinTime="08:00:00"
+                        slotMaxTime="20:00:00"
+                        allDaySlot={false}
+                        selectable={true}
+                        selectMirror={true}
+                        dayMaxEvents={true}
+                        weekends={false}
+                        editable={true}
+                        eventDurationEditable={true}
+                        select={handleDateSelect}
+                        eventClick={handleEventClick}
+                        eventDrop={handleEventDrop}
+                        eventResize={handleEventResize}
+                        height="100%"
+                        datesSet={(arg) => fetchAppointments(arg.start, arg.end)}
+                        slotLabelFormat={{
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                        }}
+                        eventContent={(arg) => {
+                            const apt = arg.event.extendedProps as Appointment;
+                            return (
+                                <div style={{
+                                    padding: '2px 6px', overflow: 'hidden',
+                                    fontSize: '0.75rem', lineHeight: 1.4,
+                                }}>
+                                    <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {apt.patient?.firstName} {apt.patient?.lastName}
                                     </div>
-                                );
-                            }}
-                        />
-                    </div>
-                )}
+                                    {apt.doctor && (
+                                        <div style={{ fontSize: '0.6875rem', opacity: 0.85 }}>
+                                            Dr. {apt.doctor.firstName} {apt.doctor.lastName}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }}
+                    />
+                </div>
             </div>
 
             <AppointmentModal

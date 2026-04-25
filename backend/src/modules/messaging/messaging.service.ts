@@ -7,6 +7,8 @@ import { UserRole, MessageDirection, MessageStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { WhatsappWebhookDto } from './dto/whatsapp-webhook.dto';
 
+import { NotificationService } from '../notification/notification.service';
+
 @Injectable()
 export class MessagingService {
     constructor(
@@ -14,7 +16,9 @@ export class MessagingService {
         private socketGateway: SocketGateway,
         private auditService: AuditService,
         private configService: ConfigService,
+        private notificationService: NotificationService,
     ) { }
+
 
     async getConversations(user: CurrentUserPayload) {
         const { clinicId, userId, role } = user;
@@ -138,93 +142,100 @@ export class MessagingService {
     }
 
     async handleInboundWebhook(data: WhatsappWebhookDto) {
-        const { clinicId, waPhone, waMessageId, body, mediaUrl, mediaType, metadata } = data;
-        // Idempotency: check if message exists
-        const existing = await this.prisma.message.findFirst({
-            where: { clinicId, waMessageId },
-        });
-        if (existing) return existing;
+        const { clinicId, waPhone, waMessageId, body, metadata } = data;
 
-        // Find or create conversation
-        let conversation = await this.prisma.conversation.findFirst({
-            where: { clinicId, waPhone },
-            include: { patient: true }
-        });
+        // Start async processing block
+        (async () => {
+            try {
+                // Idempotency: check if message exists
+                const existing = await this.prisma.message.findFirst({
+                    where: { clinicId, waMessageId },
+                });
+                if (existing) return;
 
-        if (!conversation) {
-            conversation = await this.prisma.conversation.create({
-                data: { clinicId, waPhone },
-                include: { patient: true }
-            });
-        }
+                // Find or create conversation
+                let conversation = await this.prisma.conversation.findFirst({
+                    where: { clinicId, waPhone },
+                    include: { patient: true }
+                });
 
-        // Auto-update patient info if metadata provided (e.g. from bot flow)
-        if (conversation && metadata?.patientName && !conversation.patientId) {
-            const names = metadata.patientName.split(' ');
-            const firstName = names[0];
-            const lastName = names.slice(1).join(' ') || '-';
+                if (!conversation) {
+                    conversation = await this.prisma.conversation.create({
+                        data: { clinicId, waPhone },
+                        include: { patient: true }
+                    });
+                }
 
-            const patient = await this.prisma.patient.create({
-                data: {
-                    clinicId,
-                    firstName,
-                    lastName,
-                    phone: waPhone,
-                } as any
-            });
+                // Auto-update patient info if metadata provided (e.g. from bot flow)
+                if (conversation && metadata?.patientName && !conversation.patientId) {
+                    const names = metadata.patientName.split(' ');
+                    const firstName = names[0];
+                    const lastName = names.slice(1).join(' ') || '-';
 
-            await this.prisma.conversation.update({
-                where: { id: conversation.id },
-                data: { patientId: patient.id }
-            });
+                    const patient = await this.prisma.patient.create({
+                        data: {
+                            clinicId,
+                            firstName,
+                            lastName,
+                            phone: waPhone,
+                            registrationStatus: 'PRE_REGISTERED'
+                        }
+                    });
 
-            // Re-fetch conversation to include updated patient
-            const updatedConv = await this.prisma.conversation.findUnique({
-                where: { id: conversation.id },
-                include: { patient: true }
-            });
-            if (updatedConv) conversation = updatedConv as any;
-        }
+                    await this.prisma.conversation.update({
+                        where: { id: conversation.id },
+                        data: { patientId: patient.id }
+                    });
 
-        if (!conversation) return null;
+                    // Re-fetch conversation
+                    const updatedConv = await this.prisma.conversation.findUnique({
+                        where: { id: conversation.id },
+                        include: { patient: true }
+                    });
+                    if (updatedConv) conversation = updatedConv as any;
+                }
 
-        const message = await this.prisma.message.create({
-            data: {
-                clinicId,
-                conversationId: conversation.id,
-                waMessageId,
-                direction: MessageDirection.INBOUND,
-                body,
-                mediaUrl,
-                status: MessageStatus.READ,
-                metadata: metadata || {}
-            } as any,
-            include: { conversation: { include: { patient: { include: { appointments: { select: { doctorId: true } } } } } } }
-        });
+                if (!conversation) return;
 
-        await this.prisma.conversation.update({
-            where: { id: conversation.id },
-            data: { lastMessageAt: new Date(), unreadCount: { increment: 1 } },
-        });
+                const message = await this.prisma.message.create({
+                    data: {
+                        clinicId,
+                        conversationId: conversation.id,
+                        waMessageId,
+                        direction: MessageDirection.INBOUND,
+                        body,
+                        status: MessageStatus.READ,
+                        metadata: metadata || {}
+                    } as any,
+                    include: { conversation: { include: { patient: { include: { appointments: { select: { doctorId: true } } } } } } }
+                });
 
-        // Real-time message in the specific conversation room
-        this.socketGateway.emitToConversation(conversation.id, 'new_message', message);
+                await this.prisma.conversation.update({
+                    where: { id: conversation.id },
+                    data: { lastMessageAt: new Date(), unreadCount: { increment: 1 } },
+                });
 
-        // List update notification for staff
-        this.socketGateway.emitToStaff(clinicId, 'conversation_updated', conversation);
+                // WebSocket emits (real-time chat and list updates)
+                this.socketGateway.emitToConversation(conversation.id, 'new_message', message);
+                this.socketGateway.emitToStaff(clinicId, 'conversation_updated', conversation);
 
-        if (message.conversation?.patient?.appointments) {
-            const relevantDoctorIds = Array.from(new Set(
-                message.conversation.patient.appointments.map(a => a.doctorId)
-            ));
-            for (const docId of relevantDoctorIds) {
-                this.socketGateway.emitToUser(docId, 'new_message', message);
-                this.socketGateway.emitToUser(docId, 'conversation_updated', conversation);
+                if ((message.conversation as any)?.patient?.appointments) {
+                    const relevantDoctorIds = Array.from(new Set(
+                        (message.conversation as any).patient.appointments.map((a: any) => a.doctorId)
+                    ));
+                    for (const docId of relevantDoctorIds) {
+                        this.socketGateway.emitToUser(docId as string, 'new_message', message);
+                        this.socketGateway.emitToUser(docId as string, 'conversation_updated', conversation);
+                    }
+                }
+            } catch (err) {
+                console.error('[Messaging] Async webhook processing error:', err);
             }
-        }
+        })();
 
-        return message;
+        return { success: true, message: 'Processing started' };
     }
+
 
     async switchMode(
         user: CurrentUserPayload,
@@ -236,7 +247,11 @@ export class MessagingService {
     ) {
         const result = await this.prisma.conversation.update({
             where: { id: conversationId, clinicId: user.clinicId },
-            data: { status: mode, assignedTo },
+            data: {
+                status: mode,
+                assignedTo,
+                humanModeAt: mode === 'HUMAN' ? new Date() : null
+            },
         });
 
         await this.auditService.create({
@@ -251,6 +266,85 @@ export class MessagingService {
 
         return result;
     }
+
+    async getStatusByPhone(clinicId: string, waPhone: string) {
+        const conv = await this.prisma.conversation.findUnique({
+            where: { clinicId_waPhone: { clinicId, waPhone } }
+        });
+        return conv?.status || 'BOT';
+    }
+
+    async escalate(clinicId: string, data: { waPhone: string; reason: string; urgency: string; summary: string }) {
+        const { waPhone, reason, summary } = data;
+
+        // 1. Find or create conversation
+        let conv = await this.prisma.conversation.findUnique({
+            where: { clinicId_waPhone: { clinicId, waPhone } },
+            include: { patient: true }
+        });
+
+        if (!conv) {
+            conv = await this.prisma.conversation.create({
+                data: { clinicId, waPhone, status: 'HUMAN', humanModeAt: new Date() },
+                include: { patient: true }
+            }) as any;
+        } else {
+            conv = await this.prisma.conversation.update({
+                where: { id: (conv as any).id },
+                data: { status: 'HUMAN', humanModeAt: new Date(), escalationReason: reason.substring(0, 50) },
+                include: { patient: true }
+            }) as any;
+        }
+
+        if (!conv) return { success: false, message: 'Konuşma bulunamadı' };
+
+        // 2. Notifications
+        const patientName = (conv as any).patient ? `${(conv as any).patient.firstName} ${(conv as any).patient.lastName}` : waPhone;
+        const note = `🔴 Eskalasyon (${reason}): ${patientName}\nÖzet: ${summary}`;
+
+        // Notify staff via WebSocket
+        this.socketGateway.emitToStaff(clinicId, 'conversation_escalated', {
+            conversationId: (conv as any).id,
+            reason,
+            summary,
+            patientName
+        });
+
+        // System notification for assistants
+        const assistants = await this.prisma.user.findMany({ where: { clinicId, role: 'ASSISTANT' } });
+        for (const assistant of assistants) {
+            await this.notificationService.create(clinicId, assistant.id, {
+                type: 'ESCALATION',
+                title: 'Acil Müdahale Gerekli',
+                body: note,
+                entityType: 'CONVERSATION',
+                entityId: (conv as any).id
+            });
+            this.socketGateway.emitToUser(assistant.id, 'notification', { message: note });
+        }
+
+        // If patient has a doctor, notify them too
+        if ((conv as any).patientId) {
+            const lastAppt = await this.prisma.appointment.findFirst({
+                where: { patientId: (conv as any).patientId },
+                orderBy: { startTime: 'desc' }
+            });
+            if (lastAppt?.doctorId) {
+                await this.notificationService.create(clinicId, lastAppt.doctorId, {
+                    type: 'ESCALATION',
+                    title: 'Hastanızdan Soru Var',
+                    body: note,
+                    entityType: 'CONVERSATION',
+                    entityId: (conv as any).id
+                });
+                this.socketGateway.emitToUser(lastAppt.doctorId, 'notification', { message: note });
+            }
+        }
+
+        return { success: true, conversationId: (conv as any).id };
+    }
+
+
 
     // --- Private Helpers ---
 

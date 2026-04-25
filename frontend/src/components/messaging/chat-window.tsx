@@ -23,6 +23,7 @@ interface ChatWindowProps {
     hasMore?: boolean;
     loadingMore?: boolean;
     status: 'BOT' | 'HUMAN' | 'CLOSED';
+    humanModeAt?: string | null;
     patientName?: string;
     patientId?: string;
 }
@@ -36,12 +37,41 @@ export function ChatWindow({
     hasMore,
     loadingMore,
     status,
+    humanModeAt,
     patientName,
     patientId
 }: ChatWindowProps) {
     const [inputText, setInputText] = useState('');
+    const [timeLeft, setTimeLeft] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    // Countdown Timer
+    useEffect(() => {
+        if (status !== 'HUMAN' || !humanModeAt) {
+            setTimeLeft(null);
+            return;
+        }
+
+        const interval = setInterval(() => {
+            const start = new Date(humanModeAt).getTime();
+            const now = new Date().getTime();
+            const elapsed = now - start;
+            const remaining = 3600000 - elapsed; // 1 hour in ms
+
+            if (remaining <= 0) {
+                setTimeLeft('Süre doldu');
+                clearInterval(interval);
+            } else {
+                const mins = Math.floor(remaining / 60000);
+                const secs = Math.floor((remaining % 60000) / 1000);
+                setTimeLeft(`Bot ${mins} dk ${secs} sn sonra devralacak`);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [status, humanModeAt]);
+
 
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
         messagesEndRef.current?.scrollIntoView({ behavior });
@@ -124,8 +154,10 @@ export function ChatWindow({
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                             {status === 'HUMAN' ? 'Temsilci Tarafından Yanıtlanıyor' : 'Bot Devrede'}
                         </div>
+                        {timeLeft && <div style={{ fontSize: '0.75rem', color: 'var(--warning)', fontWeight: 500 }}>{timeLeft}</div>}
                     </div>
                 </div>
+
                 <div style={{ display: 'flex', gap: '8px' }}>
                     <button
                         onClick={() => onSwitchMode(status === 'BOT' ? 'HUMAN' : 'BOT')}
