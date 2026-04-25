@@ -1,0 +1,576 @@
+{
+    "name": "KlinikApp WhatsApp Bot v15 - V9 Final",
+    "nodes": [
+        {
+            "parameters": {
+                "sessionIdType": "customKey",
+                "sessionKey": "={{ $('Data Normalization').first().json.wa_id }}\n",
+                "contextWindowLength": 50
+            },
+            "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+            "typeVersion": 1.3,
+            "position": [
+                208,
+                864
+            ],
+            "id": "Simple-Memory-Node",
+            "name": "Simple Memory"
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o-mini",
+                "options": {
+                    "temperature": 0.4
+                }
+            },
+            "id": "OpenAI-Model-Node",
+            "name": "OpenAI Chat Model",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1,
+            "position": [
+                48,
+                864
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "new_openai_credentials",
+                    "name": "OpenAI account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "={{ $json.mesaj_icerigi }}",
+                "options": {
+                    "systemMessage": "# Rol & Kimlik\nSen Feneryolu Psikiyatri kliniğinin resmi dijital asistanısın. Samimi, profesyonel, anlayışlı ve çözüm odaklı bir dil kullanmalısın.\n\n# Mevcut Bağlam (Context)\n- Bugünün Tarihi: {{ $now.setZone('Europe/Istanbul').setLocale('tr').toFormat('dd MMMM yyyy cccc HH:mm') }}\n- DİKKAT: ŞU ANKİ YIL 2026'DIR! Bütün tarih, gün ve takvim hesaplamalarını 2026 YILINA göre yap. Asla 2023 veya 2024 takvimini kullanma!\n- Müşteri Telefonu: {{ $('Data Normalization').first().json.gonderen_no }}\n- Klinik Doktorları: \n  1. Dr. Ayşe Pınar Vural\n  2. Dr. Ece Yılmaz\n\n# Hedefler\nAna görevin randevu süreçlerini (sorgulama, oluşturma, güncelleme, iptal) yönetmektir.\n\n# Çalışma Prensipleri & Karar Ağacı\n1. **Randevu İstekleri:** Bir müşteri randevu istediğinde, ÖNCE `musaitlik_kontrol` aracını kullanarak doktorun o günkü boş saatlerini kontrol et.\n2. **Eksik Bilgi:** Eğer müşteri doktor ismi veya tam tarih belirtmediyse, nazikçe bunları sor.\n3. **Randevu Oluşturma:** Uygun saat bulunduğunda ve müşteri onayladığında `randevu_olustur` aracını kullan. \n   - Not: Randevu oluşturmadan önce her zaman hastanın Ad ve Soyadını al.\n4. **Randevu Sorgulama:** Mevcut randevularını merak eden müşteriler için `randevu_sorgula` aracını telefon numarası veya (varsa) referans kodu ile kullan.\n\n# Kurallar & Format\n- Mesajlarını her zaman kısa ve okunabilir tut. \n- Her cümleden sonra bir alt satıra geç (WhatsApp'ta okunması kolay olsun).\n- Tarihleri ve saatleri net bir şekilde (Örn: 20 Nisan Pazartesi, 14:00) belirt.\n- Asla teknik hata mesajlarını (JSON, status code vb.) müşteriye yansıtma. Bir sorun olursa \"Sistemde kısa süreli bir yoğunluk var, birazdan tekrar yardımcı olabilirim\" gibi nazik bir cevap ver.\n\n# Araç Kullanım İpucu\n- Tarih parametresini her zaman `YYYY-MM-DD` formatında (örn: 2026-04-20) gönder.\n- Yarın diyorsa bugünün tarihine 1 ekle, Pazartesi diyorsa en yakın Pazartesi tarihini hesapla.\n- Geçmiş tarihlere randevu vermeye veya geçmişi kontrol etmeye çalışma.\n"
+                }
+            },
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 2,
+            "position": [
+                824,
+                640
+            ],
+            "id": "AI-Agent-Node",
+            "name": "AI Agent"
+        },
+        {
+            "parameters": {
+                "mode": "manual",
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "set-mesaj-icerigi-isolation",
+                            "name": "mesaj_icerigi",
+                            "value": "={{ $json.mesaj_icerigi }}",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                620,
+                640
+            ],
+            "id": "isolation-node",
+            "name": "Isolate AI Input"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "id": "check-is-message",
+                            "leftValue": "={{ $json.body.entry[0].changes[0].value.messages ? 'true' : 'false' }}",
+                            "rightValue": "true",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                -720,
+                640
+            ],
+            "id": "filter-messages-only",
+            "name": "Filter Messages Only"
+        },
+        {
+            "parameters": {
+                "path": "whatsapp/webhook",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                -960,
+                480
+            ],
+            "id": "webhook-get-handshake",
+            "name": "Webhook (GET Handshake)"
+        },
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp/webhook",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                -960,
+                640
+            ],
+            "id": "webhook-post-messages",
+            "name": "Webhook (POST Messages)"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "id": "check-mode",
+                            "leftValue": "={{ $json.query['hub.mode'] }}",
+                            "rightValue": "subscribe",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                -720,
+                480
+            ],
+            "id": "check-handshake",
+            "name": "Check Handshake"
+        },
+        {
+            "parameters": {
+                "respondWith": "text",
+                "responseBody": "={{ $json.query['hub.challenge'] }}",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                -480,
+                440
+            ],
+            "id": "respond-challenge",
+            "name": "Respond Challenge"
+        },
+        {
+            "parameters": {
+                "mode": "manual",
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "set-mesaj-icerigi",
+                            "name": "mesaj_icerigi",
+                            "value": "={{ $json.body.entry[0].changes[0].value.messages[0].text.body }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "set-gonderen-no",
+                            "name": "gonderen_no",
+                            "value": "={{ $json.body.entry[0].changes[0].value.messages[0].from }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "set-wa-id",
+                            "name": "wa_id",
+                            "value": "={{ $json.body.entry[0].changes[0].value.contacts[0].wa_id }}",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                -480,
+                640
+            ],
+            "id": "data-normalization-set",
+            "name": "Data Normalization"
+        },
+        {
+            "parameters": {
+                "operation": "send",
+                "phoneNumberId": "1038350189365408",
+                "recipientPhoneNumber": "={{ $('Data Normalization').first().json.gonderen_no }}",
+                "textBody": "={{ $json.output }}",
+                "additionalFields": {}
+            },
+            "type": "n8n-nodes-base.whatsApp",
+            "typeVersion": 1,
+            "position": [
+                1288,
+                560
+            ],
+            "id": "send-message-node",
+            "name": "Send message",
+            "credentials": {
+                "whatsAppApi": {
+                    "id": "pAHu8UjOiUUJ4ORt",
+                    "name": "WhatsApp account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "toolDescription": "Randevu referans kodu ile mevcut bir randevuyu sorgular. Referans kodu ile randevu detaylarını döndürür.",
+                "specifyInputSchema": true,
+                "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"referenceCode\": {\n      \"type\": \"string\",\n      \"description\": \"The appointment reference code to look up\"\n    }\n  },\n  \"required\": [\"referenceCode\"]\n}",
+                "method": "GET",
+                "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/lookup?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024",
+                "sendQuery": true,
+                "parametersQuery": {
+                    "values": [
+                        {
+                            "name": "referenceCode",
+                            "value": "={{ $fromAI('referenceCode') }}"
+                        }
+                    ]
+                },
+                "sendHeaders": false,
+                "parametersHeaders": {
+                    "values": []
+                },
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+            "typeVersion": 1.1,
+            "position": [
+                384,
+                864
+            ],
+            "id": "randevu-sorgula-tool",
+            "name": "randevu_sorgula"
+        },
+        {
+            "parameters": {
+                "toolDescription": "Yeni bir randevu oluşturur. Hasta adı, telefonu, doktor adı ve randevu zamanı gereklidir.",
+                "specifyInputSchema": true,
+                "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"patientName\": {\n      \"type\": \"string\",\n      \"description\": \"Full name of the patient\"\n    },\n    \"patientPhone\": {\n      \"type\": \"string\",\n      \"description\": \"Phone number of the patient in international format\"\n    },\n    \"doctorName\": {\n      \"type\": \"string\",\n      \"description\": \"Name of the doctor\"\n    },\n    \"startTime\": {\n      \"type\": \"string\",\n      \"description\": \"Appointment start time. Exactly copy the string provided by musaitlik_kontrol tool.\"\n    }\n  },\n  \"required\": [\"patientName\", \"patientPhone\", \"doctorName\", \"startTime\"]\n}",
+                "method": "POST",
+                "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments?token=klinikapp-n8n-secret-2024",
+                "sendHeaders": true,
+                "parametersHeaders": {
+                    "values": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendQuery": false,
+                "parametersQuery": {
+                    "values": []
+                },
+                "sendBody": true,
+                "parametersBody": {
+                    "values": [
+                        {
+                            "name": "clinicId",
+                            "value": "135460d3-f612-457f-89e8-8ead3181c562"
+                        },
+                        {
+                            "name": "patientName",
+                            "value": "={{ $fromAI('patientName') }}"
+                        },
+                        {
+                            "name": "patientPhone",
+                            "value": "={{ $fromAI('patientPhone') }}"
+                        },
+                        {
+                            "name": "doctorName",
+                            "value": "={{ $fromAI('doctorName') }}"
+                        },
+                        {
+                            "name": "startTime",
+                            "value": "={{ $fromAI('startTime') }}"
+                        },
+                        {
+                            "name": "durationMin",
+                            "value": 60
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+            "typeVersion": 1.1,
+            "position": [
+                592,
+                864
+            ],
+            "id": "randevu-olustur-tool",
+            "name": "randevu_olustur"
+        },
+        {
+            "parameters": {
+                "toolDescription": "Mevcut bir randevuyu günceller veya iptal eder. Güncelleme için yeni zaman, iptal için action olarak /cancel kullanılır.",
+                "specifyInputSchema": true,
+                "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"appointmentId\": {\n      \"type\": \"string\",\n      \"description\": \"The UUID of the appointment to update or cancel\"\n    },\n    \"action\": {\n      \"type\": \"string\",\n      \"description\": \"Use /cancel for cancellation or leave empty string for time updates\"\n    },\n    \"startTime\": {\n      \"type\": \"string\",\n      \"description\": \"New appointment start time. Exactly copy the string provided by musaitlik_kontrol tool\"\n    }\n  },\n  \"required\": [\"appointmentId\", \"action\", \"startTime\"]\n}",
+                "method": "PATCH",
+                "url": "=https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/{{ $fromAI('appointmentId') }}{{ $fromAI('action') }}?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024",
+                "sendQuery": false,
+                "parametersQuery": {
+                    "values": []
+                },
+                "sendHeaders": true,
+                "parametersHeaders": {
+                    "values": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "parametersBody": {
+                    "values": [
+                        {
+                            "name": "startTime",
+                            "value": "={{ $fromAI('startTime') }}"
+                        },
+                        {
+                            "name": "durationMin",
+                            "value": 60
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+            "typeVersion": 1.1,
+            "position": [
+                768,
+                864
+            ],
+            "id": "randevu-guncelle-tool",
+            "name": "randevu_guncelle"
+        },
+        {
+            "parameters": {
+                "toolDescription": "Belirli bir doktorun belirli bir tarihteki müsait randevu saatlerini kontrol eder.",
+                "specifyInputSchema": true,
+                "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"doctorName\": {\n      \"type\": \"string\",\n      \"description\": \"Name of the doctor to check availability for\"\n    },\n    \"date\": {\n      \"type\": \"string\",\n      \"description\": \"Date to check in YYYY-MM-DD format\"\n    }\n  },\n  \"required\": [\"doctorName\", \"date\"]\n}",
+                "method": "GET",
+                "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/availability?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024",
+                "sendQuery": true,
+                "parametersQuery": {
+                    "values": [
+                        {
+                            "name": "doctorName",
+                            "value": "={{ $fromAI('doctorName') }}"
+                        },
+                        {
+                            "name": "date",
+                            "value": "={{ $fromAI('date') }}"
+                        }
+                    ]
+                },
+                "sendHeaders": false,
+                "parametersHeaders": {
+                    "values": []
+                },
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+            "typeVersion": 1.1,
+            "position": [
+                928,
+                864
+            ],
+            "id": "availability-tool",
+            "name": "musaitlik_kontrol"
+        }
+    ],
+    "connections": {
+        "Simple Memory": {
+            "ai_memory": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_memory",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenAI Chat Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "randevu_sorgula": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "randevu_olustur": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "randevu_guncelle": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "musaitlik_kontrol": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Isolate AI Input": {
+            "main": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Filter Messages Only": {
+            "main": [
+                [
+                    {
+                        "node": "Data Normalization",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI Agent": {
+            "main": [
+                [
+                    {
+                        "node": "Send message",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "webhook-get-handshake": {
+            "main": [
+                [
+                    {
+                        "node": "Check Handshake",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check Handshake": {
+            "main": [
+                [
+                    {
+                        "node": "Respond Challenge",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "webhook-post-messages": {
+            "main": [
+                [
+                    {
+                        "node": "Filter Messages Only",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Data Normalization": {
+            "main": [
+                [
+                    {
+                        "node": "Isolate AI Input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "versionId": "v9-openai",
+    "meta": {
+        "templateCredsSetupCompleted": true
+    }
+}

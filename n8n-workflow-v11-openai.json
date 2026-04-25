@@ -1,0 +1,778 @@
+{
+    "name": "KlinikApp WhatsApp Bot v16 - V11 Escalation & Handover",
+    "nodes": [
+        {
+            "parameters": {
+                "sessionIdType": "customKey",
+                "sessionKey": "={{ $('Data Normalization').first().json.wa_id }}\n",
+                "contextWindowLength": 50
+            },
+            "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+            "typeVersion": 1.3,
+            "position": [
+                208,
+                864
+            ],
+            "id": "Simple-Memory-Node",
+            "name": "Simple Memory"
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o-mini",
+                "options": {
+                    "temperature": 0.4
+                }
+            },
+            "id": "OpenAI-Model-Node",
+            "name": "OpenAI Chat Model",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1,
+            "position": [
+                48,
+                864
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "new_openai_credentials",
+                    "name": "OpenAI account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "={{ $json.mesaj_icerigi }}",
+                "options": {
+                    "systemMessage": "# Rol & Kimlik\nSen Feneryolu Psikiyatri kliniğinin resmi dijital asistanısın. Samimi, profesyonel, anlayışlı ve çözüm odaklı bir dil kullanmalısın.\n\n# Mevcut Bağlam (Context)\n- Bugünün Tarihi ve Saati: {{ $now.setZone('Europe/Istanbul').setLocale('tr').toFormat('dd MMMM yyyy cccc HH:mm') }}\n- DİKKAT: ŞU ANKİ YIL 2026'DIR!\n- Müşteri Telefonu: {{ $('Data Normalization').first().json.gonderen_no }}\n- Klinik Doktorları: \n  1. Dr. Ayşe Pınar Vural\n  2. Dr. Ece Yılmaz\n\n# 📅 TAKVİM REFERANSI (Aşağıdaki listeyi kullan, KENDİN hesaplama!)\nBugün: {{ $now.setZone('Europe/Istanbul').toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').setLocale('tr').toFormat('cccc') }}\nYarın: {{ $now.setZone('Europe/Istanbul').plus({days:1}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:1}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:2}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:2}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:3}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:3}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:4}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:4}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:5}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:5}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:6}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:6}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:7}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:7}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:8}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:8}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:9}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:9}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:10}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:10}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:11}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:11}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:12}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:12}).setLocale('tr').toFormat('cccc') }}\n{{ $now.setZone('Europe/Istanbul').plus({days:13}).toFormat('yyyy-MM-dd') }} {{ $now.setZone('Europe/Istanbul').plus({days:13}).setLocale('tr').toFormat('cccc') }}\n\nÖNEMLİ: Müşteri bir gün ismi (Perşembe, Cuma vb.) söylediğinde YUKARIDAKI LİSTEDEN eşleşen en yakın tarihi bul. KENDİN tarih hesaplaması YAPMA.\n\n# Hedefler\nAna görevin randevu süreçlerini (sorgulama, oluşturma, güncelleme, iptal) yönetmektir.\n\n# Çalışma Prensipleri & Karar Ağacı\n1. **Randevu İstekleri:** Bir müşteri randevu istediğinde, ÖNCE `musaitlik_kontrol` aracını kullanarak doktorun o günkü boş saatlerini kontrol et.\n2. **Eksik Bilgi:** Eğer müşteri doktor ismi veya tam tarih belirtmediyse, nazikçe bunları sor.\n3. **Randevu Oluşturma:** Uygun saat bulunduğunda ve müşteri onayladığında `randevu_olustur` aracını kullan. \n   - Not: Randevu oluşturmadan önce her zaman hastanın Ad ve Soyadını al.\n4. **Randevu Sorgulama (Referans Kodu):** Referans kodu bilen müşteriler için `randevu_sorgula` aracını kullan.\n5. **Randevularım (Self-Service):** Müşteri 'randevularım', 'randevumu göster' veya 'ne zaman randevum var' derse `randevu_sorgula_telefon` aracını kullan. Müşterinin telefonunu zaten biliyorsun (Context'teki Müşteri Telefonu).\n\n# Kurallar & Format\n- Mesajlarını her zaman kısa ve okunabilir tut. \n- Her cümleden sonra bir alt satıra geç.\n- Tarih ve saati net bir şekilde (Örn: 23 Nisan Perşembe, 14:00) belirt.\n- Randevu zamanı (startTime) API'ye gönderilirken musaitlik_kontrol'den gelen 'YYYY-MM-DD HH:mm' (Örn 2026-04-23 16:00) formatını BİREBİR koru.\n- Asla teknik hata mesajlarını kullanıcıya yansıtma.\n\n6. **Klinik Dışı Sorular:** Eğer müşteri randevu dışında klinik hakkında detaylı bilgi (doktor uzmanlıkları, fiyatlar, tedavi detayları vb.) isterse veya bir doktorla konuşmak isterse:\n   - `eskalasyon` aracını çağır (reason: kısa açıklama, urgency: 'normal' veya 'urgent')\n   - Müşteriye: \"Bilginizi kliniğimize ilettim, en kısa sürede size dönüş yapılacaktır.\" de.\n"
+                }
+            },
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 2,
+            "position": [
+                824,
+                640
+            ],
+            "id": "AI-Agent-Node",
+            "name": "AI Agent"
+        },
+        {
+            "parameters": {
+                "mode": "manual",
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "set-mesaj-icerigi-isolation",
+                            "name": "mesaj_icerigi",
+                            "value": "={{ $('Data Normalization').first().json.mesaj_icerigi }}",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                240,
+                640
+            ],
+            "id": "isolation-node",
+            "name": "Isolate AI Input"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "id": "check-is-message",
+                            "leftValue": "={{ $json.body.entry[0].changes[0].value.messages ? 'true' : 'false' }}",
+                            "rightValue": "true",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                -720,
+                640
+            ],
+            "id": "filter-messages-only",
+            "name": "Filter Messages Only"
+        },
+        {
+            "parameters": {
+                "path": "whatsapp/webhook",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                -960,
+                480
+            ],
+            "id": "webhook-get-handshake",
+            "name": "Webhook (GET Handshake)"
+        },
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp/webhook",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                -960,
+                640
+            ],
+            "id": "webhook-post-messages",
+            "name": "Webhook (POST Messages)"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "id": "check-mode",
+                            "leftValue": "={{ $json.query['hub.mode'] }}",
+                            "rightValue": "subscribe",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                -720,
+                480
+            ],
+            "id": "check-handshake",
+            "name": "Check Handshake"
+        },
+        {
+            "parameters": {
+                "respondWith": "text",
+                "responseBody": "={{ $json.query['hub.challenge'] }}",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.1,
+            "position": [
+                -480,
+                440
+            ],
+            "id": "respond-challenge",
+            "name": "Respond Challenge"
+        },
+        {
+            "parameters": {
+                "mode": "manual",
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "set-mesaj-icerigi",
+                            "name": "mesaj_icerigi",
+                            "value": "={{ $json.body.entry[0].changes[0].value.messages[0].text.body }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "set-gonderen-no",
+                            "name": "gonderen_no",
+                            "value": "={{ $json.body.entry[0].changes[0].value.messages[0].from }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "set-wa-id",
+                            "name": "wa_id",
+                            "value": "={{ $json.body.entry[0].changes[0].value.contacts[0].wa_id }}",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                -480,
+                640
+            ],
+            "id": "data-normalization-set",
+            "name": "Data Normalization"
+        },
+        {
+            "parameters": {
+                "operation": "send",
+                "phoneNumberId": "1038350189365408",
+                "recipientPhoneNumber": "={{ $('Data Normalization').first().json.gonderen_no }}",
+                "textBody": "={{ $json.output }}",
+                "additionalFields": {}
+            },
+            "type": "n8n-nodes-base.whatsApp",
+            "typeVersion": 1,
+            "position": [
+                1288,
+                560
+            ],
+            "id": "send-message-node",
+            "name": "Send message",
+            "credentials": {
+                "whatsAppApi": {
+                    "id": "pAHu8UjOiUUJ4ORt",
+                    "name": "WhatsApp account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "toolDescription": "Randevu referans kodu ile mevcut bir randevuyu sorgular. Referans kodu ile randevu detaylarını döndürür.",
+                "method": "GET",
+                "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/lookup?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024",
+                "sendQuery": true,
+                "parametersQuery": {
+                    "values": [
+                        {
+                            "name": "referenceCode"
+                        }
+                    ]
+                },
+                "sendHeaders": false,
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+            "typeVersion": 1.1,
+            "position": [
+                384,
+                864
+            ],
+            "id": "randevu-sorgula-tool",
+            "name": "randevu_sorgula"
+        },
+        {
+            "parameters": {
+                "toolDescription": "Yeni bir randevu oluşturur. Hasta adı, telefonu, doktor adı ve randevu zamanı gereklidir.",
+                "method": "POST",
+                "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments?token=klinikapp-n8n-secret-2024",
+                "sendHeaders": true,
+                "parametersHeaders": {
+                    "values": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendQuery": false,
+                "sendBody": true,
+                "parametersBody": {
+                    "values": [
+                        {
+                            "name": "clinicId",
+                            "value": "135460d3-f612-457f-89e8-8ead3181c562"
+                        },
+                        {
+                            "name": "patientName"
+                        },
+                        {
+                            "name": "patientPhone"
+                        },
+                        {
+                            "name": "doctorName"
+                        },
+                        {
+                            "name": "startTime"
+                        },
+                        {
+                            "name": "durationMin",
+                            "value": "60"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+            "typeVersion": 1.1,
+            "position": [
+                592,
+                864
+            ],
+            "id": "randevu-olustur-tool",
+            "name": "randevu_olustur"
+        },
+        {
+            "parameters": {
+                "toolDescription": "Mevcut bir randevuyu günceller veya iptal eder. İptal etmek için URL path'te action /cancel olmalıdır.",
+                "method": "PATCH",
+                "url": "=https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/{{ $fromAI('appointmentId') }}?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024",
+                "sendQuery": false,
+                "sendHeaders": true,
+                "parametersHeaders": {
+                    "values": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "parametersBody": {
+                    "values": [
+                        {
+                            "name": "startTime"
+                        },
+                        {
+                            "name": "durationMin",
+                            "value": "60"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+            "typeVersion": 1.1,
+            "position": [
+                768,
+                864
+            ],
+            "id": "randevu-guncelle-tool",
+            "name": "randevu_guncelle"
+        },
+        {
+            "parameters": {
+                "toolDescription": "Belirli bir doktorun belirli bir tarihteki müsait randevu saatlerini kontrol eder.",
+                "method": "GET",
+                "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/availability?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024",
+                "sendQuery": true,
+                "parametersQuery": {
+                    "values": [
+                        {
+                            "name": "doctorName"
+                        },
+                        {
+                            "name": "date"
+                        }
+                    ]
+                },
+                "sendHeaders": false,
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+            "typeVersion": 1.1,
+            "position": [
+                928,
+                864
+            ],
+            "id": "availability-tool",
+            "name": "musaitlik_kontrol"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/webhooks/whatsapp?token=klinikapp-n8n-secret-2024",
+                "sendHeaders": true,
+                "parametersHeaders": {
+                    "values": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "parametersBody": {
+                    "values": [
+                        {
+                            "name": "clinicId",
+                            "value": "135460d3-f612-457f-89e8-8ead3181c562"
+                        },
+                        {
+                            "name": "waPhone",
+                            "value": "={{ $json.gonderen_no }}"
+                        },
+                        {
+                            "name": "waMessageId",
+                            "value": "={{ $json.wa_id }}-{{ Date.now() }}"
+                        },
+                        {
+                            "name": "body",
+                            "value": "={{ $json.mesaj_icerigi }}"
+                        }
+                    ]
+                },
+                "options": {
+                    "allowUnauthorizedCerts": true,
+                    "timeout": 5000
+                }
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                20,
+                440
+            ],
+            "id": "forward-to-backend",
+            "name": "Forward to Backend",
+            "continueOnFail": true
+        },
+        {
+            "parameters": {
+                "toolDescription": "Hastanin kendi randevularini telefon numarasiyla sorgular. Hasta 'randevularim' veya 'randevumu goster' dediginde kullan.",
+                "method": "GET",
+                "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/lookup?token=klinikapp-n8n-secret-2024",
+                "sendQuery": true,
+                "parametersQuery": {
+                    "values": [
+                        {
+                            "name": "phone"
+                        }
+                    ]
+                },
+                "sendHeaders": false,
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+            "typeVersion": 1.1,
+            "position": [
+                1100,
+                864
+            ],
+            "id": "randevu-sorgula-telefon-tool",
+            "name": "randevu_sorgula_telefon"
+        },
+        {
+            "parameters": {
+                "toolDescription": "Klinik dışı uzmanlık/fiyat sorularında veya müşterinin acil olarak doktor/insan ile görüşme talebinde bu aracı kullan.",
+                "method": "POST",
+                "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/escalate?token=klinikapp-n8n-secret-2024",
+                "sendHeaders": true,
+                "parametersHeaders": {
+                    "values": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "parametersBody": {
+                    "values": [
+                        {
+                            "name": "waPhone",
+                            "value": "={{ $('Data Normalization').first().json.gonderen_no }}"
+                        },
+                        {
+                            "name": "reason"
+                        },
+                        {
+                            "name": "urgency"
+                        },
+                        {
+                            "name": "summary"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+            "typeVersion": 1.1,
+            "position": [
+                1250,
+                864
+            ],
+            "id": "eskalasyon-tool",
+            "name": "eskalasyon"
+        },
+        {
+            "parameters": {
+                "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/conversation-status",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "waPhone",
+                            "value": "={{ $json.gonderen_no }}"
+                        },
+                        {
+                            "name": "token",
+                            "value": "klinikapp-n8n-secret-2024"
+                        }
+                    ]
+                },
+                "options": {
+                    "allowUnauthorizedCerts": true
+                }
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                -240,
+                640
+            ],
+            "id": "check-conversation-status-node",
+            "name": "Check Conversation Status",
+            "continueOnFail": true
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "id": "check-bot-mode",
+                            "leftValue": "={{ $json.status.mode }}",
+                            "rightValue": "HUMAN",
+                            "operator": {
+                                "type": "string",
+                                "operation": "notEqual"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                0,
+                640
+            ],
+            "id": "if-not-human-node",
+            "name": "If NOT Human Mode"
+        }
+    ],
+    "connections": {
+        "Simple Memory": {
+            "ai_memory": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_memory",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenAI Chat Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "randevu_sorgula": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "randevu_olustur": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "randevu_guncelle": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "musaitlik_kontrol": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Isolate AI Input": {
+            "main": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Filter Messages Only": {
+            "main": [
+                [
+                    {
+                        "node": "Data Normalization",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI Agent": {
+            "main": [
+                [
+                    {
+                        "node": "Send message",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "webhook-get-handshake": {
+            "main": [
+                [
+                    {
+                        "node": "Check Handshake",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check Handshake": {
+            "main": [
+                [
+                    {
+                        "node": "Respond Challenge",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "webhook-post-messages": {
+            "main": [
+                [
+                    {
+                        "node": "Filter Messages Only",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Data Normalization": {
+            "main": [
+                [
+                    {
+                        "node": "Forward to Backend",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Check Conversation Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "randevu_sorgula_telefon": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "eskalasyon": {
+            "ai_tool": [
+                [
+                    {
+                        "node": "AI Agent",
+                        "type": "ai_tool",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check Conversation Status": {
+            "main": [
+                [
+                    {
+                        "node": "If NOT Human Mode",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "If NOT Human Mode": {
+            "main": [
+                [
+                    {
+                        "node": "Isolate AI Input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                []
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "versionId": "v10-openai",
+    "meta": {
+        "templateCredsSetupCompleted": true
+    }
+}
