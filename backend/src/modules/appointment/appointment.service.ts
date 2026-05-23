@@ -11,6 +11,55 @@ export class AppointmentService {
         private notificationService: NotificationService,
         private socketGateway: SocketGateway,
     ) { }
+    
+    async getPatientPatterns(clinicId: string, patientId: string) {
+        const pastAppointments = await this.prisma.appointment.findMany({
+            where: { clinicId, patientId, status: { in: ['COMPLETED', 'CONFIRMED'] } },
+            orderBy: { startTime: 'desc' },
+            take: 10,
+            include: { doctor: { select: { id: true, firstName: true, lastName: true } } },
+        });
+
+        if (pastAppointments.length === 0) return null;
+
+        // Find most frequent doctor
+        const doctorCounts: Record<string, { count: number; name: string }> = {};
+        pastAppointments.forEach(a => {
+            const docId = a.doctorId;
+            if (!doctorCounts[docId]) {
+                doctorCounts[docId] = { count: 0, name: `Dr. ${a.doctor.firstName} ${a.doctor.lastName}` };
+            }
+            doctorCounts[docId].count++;
+        });
+
+        const favoriteDoctor = Object.entries(doctorCounts).sort((a, b) => b[1].count - a[1].count)[0];
+
+        // Find most frequent day of week (0-6)
+        const dayCounts: Record<number, number> = {};
+        pastAppointments.forEach(a => {
+            const day = new Date(a.startTime).getDay();
+            dayCounts[day] = (dayCounts[day] || 0) + 1;
+        });
+        const favoriteDay = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0][0];
+
+        // Find most frequent hour (HH:mm)
+        const hourCounts: Record<string, number> = {};
+        pastAppointments.forEach(a => {
+            const date = new Date(a.startTime);
+            const hhmm = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+            hourCounts[hhmm] = (hourCounts[hhmm] || 0) + 1;
+        });
+        const favoriteTime = Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0][0];
+
+        return {
+            favoriteDoctorId: favoriteDoctor[0],
+            favoriteDoctorName: favoriteDoctor[1].name,
+            preferredDay: Number(favoriteDay),
+            preferredTime: favoriteTime,
+            appointmentCount: pastAppointments.length
+        };
+    }
+
 
 
     async findAll(clinicId: string, filters: { doctorId?: string; date?: string; startDate?: string; endDate?: string; status?: AppointmentStatus; page?: any; limit?: any }) {
@@ -126,6 +175,13 @@ export class AppointmentService {
                 durationMin,
                 notes: data.notes,
             },
+        });
+    }
+
+    async remove(clinicId: string, appointmentId: string) {
+        await this.findOne(clinicId, appointmentId);
+        return this.prisma.appointment.delete({
+            where: { id: appointmentId },
         });
     }
 
@@ -288,6 +344,16 @@ export class AppointmentService {
             }
         }
 
+        // Link patient to the active conversation immediately so UI updates
+        // If it's a new patient, flag the conversation as 'Yeni Ön-Kayıt' so the doctor gets notified
+        await this.prisma.conversation.updateMany({
+            where: { clinicId, waPhone: phone, patientId: null },
+            data: { 
+                patientId,
+                ...(isNewPatient ? { escalationReason: 'Yeni Ön-Kayıt', unreadCount: { increment: 1 } } : {})
+            }
+        });
+
         // 3. Find Doctor
         const normalizedDoctorInput = data.doctorName.replace(/^Dr\.?\s*/i, '').trim().toLowerCase();
         const doctors = await this.prisma.user.findMany({ where: { clinicId, role: 'DOCTOR' } });
@@ -313,12 +379,12 @@ export class AppointmentService {
         const patientName = `${patient?.firstName} ${patient?.lastName}`;
         const dateStr = new Date(data.startTime).toLocaleString('tr-TR', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' });
 
-        const apptMsg = `📅 Yeni WA randevusu: ${patientName} — ${dateStr}`;
+        const apptMsg = `📅 ${isNewPatient ? '🆕 YENİ HASTA: ' : ''}${patientName} — ${dateStr}${isNewPatient ? ' (Lütfen TC Kimlik eksiklerini tamamlayın)' : ''}`;
 
         // Notify Doctor
         await this.notificationService.create(clinicId, doctor.id, {
             type: 'NEW_APPOINTMENT',
-            title: 'Yeni Randevu (WhatsApp)',
+            title: isNewPatient ? 'Yeni Randevu ve Ön-Kayıt (WhatsApp)' : 'Yeni Randevu (WhatsApp)',
             body: apptMsg,
             entityType: 'APPOINTMENT',
             entityId: appointment.id
@@ -330,33 +396,12 @@ export class AppointmentService {
         for (const assistant of assistants) {
             await this.notificationService.create(clinicId, assistant.id, {
                 type: 'NEW_APPOINTMENT',
-                title: 'Yeni Randevu (WhatsApp)',
+                title: isNewPatient ? 'Yeni Randevu ve Ön-Kayıt (WhatsApp)' : 'Yeni Randevu (WhatsApp)',
                 body: apptMsg,
                 entityType: 'APPOINTMENT',
                 entityId: appointment.id
             });
             this.socketGateway.emitToUser(assistant.id, 'notification', { message: apptMsg });
-        }
-
-        // Additional notification for NEW patient
-        if (isNewPatient) {
-            const preRegMsg = `⚠️ Yeni ön-kayıt: ${patientName} — TC eksik`;
-            await this.notificationService.create(clinicId, doctor.id, {
-                type: 'PRE_REGISTERED_PATIENT',
-                title: 'Yeni Ön-Kayıt',
-                body: preRegMsg,
-                entityType: 'PATIENT',
-                entityId: patientId!
-            });
-            for (const assistant of assistants) {
-                await this.notificationService.create(clinicId, assistant.id, {
-                    type: 'PRE_REGISTERED_PATIENT',
-                    title: 'Yeni Ön-Kayıt',
-                    body: preRegMsg,
-                    entityType: 'PATIENT',
-                    entityId: patientId!
-                });
-            }
         }
 
         return { ...appointment, isNewPatient };
@@ -402,16 +447,40 @@ export class AppointmentService {
         if (!doctor) throw new BadRequestException(`Doktor bulunamadı: "${doctorName}"`);
 
         const slots = await this.getAvailableSlots(clinicId, doctor.id, date);
-
         const pad = (n: number) => n.toString().padStart(2, '0');
+
+        const allSlotsFormatted = slots.filter(s => s.available).map(s => {
+            const d = new Date(s.startTime);
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        });
+
+        // Smart Filtering: Suggest 3 best slots
+        // 1. If we have a preferred time, try to find a slot near it
+        // 2. Otherwise pick morning, noon, and afternoon
+        const suggestedSlots: string[] = [];
+        
+        // Pick one around 10:00 (morning)
+        const morning = allSlotsFormatted.find(s => s.includes(' 10:') || s.includes(' 09:'));
+        if (morning) suggestedSlots.push(morning);
+
+        // Pick one around 14:00 (afternoon)
+        const afternoon = allSlotsFormatted.find(s => s.includes(' 14:') || s.includes(' 15:'));
+        if (afternoon) suggestedSlots.push(afternoon);
+
+        // Pick one around 18:00 (evening)
+        const evening = allSlotsFormatted.find(s => s.includes(' 18:') || s.includes(' 19:'));
+        if (evening) suggestedSlots.push(evening);
+
+        // If still empty or too few, just take the first 3
+        if (suggestedSlots.length < 2) {
+            suggestedSlots.push(...allSlotsFormatted.slice(0, 3));
+        }
 
         return {
             doctorId: doctor.id,
             doctorName: `${doctor.firstName} ${doctor.lastName}`,
-            availableSlots: slots.filter(s => s.available).map(s => {
-                const d = new Date(s.startTime);
-                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            }),
+            suggestedSlots: Array.from(new Set(suggestedSlots)).slice(0, 3), // Ensure uniqueness
+            allSlotsCount: allSlotsFormatted.length,
         };
     }
 
@@ -431,12 +500,77 @@ export class AppointmentService {
 
         return this.prisma.appointment.update({
             where: { id: appointmentId },
-            data: { status: 'CANCELLED', cancelReason: 'WhatsApp üzerinden iptal' },
+            data: { status: 'CANCELLED', cancelReason: 'WhatsApp üzerinden iptal', reminderStatus: 'CANCELLED' },
             include: {
                 patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
                 doctor: { select: { id: true, firstName: true, lastName: true } },
             },
         });
+    }
+
+    async confirmReminderFromWhatsApp(clinicId: string, appointmentId: string) {
+        const appointment = await this.findOne(clinicId, appointmentId);
+        if (appointment.status === 'CANCELLED') throw new BadRequestException('Bu randevu iptal edilmiş.');
+
+        return this.prisma.appointment.update({
+            where: { id: appointmentId },
+            data: { reminderStatus: 'CONFIRMED' },
+            include: {
+                patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
+                doctor: { select: { id: true, firstName: true, lastName: true } },
+            },
+        });
+    }
+
+    async getMissingFollowups(clinicId: string) {
+        // Look back 2 days
+        const pastDate = new Date();
+        pastDate.setDate(pastDate.getDate() - 2);
+        
+        // Find COMPLETED appointments from the last 2 days
+        const recentCompleted = await this.prisma.appointment.findMany({
+            where: {
+                clinicId,
+                status: 'COMPLETED',
+                startTime: { gte: pastDate }
+            },
+            include: {
+                patient: { select: { id: true, firstName: true, lastName: true } },
+                doctor: { select: { id: true, firstName: true, lastName: true } }
+            },
+            orderBy: { startTime: 'desc' }
+        });
+
+        if (recentCompleted.length === 0) return [];
+
+        const patientIds = [...new Set(recentCompleted.map(a => a.patientId))];
+
+        // Check if these patients have any future appointments
+        const futureAppointments = await this.prisma.appointment.findMany({
+            where: {
+                clinicId,
+                patientId: { in: patientIds },
+                startTime: { gt: new Date() },
+                status: { in: ['CONFIRMED', 'COMPLETED'] }
+            },
+            select: { patientId: true }
+        });
+
+        const futurePatientIds = new Set(futureAppointments.map(a => a.patientId));
+
+        // Filter out patients who already have a future appointment booked
+        // Return only the most recent completed appointment for each missing-followup patient
+        const missing = [];
+        const seenPatients = new Set<string>();
+
+        for (const appt of recentCompleted) {
+            if (!futurePatientIds.has(appt.patientId) && !seenPatients.has(appt.patientId)) {
+                missing.push(appt);
+                seenPatients.add(appt.patientId);
+            }
+        }
+
+        return missing;
     }
 
     async getTomorrowAppointments(clinicId: string) {

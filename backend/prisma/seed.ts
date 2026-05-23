@@ -22,6 +22,23 @@ async function main() {
     });
     console.log(`✅ Klinik: ${clinic.name} (${clinic.id})`);
 
+    // Admin
+    const adminPassword = await bcrypt.hash('Admin123!', 12);
+    const admin = await prisma.user.upsert({
+        where: { clinicId_email: { clinicId: clinic.id, email: 'admin@demo.com' } },
+        update: {},
+        create: {
+            clinicId: clinic.id,
+            email: 'admin@demo.com',
+            passwordHash: adminPassword,
+            firstName: 'Demo',
+            lastName: 'Admin',
+            phone: '+905559998877',
+            role: UserRole.ADMIN,
+        },
+    });
+    console.log(`✅ Admin: ${admin.email}`);
+
     // Doktor 1 (Ayşe Pınar Vural)
     const doctor1Password = await bcrypt.hash('Doctor123!', 12);
     const doctor1 = await prisma.user.upsert({
@@ -104,29 +121,27 @@ async function main() {
 
     // Demo hastalar
     const patients = [
-        { tcKimlik: '10000000001', firstName: 'Ali', lastName: 'Korkmaz', phone: '+905550001111', address: 'Ankara, Çankaya, Kızılay Mah. Atatürk Blv. No:10' },
-        { tcKimlik: '20000000002', firstName: 'Ayşe', lastName: 'Şahin', phone: '+905550002222', address: 'Ankara, Keçiören, Etlik Cad. No:25' },
-        { tcKimlik: '30000000003', firstName: 'Mehmet', lastName: 'Öztürk', phone: '+905550003333', address: 'İstanbul, Kadıköy, Moda Cad. No:5' },
-        { tcKimlik: '40000000004', firstName: 'Zeynep', lastName: 'Arslan', phone: '+905550004444', address: 'İzmir, Bornova, Üniversite Mah. No:42' },
-        { tcKimlik: '50000000005', firstName: 'Emre', lastName: 'Yıldız', phone: '+905550005555', address: 'Ankara, Çankaya, Bahçelievler Mah. No:8' },
+        { firstName: 'Ali', lastName: 'Korkmaz', phone: '+905550001111', address: 'Ankara, Çankaya, Kızılay Mah. Atatürk Blv. No:10' },
+        { firstName: 'Ayşe', lastName: 'Şahin', phone: '+905550002222', address: 'Ankara, Keçiören, Etlik Cad. No:25' },
+        { firstName: 'Mehmet', lastName: 'Öztürk', phone: '+905550003333', address: 'İstanbul, Kadıköy, Moda Cad. No:5' },
+        { firstName: 'Zeynep', lastName: 'Arslan', phone: '+905550004444', address: 'İzmir, Bornova, Üniversite Mah. No:42' },
+        { firstName: 'Emre', lastName: 'Yıldız', phone: '+905550005555', address: 'Ankara, Çankaya, Bahçelievler Mah. No:8' },
     ];
 
     for (const p of patients) {
-        const encryptedTc = CryptoUtil.encrypt(p.tcKimlik);
-        const hashedTc = CryptoUtil.hash(p.tcKimlik);
-
-        await prisma.patient.upsert({
-            where: { clinicId_tcKimlikHash: { clinicId: clinic.id, tcKimlikHash: hashedTc } },
-            update: {},
-            create: {
-                clinicId: clinic.id,
-                ...p,
-                tcKimlik: encryptedTc,
-                tcKimlikHash: hashedTc
-            },
+        const existing = await prisma.patient.findFirst({
+            where: { clinicId: clinic.id, phone: p.phone }
         });
+        if (!existing) {
+            await prisma.patient.create({
+                data: {
+                    clinicId: clinic.id,
+                    ...p
+                },
+            });
+        }
     }
-    console.log(`✅ ${patients.length} demo hasta oluşturuldu`);
+    console.log(`✅ ${patients.length} demo hasta kontrol edildi/oluşturuldu`);
 
     // Example Conversations & Messages
     const ali = await prisma.patient.findFirst({ where: { firstName: 'Ali', clinicId: clinic.id } });
@@ -134,6 +149,10 @@ async function main() {
     const mehmet = await prisma.patient.findFirst({ where: { firstName: 'Mehmet', clinicId: clinic.id } });
 
     if (ali && ayse && mehmet) {
+        // Clear old conversations to avoid unique constraint errors
+        await prisma.message.deleteMany({ where: { clinicId: clinic.id } });
+        await prisma.conversation.deleteMany({ where: { clinicId: clinic.id } });
+
         // Ali: Completed bot flow
         const convAli = await prisma.conversation.create({
             data: {

@@ -12,19 +12,19 @@ export class MessageCleanupTask {
     async handleCron() {
         this.logger.debug('Running MessageCleanupTask...');
 
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const fifteenDaysAgo = new Date();
+        fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
 
         const deleteResult = await this.prisma.message.deleteMany({
             where: {
-                createdAt: { lt: thirtyDaysAgo }
+                createdAt: { lt: fifteenDaysAgo }
                 // Note: appointments are currently not directly linked in schema,
-                // so we delete all messages older than 30 days.
+                // so we delete all messages older than 15 days.
             }
         });
 
         if (deleteResult.count > 0) {
-            this.logger.log(`Deleted ${deleteResult.count} messages older than 30 days.`);
+            this.logger.log(`Deleted ${deleteResult.count} messages older than 15 days.`);
         }
     }
 }

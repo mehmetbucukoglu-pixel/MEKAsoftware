@@ -25,7 +25,8 @@ interface ConversationListProps {
 
 export function ConversationList({ conversations, selectedId, onSelect }: ConversationListProps) {
     const getBadgeStyle = (conv: Conversation) => {
-        if (conv.status === 'HUMAN' && conv.escalationReason) return { bg: 'var(--error-muted)', text: 'var(--error)', label: 'ESCALATED', icon: '⚠️' };
+        if (conv.escalationReason === 'Yeni Ön-Kayıt') return { bg: 'var(--info-muted, #e0f2fe)', text: 'var(--info, #0284c7)', label: 'Yeni Hasta', icon: '🆕' };
+        if (conv.status === 'HUMAN' && conv.escalationReason) return { bg: 'var(--error-muted)', text: 'var(--error)', label: 'Bekleyen Mesaj', icon: '🔴' };
         if (conv.status === 'HUMAN') return { bg: 'var(--warning-muted)', text: 'var(--warning)', label: 'HUMAN', icon: '👤' };
         return { bg: 'var(--primary-muted)', text: 'var(--primary)', label: 'BOT', icon: '🤖' };
     };
@@ -96,19 +97,21 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
                                         )}
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', alignItems: 'center' }}>
-                                        <span style={{
-                                            fontSize: '0.65rem',
-                                            fontWeight: 700,
-                                            padding: '2px 6px',
-                                            borderRadius: '4px',
-                                            background: badge.bg,
-                                            color: badge.text,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '4px'
-                                        }}>
-                                            <span>{badge.icon}</span> {badge.label}
-                                        </span>
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <span style={{
+                                                fontSize: '0.65rem',
+                                                fontWeight: 700,
+                                                padding: '2px 6px',
+                                                borderRadius: '4px',
+                                                background: badge.bg,
+                                                color: badge.text,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}>
+                                                <span>{badge.icon}</span> {badge.label}
+                                            </span>
+                                        </div>
                                         {conv.unreadCount > 0 && (
                                             <span style={{
                                                 background: 'var(--primary)', color: '#fff', borderRadius: '10px',

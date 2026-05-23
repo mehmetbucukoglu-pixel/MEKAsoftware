@@ -18,7 +18,7 @@ import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
 /* ── Durum Renkleri (Gruplanmış) ── */
 const STATUS_COLOR_MAP: Record<string, string> = {
     CONFIRMED: '#3b82f6',   // Mavi — Bekliyor
-    ARRIVED: '#3b82f6',     // Mavi — Bekliyor
+    ARRIVED: '#16a34a',     // Yeşil — Bekliyor / Geldi
     COMPLETED: '#16a34a',   // Yeşil — Tamamlandı
     CANCELLED: '#ef4444',   // Kırmızı — İptal/Gelmedi
     NO_SHOW: '#ef4444',     // Kırmızı — İptal/Gelmedi
@@ -96,7 +96,12 @@ export default function AppointmentsPage() {
             setAllAppointments(eventsData);
 
             const formattedEvents = eventsData.map((apt: Appointment) => {
-                const color = STATUS_COLOR_MAP[apt.status] || STATUS_COLOR_MAP.CONFIRMED;
+                let displayStatus = apt.status;
+                // Gelmedi veya İptal edilmediyse, saati biten randevuyu otomatik yeşil (COMPLETED) göster
+                if (new Date(apt.endTime) < new Date() && displayStatus !== 'NO_SHOW' && displayStatus !== 'CANCELLED') {
+                    displayStatus = 'COMPLETED';
+                }
+                const color = STATUS_COLOR_MAP[displayStatus] || STATUS_COLOR_MAP.CONFIRMED;
                 return {
                     id: apt.id,
                     title: `${apt.patient?.firstName} ${apt.patient?.lastName}`,
@@ -216,27 +221,9 @@ export default function AppointmentsPage() {
         setIsModalOpen(true);
     };
 
-    /* ── Durum Lejandı (FullCalendar modu için) ── */
-    const StatusLegend = () => (
-        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-            {[
-                { color: '#3b82f6', label: 'Bekliyor (Onaylı/Geldi)' },
-                { color: '#16a34a', label: 'Tamamlandı' },
-                { color: '#ef4444', label: 'İptal / Gelmedi' },
-            ].map(item => (
-                <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div style={{
-                        width: '12px', height: '12px', borderRadius: '3px',
-                        background: item.color,
-                    }} />
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{item.label}</span>
-                </div>
-            ))}
-        </div>
-    );
 
     return (
-        <div style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '24px' }}>
             {/* Header via Portal */}
             <PageHeader
                 title={
@@ -300,10 +287,6 @@ export default function AppointmentsPage() {
                 </div>
             )}
 
-            {/* Durum Lejandı */}
-            <div style={{ marginBottom: '12px', paddingLeft: '4px' }}>
-                <StatusLegend />
-            </div>
 
             <div className="card" style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
                 {isLoading && (
@@ -342,7 +325,7 @@ export default function AppointmentsPage() {
                             }
                             return now;
                         })()}
-                        slotDuration="00:15:00"
+                        slotDuration="00:30:00"
                         slotMinTime="08:00:00"
                         slotMaxTime="20:00:00"
                         allDaySlot={false}
@@ -365,10 +348,12 @@ export default function AppointmentsPage() {
                         }}
                         eventContent={(arg) => {
                             const apt = arg.event.extendedProps as Appointment;
+                            const isPast = new Date(apt.startTime) < new Date();
                             return (
                                 <div style={{
                                     padding: '2px 6px', overflow: 'hidden',
                                     fontSize: '0.75rem', lineHeight: 1.4,
+                                    opacity: isPast ? 0.7 : 1, // Changed from 0.4 to 0.7 so it's not too faded since color logic handles it
                                 }}>
                                     <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {apt.patient?.firstName} {apt.patient?.lastName}

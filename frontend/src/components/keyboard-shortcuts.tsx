@@ -6,8 +6,6 @@ import { X, Keyboard } from 'lucide-react';
 
 const SHORTCUTS = [
     { keys: ['Ctrl', 'K'], label: 'Hızlı Arama' },
-    { keys: ['Alt', 'N'], label: 'Yeni Hasta' },
-    { keys: ['Alt', 'R'], label: 'Yeni Randevu' },
     { keys: ['Ctrl', '/'], label: 'Kısayolları Göster' },
 ];
 
@@ -30,16 +28,7 @@ export function useKeyboardShortcuts() {
                 }
             }
 
-            // Alt shortcuts (since Ctrl+N is locked by browsers)
-            if (e.altKey && !isTyping) {
-                if (e.key.toLowerCase() === 'n') {
-                    e.preventDefault();
-                    router.push('/patients?action=new');
-                } else if (e.key.toLowerCase() === 'r') {
-                    e.preventDefault();
-                    router.push('/appointments?action=new');
-                }
-            }
+            // Alt shortcuts disabled per user request
         };
         // Use capture phase to intercept before browser defaults if possible
         window.addEventListener('keydown', handler, { capture: true });

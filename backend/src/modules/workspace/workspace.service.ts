@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationService } from '../notification/notification.service';
 import { CreateDocumentDto, UpdateDocumentDto, ShareDocumentDto } from './dto/document.dto';
 import { CreateTeamspaceDto, UpdateTeamspaceDto, AddTeamspaceMembersDto } from './dto/teamspace.dto';
 
 @Injectable()
 export class WorkspaceService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private notificationService: NotificationService
+    ) { }
 
     async createDocument(clinicId: string, creatorId: string, dto: CreateDocumentDto) {
         console.log('Creating document:', { clinicId, creatorId, dto });
@@ -88,7 +92,7 @@ export class WorkspaceService {
     }
 
     async shareDocument(clinicId: string, id: string, dto: ShareDocumentDto) {
-        return this.prisma.workspaceDocument.update({
+        const doc = await this.prisma.workspaceDocument.update({
             where: { id, clinicId },
             data: {
                 collaborators: {
@@ -101,6 +105,19 @@ export class WorkspaceService {
                 }
             }
         });
+
+        // Bildirim gönder
+        for (const userId of dto.userIds) {
+            await this.notificationService.create(clinicId, userId, {
+                type: 'WORKSPACE_DOCUMENT',
+                title: 'Belge Paylaşımı',
+                body: `"${doc.title}" isimli çalışma belgesi sizinle paylaşıldı.`,
+                entityType: 'WORKSPACE_DOCUMENT',
+                entityId: doc.id
+            });
+        }
+
+        return doc;
     }
 
     async removeDocument(clinicId: string, id: string) {
@@ -142,7 +159,7 @@ export class WorkspaceService {
     }
 
     async addTeamspaceMembers(clinicId: string, teamspaceId: string, dto: AddTeamspaceMembersDto) {
-        return this.prisma.teamspace.update({
+        const ts = await this.prisma.teamspace.update({
             where: { id: teamspaceId, clinicId },
             data: {
                 members: {
@@ -153,5 +170,18 @@ export class WorkspaceService {
                 members: { select: { id: true, firstName: true, lastName: true } }
             }
         });
+
+        // Bildirim gönder
+        for (const userId of dto.userIds) {
+            await this.notificationService.create(clinicId, userId, {
+                type: 'WORKSPACE_TEAMSPACE',
+                title: 'Yeni Çalışma Alanı',
+                body: `"${ts.name}" isimli çalışma alanına eklendiniz.`,
+                entityType: 'TEAMSPACE',
+                entityId: ts.id
+            });
+        }
+
+        return ts;
     }
 }

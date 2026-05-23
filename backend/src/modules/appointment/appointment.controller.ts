@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -29,8 +29,18 @@ export class AppointmentController {
         return this.appointmentService.findAll(user.clinicId, filters);
     }
 
+    @Get('appointments/missing-followups')
+    @ApiOperation({ summary: 'Yeni randevusu olmayan geçmiş randevuları getirir' })
+    async getMissingFollowups(@CurrentUser() user: CurrentUserPayload) {
+        try {
+            return await this.appointmentService.getMissingFollowups(user.clinicId);
+        } catch (error) {
+            return { error: error.message, stack: error.stack };
+        }
+    }
+
     @Post('appointments')
-    @Roles('ADMIN' as any, 'ASSISTANT' as any)
+    @Roles('ADMIN' as any, 'ASSISTANT' as any, 'DOCTOR' as any)
     @ApiOperation({ summary: 'Manuel randevu oluştur' })
     async create(@CurrentUser() user: CurrentUserPayload, @Body() data: any) {
         const result = await this.appointmentService.create(user.clinicId, {
@@ -59,6 +69,14 @@ export class AppointmentController {
         return result;
     }
 
+    @Get('appointments/available-slots')
+    @ApiOperation({ summary: 'Müsait randevu slotları' })
+    @ApiQuery({ name: 'doctorId', required: true })
+    @ApiQuery({ name: 'date', required: true, description: 'YYYY-MM-DD' })
+    availableSlots(@CurrentUser() user: CurrentUserPayload, @Query('doctorId') doctorId: string, @Query('date') date: string) {
+        return this.appointmentService.getAvailableSlots(user.clinicId, doctorId, date);
+    }
+
     @Get('appointments/:id')
     @ApiOperation({ summary: 'Randevu detay' })
     findOne(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string) {
@@ -66,10 +84,17 @@ export class AppointmentController {
     }
 
     @Patch('appointments/:id')
-    @Roles('ADMIN' as any, 'ASSISTANT' as any)
+    @Roles('ADMIN' as any, 'ASSISTANT' as any, 'DOCTOR' as any)
     @ApiOperation({ summary: 'Randevu düzenle' })
     update(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string, @Body() data: any) {
         return this.appointmentService.update(user.clinicId, id, data);
+    }
+
+    @Delete('appointments/:id')
+    @Roles('ADMIN' as any, 'ASSISTANT' as any, 'DOCTOR' as any)
+    @ApiOperation({ summary: 'Randevu sil' })
+    remove(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string) {
+        return this.appointmentService.remove(user.clinicId, id);
     }
 
     @Patch('appointments/:id/cancel')
@@ -79,7 +104,7 @@ export class AppointmentController {
     }
 
     @Patch('appointments/:id/no-show')
-    @Roles('ADMIN' as any, 'DOCTOR' as any)
+    @Roles('ADMIN' as any, 'DOCTOR' as any, 'ASSISTANT' as any)
     @ApiOperation({ summary: 'Hasta gelmedi' })
     noShow(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string) {
         return this.appointmentService.updateStatus(user.clinicId, id, 'NO_SHOW');
@@ -93,19 +118,13 @@ export class AppointmentController {
     }
 
     @Patch('appointments/:id/complete')
-    @Roles('ADMIN' as any, 'DOCTOR' as any)
+    @Roles('ADMIN' as any, 'DOCTOR' as any, 'ASSISTANT' as any)
     @ApiOperation({ summary: 'Randevu tamamlandı' })
     complete(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string) {
         return this.appointmentService.updateStatus(user.clinicId, id, 'COMPLETED');
     }
 
-    @Get('appointments/available-slots')
-    @ApiOperation({ summary: 'Müsait randevu slotları' })
-    @ApiQuery({ name: 'doctorId', required: true })
-    @ApiQuery({ name: 'date', required: true, description: 'YYYY-MM-DD' })
-    availableSlots(@CurrentUser() user: CurrentUserPayload, @Query('doctorId') doctorId: string, @Query('date') date: string) {
-        return this.appointmentService.getAvailableSlots(user.clinicId, doctorId, date);
-    }
+
 
     @Get('doctors/:id/schedule')
     @ApiOperation({ summary: 'Doktor çalışma saatleri' })

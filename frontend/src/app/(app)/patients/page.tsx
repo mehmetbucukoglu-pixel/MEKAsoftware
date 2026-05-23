@@ -6,13 +6,14 @@ import { Users, Search, Plus, ChevronLeft, ChevronRight, Loader2, ArchiveRestore
 import { patientApi, Patient, PatientListResponse } from '@/lib/api';
 import PatientModal from './patient-modal';
 import { Highlight } from '@/components/highlight';
-import { maskTC, formatPhone } from '@/lib/format';
+import { formatPhone } from '@/lib/format';
 import { useAuthStore } from '@/lib/auth-store';
 import { PageHeader } from '@/lib/page-header';
+import { getSocket } from '@/lib/socket';
 
 export default function PatientsPage() {
     const router = useRouter();
-    const { user } = useAuthStore();
+    const { user, clinic } = useAuthStore();
     const [patients, setPatients] = useState<Patient[]>([]);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
@@ -67,6 +68,25 @@ export default function PatientsPage() {
     useEffect(() => {
         fetchPatients();
     }, [fetchPatients]);
+
+    // WebSocket refresh listener
+    useEffect(() => {
+        if (!clinic || !user) return;
+        const socket = getSocket(clinic.id, user.id, user.role);
+
+        const handleUpdate = () => {
+            console.log('Real-time update received, refreshing patient list...');
+            fetchPatients();
+        };
+
+        socket.on('conversation_updated', handleUpdate);
+        socket.on('conversation_escalated', handleUpdate);
+
+        return () => {
+            socket.off('conversation_updated', handleUpdate);
+            socket.off('conversation_escalated', handleUpdate);
+        };
+    }, [clinic, user, fetchPatients]);
 
     // Toast auto-dismiss
     useEffect(() => {
@@ -138,7 +158,7 @@ export default function PatientsPage() {
                     <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                     <input
                         className="input"
-                        placeholder="Hasta ara... (en az 3 karakter: isim, telefon, e-posta, TC Kimlik)"
+                        placeholder="Hasta ara... (en az 3 karakter: isim, telefon, e-posta)"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         style={{ paddingLeft: '40px', width: '100%', background: 'transparent', border: 'none' }}
@@ -195,7 +215,6 @@ export default function PatientsPage() {
                             <thead>
                                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Ad Soyad</th>
-                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>TC Kimlik</th>
                                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Telefon</th>
                                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Cinsiyet</th>
                                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Son Ziyaret</th>
@@ -238,12 +257,25 @@ export default function PatientsPage() {
                                                             Ön Kayıt
                                                         </span>
                                                     )}
+                                                    {p.conversations && (p.conversations[0]?.unreadCount ?? 0) > 0 && (
+                                                        <span style={{
+                                                            fontSize: '0.6rem',
+                                                            background: 'rgba(34, 197, 94, 0.15)',
+                                                            color: '#16a34a',
+                                                            padding: '1px 5px',
+                                                            borderRadius: '4px',
+                                                            fontWeight: 600,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '3px'
+                                                        }}>
+                                                            <div style={{ width: '6px', height: '6px', background: '#16a34a', borderRadius: '50%' }} />
+                                                            {p.conversations[0].unreadCount} Yeni Mesaj
+                                                        </span>
+                                                    )}
                                                 </span>
 
                                             </div>
-                                        </td>
-                                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.875rem', fontFamily: 'monospace' }}>
-                                            <Highlight text={maskTC(p.tcKimlik)} query={search} />
                                         </td>
                                         <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
                                             <Highlight text={formatPhone(p.phone)} query={search} />

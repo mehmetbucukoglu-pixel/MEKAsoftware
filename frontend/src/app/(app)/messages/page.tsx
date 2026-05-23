@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { MessageSquare } from 'lucide-react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { MessageSquare, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/auth-store';
 import { getSocket } from '@/lib/socket';
 import api from '@/lib/api';
@@ -19,12 +20,16 @@ export default function MessagesPage() {
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
+    const [loadingMessages, setLoadingMessages] = useState(false);
 
     const activeConversation = conversations.find(c => c.id === selectedId);
 
+    const searchParams = useSearchParams();
+    const phoneParam = searchParams.get('phone');
+
     useEffect(() => {
         fetchConversations();
-    }, []);
+    }, [phoneParam]);
 
     useEffect(() => {
         if (clinic?.id && user?.id && user?.role) {
@@ -76,13 +81,36 @@ export default function MessagesPage() {
             setPage(1);
             setHasMore(true);
             fetchInitialMessages(selectedId);
+
+            // Clear unread count + escalation badge when opening conversation
+            api.patch(`/conversations/${selectedId}/mark-seen`).then(() => {
+                // Update local state immediately so badge disappears
+                setConversations(prev =>
+                    prev.map(c => c.id === selectedId ? { ...c, unreadCount: 0, escalationReason: null } : c)
+                );
+            }).catch(() => {});
         }
     }, [selectedId]);
 
     const fetchConversations = async () => {
         try {
             const { data } = await api.get('/conversations');
-            setConversations(data);
+            const sorted = [...data].sort((a: any, b: any) => {
+                if (a.status === 'HUMAN' && b.status !== 'HUMAN') return -1;
+                if (a.status !== 'HUMAN' && b.status === 'HUMAN') return 1;
+                // Within same status group, sort by latest message
+                return new Date(b.lastMessageAt || 0).getTime() - new Date(a.lastMessageAt || 0).getTime();
+            });
+            setConversations(sorted);
+
+            if (phoneParam && !selectedId) {
+                const cleanPhone = phoneParam.replace(/[^0-9]/g, '');
+                const target = sorted.find((c: any) => 
+                    (c.waPhone && c.waPhone.includes(cleanPhone)) || 
+                    (c.patient?.phone && c.patient.phone.includes(cleanPhone))
+                );
+                if (target) setSelectedId(target.id);
+            }
         } catch (error) {
             console.error('Failed to fetch conversations', error);
         } finally {
@@ -91,12 +119,15 @@ export default function MessagesPage() {
     };
 
     const fetchInitialMessages = async (id: string) => {
+        setLoadingMessages(true);
         try {
             const { data } = await api.get(`/conversations/${id}`, { params: { page: 1, limit: 20 } });
             setMessages(data.reverse());
             if (data.length < 20) setHasMore(false);
         } catch (error) {
             console.error('Failed to fetch messages', error);
+        } finally {
+            setLoadingMessages(false);
         }
     };
 
@@ -146,56 +177,80 @@ export default function MessagesPage() {
         }
     };
 
+    const handleToggleLock = async (locked: boolean) => {
+        if (!selectedId) return;
+        try {
+            await api.patch(`/conversations/${selectedId}/lock`, { locked });
+            toast.success(locked ? 'Bot geçişi kilitlendi' : 'Bot geçiş kilidi açıldı');
+            fetchConversations();
+        } catch (error) {
+            toast.error('Kilit durumu değiştirilemedi');
+        }
+    };
+
     if (loading) return <div>Yükleniyor...</div>;
 
     return (
-        <div style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column' }}>
-            {/* Header via Portal */}
-            <PageHeader
-                title={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <MessageSquare size={18} style={{ color: 'var(--primary)' }} />
-                        <h1 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>Mesajlar</h1>
-                    </div>
-                }
-            />
-
-            <div className="card" style={{ flex: 1, padding: 0, display: 'flex', overflow: 'hidden' }}>
-                {/* Conversations Sidebar */}
-                <div style={{ width: '320px', minWidth: '320px' }}>
-                    <ConversationList
-                        conversations={conversations}
-                        selectedId={selectedId}
-                        onSelect={setSelectedId}
-                    />
-                </div>
-
-                {/* Chat Area */}
-                <div style={{ flex: 1 }}>
-                    {selectedId ? (
-                        <ChatWindow
-                            conversationId={selectedId}
-                            messages={messages}
-                            onSendMessage={handleSendMessage}
-                            onSwitchMode={handleSwitchMode}
-                            onLoadMore={fetchMoreMessages}
-                            hasMore={hasMore}
-                            loadingMore={loadingMore}
-                            status={activeConversation?.status || 'BOT'}
-                            patientName={activeConversation?.patient ? `${activeConversation.patient.firstName} ${activeConversation.patient.lastName}` : activeConversation?.waPhone}
-                            patientId={activeConversation?.patientId}
-                        />
-                    ) : (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <div className="empty-state">
-                                <MessageSquare size={48} style={{ color: 'var(--text-muted)' }} />
-                                <h3>Mesajlaşmaya Başlayın</h3>
-                                <p>Sol taraftan bir görüşme seçin.</p>
-                            </div>
+        <Suspense fallback={<div>Yükleniyor...</div>}>
+            <div style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column' }}>
+                {/* Header via Portal */}
+                <PageHeader
+                    title={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <MessageSquare size={18} style={{ color: 'var(--primary)' }} />
+                            <h1 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>Mesajlar</h1>
                         </div>
-                    )}
+                    }
+                />
+
+                <div className="card" style={{ flex: 1, padding: 0, display: 'flex', overflow: 'hidden' }}>
+                    {/* Conversations Sidebar */}
+                    <div style={{ width: '320px', minWidth: '320px' }}>
+                        <ConversationList
+                            conversations={conversations}
+                            selectedId={selectedId}
+                            onSelect={setSelectedId}
+                        />
+                    </div>
+
+                    {/* Chat Area */}
+                    <div style={{ flex: 1 }}>
+                        {selectedId ? (
+                            loadingMessages ? (
+                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Loader2 className="animate-spin" size={32} style={{ color: 'var(--primary)' }} />
+                                </div>
+                            ) : (
+                                <ChatWindow
+                                    conversationId={selectedId}
+                                    messages={messages}
+                                    onSendMessage={handleSendMessage}
+                                    onSwitchMode={handleSwitchMode}
+                                    onToggleLock={handleToggleLock}
+                                    onLoadMore={fetchMoreMessages}
+                                    hasMore={hasMore}
+                                    loadingMore={loadingMore}
+                                    status={activeConversation?.status || 'BOT'}
+                                    humanModeAt={activeConversation?.humanModeAt}
+                                    humanModeLocked={activeConversation?.humanModeLocked}
+                                    lastOutboundAt={activeConversation?.lastOutboundAt}
+                                    patientName={activeConversation?.patient ? `${activeConversation.patient.firstName} ${activeConversation.patient.lastName}` : activeConversation?.waPhone}
+                                    patientId={activeConversation?.patientId}
+                                    escalationReason={activeConversation?.escalationReason}
+                                />
+                            )
+                        ) : (
+                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div className="empty-state">
+                                    <MessageSquare size={48} style={{ color: 'var(--text-muted)' }} />
+                                    <h3>Mesajlaşmaya Başlayın</h3>
+                                    <p>Sol taraftan bir görüşme seçin.</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
+        </Suspense>
     );
 }

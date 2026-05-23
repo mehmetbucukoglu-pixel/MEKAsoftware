@@ -22,11 +22,10 @@ export class WhatsappAppointmentController {
     }
 
     @Get('conversation-status')
-    @ApiOperation({ summary: 'WhatsApp numarasının BOT veya HUMAN modda olduğunu getirir' })
+    @ApiOperation({ summary: 'WhatsApp numarasının BOT/HUMAN modu ve doktor bilgisini getirir' })
     @ApiQuery({ name: 'waPhone', required: true })
     async getConversationStatus(@Query('waPhone') waPhone: string) {
-        const status = await this.messagingService.getStatusByPhone(this.defaultClinicId, waPhone);
-        return { status };
+        return this.messagingService.getStatusByPhone(this.defaultClinicId, waPhone);
     }
 
     @Post('escalate')
@@ -35,6 +34,19 @@ export class WhatsappAppointmentController {
         return this.messagingService.escalate(this.defaultClinicId, data);
     }
 
+    @Get('latest-inbound')
+    @ApiOperation({ summary: 'Telefon numarasının en son inbound mesaj ID sini getirir (debounce için)' })
+    @ApiQuery({ name: 'waPhone', required: true })
+    async getLatestInbound(@Query('waPhone') waPhone: string) {
+        return this.messagingService.getLatestInboundId(this.defaultClinicId, waPhone);
+    }
+
+    @Get('pending-inbound')
+    @ApiOperation({ summary: 'Henüz cevaplanmamış tüm inbound mesajları birleştirip getirir (debounce sonrası AI context için)' })
+    @ApiQuery({ name: 'waPhone', required: true })
+    async getPendingInbound(@Query('waPhone') waPhone: string) {
+        return this.messagingService.getPendingInboundMessages(this.defaultClinicId, waPhone);
+    }
 
     @Get('ping')
     ping() {
@@ -85,10 +97,22 @@ export class WhatsappAppointmentController {
 
     @Patch(':id/cancel')
     @ApiOperation({ summary: 'WhatsApp üzerinden randevu iptal' })
-    whatsappCancel(
+    async whatsappCancel(
         @Param('id') id: string,
     ) {
-        return this.appointmentService.cancelFromWhatsApp(this.defaultClinicId, id);
+        const result = await this.appointmentService.cancelFromWhatsApp(this.defaultClinicId, id);
+        this.socketGateway.emitToStaff(this.defaultClinicId, 'appointment_cancelled', result);
+        return result;
+    }
+
+    @Patch(':id/confirm-reminder')
+    @ApiOperation({ summary: 'WhatsApp üzerinden randevu teyidini onayla' })
+    async whatsappConfirmReminder(
+        @Param('id') id: string,
+    ) {
+        const result = await this.appointmentService.confirmReminderFromWhatsApp(this.defaultClinicId, id);
+        // Maybe emit to staff to update the UI
+        return result;
     }
 
     @Get('tomorrow')

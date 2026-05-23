@@ -27,7 +27,7 @@ export class PatientService {
 
             // Eğer arama terimi 11 haneli rakamsa (TC araması olma ihtimali)
             if (/^\d{11}$/.test(search)) {
-                where.OR.push({ tcKimlikHash: CryptoUtil.hash(search) });
+                where.OR.push({ phone: { contains: search, mode: 'insensitive' } });
             }
         }
 
@@ -43,6 +43,12 @@ export class PatientService {
                         take: 1,
                         select: { startTime: true, status: true },
                     },
+                    conversations: {
+                        where: { clinicId },
+                        select: { status: true, escalationReason: true },
+                        take: 1,
+                        orderBy: { updatedAt: 'desc' }
+                    }
                 },
             }),
             this.prisma.patient.count({ where }),
@@ -51,7 +57,7 @@ export class PatientService {
         // TC Kimlikleri deşifre et
         const mappedData = data.map(p => ({
             ...p,
-            tcKimlik: CryptoUtil.decrypt(p.tcKimlik)
+            // Removed tcKimlik
         }));
 
         return { data: mappedData, total, page: Number(page), limit: take, totalPages: Math.ceil(total / take) };
@@ -87,7 +93,7 @@ export class PatientService {
         }
 
         // Deşifre
-        patient.tcKimlik = CryptoUtil.decrypt(patient.tcKimlik);
+        // tcKimlik decryption removed
 
         return patient;
     }
@@ -95,8 +101,7 @@ export class PatientService {
     async create(clinicId: string, dto: CreatePatientDto) {
         const data: any = {
             clinicId,
-            tcKimlik: CryptoUtil.encrypt(dto.tcKimlik),
-            tcKimlikHash: CryptoUtil.hash(dto.tcKimlik),
+            // tcKimlik removed
             firstName: dto.firstName,
             lastName: dto.lastName,
             phone: dto.phone,
@@ -111,7 +116,7 @@ export class PatientService {
         }
 
         const created = await this.prisma.patient.create({ data });
-        created.tcKimlik = CryptoUtil.decrypt(created.tcKimlik);
+        // tcKimlik decryption removed
         return created;
     }
 
@@ -125,16 +130,26 @@ export class PatientService {
         }
 
         const data: any = { ...dto };
-        if (dto.tcKimlik) {
-            data.tcKimlik = CryptoUtil.encrypt(dto.tcKimlik);
-            data.tcKimlikHash = CryptoUtil.hash(dto.tcKimlik);
-        }
+        // tcKimlik logic removed
         if (dto.dateOfBirth) {
             data.dateOfBirth = new Date(dto.dateOfBirth);
         }
 
+        // Ön-kayıt tamamlandığında durumu güncelle ve bildirimleri sil
+        if (existing.registrationStatus === 'PRE_REGISTERED') {
+            data.registrationStatus = 'FULL';
+
+            await this.prisma.notification.deleteMany({
+                where: {
+                    clinicId,
+                    type: 'PRE_REGISTERED_PATIENT',
+                    entityId: patientId
+                }
+            });
+        }
+
         const updated = await this.prisma.patient.update({ where: { id: patientId }, data });
-        updated.tcKimlik = CryptoUtil.decrypt(updated.tcKimlik);
+        // tcKimlik decryption removed
         return updated;
     }
 
@@ -162,7 +177,7 @@ export class PatientService {
 
         return data.map(p => ({
             ...p,
-            tcKimlik: CryptoUtil.decrypt(p.tcKimlik)
+            // Removed tcKimlik
         }));
     }
 
@@ -181,15 +196,13 @@ export class PatientService {
             data: { isActive: true },
         });
 
-        restored.tcKimlik = CryptoUtil.decrypt(restored.tcKimlik);
         return restored;
     }
 
-    // Yeni: TC duplicate kontrolü
-    async checkTc(clinicId: string, tcKimlik: string) {
-        const hash = CryptoUtil.hash(tcKimlik);
+    // Yeni: Telefon duplicate kontrolü
+    async checkPhone(clinicId: string, phone: string) {
         const existing = await this.prisma.patient.findFirst({
-            where: { clinicId, tcKimlikHash: hash }
+            where: { clinicId, phone }
         });
 
         if (existing) {

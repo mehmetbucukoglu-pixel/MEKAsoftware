@@ -1,0 +1,8 @@
+version: "3"
+agent:
+  authtoken: 3CIerq5akzz80oqH7Pn7PFme6Po_4xwRMtQHEVjZohR5dwawA
+tunnels:
+  backend:
+    proto: http
+    addr: 3000
+    domain: rebuff-husband-legibly.ngrok-free.dev

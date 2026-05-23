@@ -114,8 +114,6 @@ model RefreshToken {
 model Patient {
   id                 String   @id @default(uuid()) @db.Uuid
   clinicId           String   @map("clinic_id") @db.Uuid
-  tcKimlik           String?  @map("tc_kimlik") @db.Text
-  tcKimlikHash       String?  @map("tc_kimlik_hash") @db.VarChar(64)
   firstName          String   @map("first_name") @db.VarChar(100)
   lastName           String   @map("last_name") @db.VarChar(100)
   phone              String   @db.VarChar(20)
@@ -139,7 +137,6 @@ model Patient {
   attachments   PatientAttachment[]
   phoneLinks    PhonePatientLink[]
 
-  @@unique([clinicId, tcKimlikHash])
   @@index([clinicId, lastName, firstName], map: "idx_patients_search")
   @@map("patients")
 }
@@ -213,6 +210,13 @@ enum AppointmentSource {
   WHATSAPP
 }
 
+enum ReminderStatus {
+  PENDING
+  SENT
+  CONFIRMED
+  CANCELLED
+}
+
 model Appointment {
   id           String            @id @default(uuid()) @db.Uuid
   clinicId     String            @map("clinic_id") @db.Uuid
@@ -223,6 +227,7 @@ model Appointment {
   durationMin  Int               @map("duration_min") @db.SmallInt
   status       AppointmentStatus @default(CONFIRMED)
   source       AppointmentSource @default(MANUAL)
+  reminderStatus ReminderStatus  @default(PENDING) @map("reminder_status")
   referenceCode String?          @unique @map("reference_code") @db.VarChar(10)
   cancelReason String?           @map("cancel_reason") @db.Text
   notes        String?           @db.Text
@@ -264,6 +269,8 @@ model Conversation {
   humanModeAt      DateTime?          @map("human_mode_at") @db.Timestamptz()
   escalationReason String?            @map("escalation_reason") @db.VarChar(50)
   lastMessageAt    DateTime?          @map("last_message_at") @db.Timestamptz()
+  lastOutboundAt   DateTime?          @map("last_outbound_at") @db.Timestamptz()
+  humanModeLocked  Boolean            @default(false) @map("human_mode_locked")
   unreadCount      Int                @default(0) @map("unread_count")
   createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt        DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()

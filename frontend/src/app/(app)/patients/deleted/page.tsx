@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArchiveRestore, ArrowLeft, Loader2, Search, User } from 'lucide-react';
 import { patientApi, Patient } from '@/lib/api';
-import { maskTC, formatPhone } from '@/lib/format';
+import { formatPhone } from '@/lib/format';
 import { useAuthStore } from '@/lib/auth-store';
 
 export default function DeletedPatientsPage() {
@@ -57,7 +57,6 @@ export default function DeletedPatientsPage() {
         return (
             p.firstName.toLowerCase().includes(tr) ||
             p.lastName.toLowerCase().includes(tr) ||
-            (p.tcKimlik && p.tcKimlik.includes(search)) ||
             (p.phone && p.phone.includes(search))
         );
     });
@@ -120,7 +119,6 @@ export default function DeletedPatientsPage() {
                             <thead>
                                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Ad Soyad</th>
-                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>TC Kimlik</th>
                                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Telefon</th>
                                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Silinme Tarihi</th>
                                     <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>İşlem</th>
@@ -139,9 +137,7 @@ export default function DeletedPatientsPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: '0.875rem', fontFamily: 'monospace' }}>
-                                            {maskTC(p.tcKimlik)}
-                                        </td>
+
                                         <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
                                             {formatPhone(p.phone)}
                                         </td>

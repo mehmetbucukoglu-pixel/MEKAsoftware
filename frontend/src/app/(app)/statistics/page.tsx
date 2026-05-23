@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { statisticsApi, userApi, StatisticsOverview, VisitStats, Appointment } from '@/lib/api';
 import {
     BarChart3, Users, Clock, UserX, TrendingUp, Activity,
-    ArrowUpRight, ArrowDownRight, Calendar, Filter
+    ArrowUpRight, ArrowDownRight, Calendar, Filter, MessageSquare, Bot, AlertTriangle
 } from 'lucide-react';
+
 import { PageHeader } from '@/lib/page-header';
 import {
     AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -40,7 +41,9 @@ export default function StatisticsPage() {
     const [doctors, setDoctors] = useState<{ id: string; firstName: string; lastName: string }[]>([]);
     const [selectedDoctor, setSelectedDoctor] = useState<string>('');
     const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter'>('month');
+    const [chatInsights, setChatInsights] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+
 
     const getDateParams = () => {
         const now = new Date();
@@ -65,16 +68,19 @@ export default function StatisticsPage() {
         setLoading(true);
         try {
             const params = getDateParams();
-            const [overviewRes, visitsRes, recentRes, doctorsRes] = await Promise.all([
+            const [overviewRes, visitsRes, recentRes, doctorsRes, chatRes] = await Promise.all([
                 statisticsApi.getOverview(params),
                 statisticsApi.getVisits(params),
                 statisticsApi.getRecentVisits(15),
                 userApi.getDoctors(),
+                statisticsApi.getChatInsights(),
             ]);
             setOverview(overviewRes.data);
             setVisits(visitsRes.data);
             setRecentVisits(recentRes.data);
             setDoctors(doctorsRes.data);
+            setChatInsights(chatRes.data);
+
         } catch (err) {
             console.error('Failed to fetch statistics', err);
         } finally {
@@ -548,6 +554,99 @@ export default function StatisticsPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Chat Insights Section */}
+            {chatInsights && (
+                <div style={{ marginTop: 40 }}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <h3 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Bot size={20} style={{ color: 'var(--primary)' }} />
+                            WhatsApp AI Bot Performansı
+                        </h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', marginTop: '4px', margin: 0 }}>
+                            Yapay zeka asistanının verimlilik ve eskalasyon analizleri
+                        </p>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+                        <div style={{
+                            padding: 20, borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                            display: 'flex', alignItems: 'center', gap: 16
+                        }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(99, 102, 241, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <MessageSquare size={20} style={{ color: 'var(--primary)' }} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{chatInsights.unlinkedPatients}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Kayıtsız Potansiyel Hasta</div>
+                            </div>
+                        </div>
+
+                        <div style={{
+                            padding: 20, borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                            display: 'flex', alignItems: 'center', gap: 16
+                        }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <TrendingUp size={20} style={{ color: 'var(--success)' }} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+                                    %{Math.round((chatInsights.modeDistribution.find((s: any) => s.status === 'BOT')?.count || 0) / 
+                                    (chatInsights.modeDistribution.reduce((a: any, b: any) => a + b.count, 0) || 1) * 100)}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Bot Çözümleme Oranı</div>
+                            </div>
+                        </div>
+
+                        <div style={{
+                            padding: 20, borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                            display: 'flex', alignItems: 'center', gap: 16
+                        }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <AlertTriangle size={20} style={{ color: 'var(--danger)' }} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{chatInsights.modeDistribution.find((s: any) => s.status === 'HUMAN')?.count || 0}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>İnsana Devredilen (Son 30 Gün)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                        <div style={{ padding: 20, borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                            <h4 style={{ margin: '0 0 16px 0', fontSize: '0.875rem', fontWeight: 600 }}>Eskalasyon Nedenleri (Neden İnsan İsteniyor?)</h4>
+                            <div style={{ height: 240 }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chatInsights.topEscalationReasons} layout="vertical">
+                                        <XAxis type="number" hide />
+                                        <YAxis dataKey="reason" type="category" width={120} fontSize={10} axisLine={false} tickLine={false} />
+                                        <Tooltip 
+                                            contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8 }}
+                                        />
+                                        <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]} barSize={20} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        <div style={{ padding: 20, borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                            <h4 style={{ margin: '0 0 16px 0', fontSize: '0.875rem', fontWeight: 600 }}>WhatsApp Mesaj Yoğunluğu</h4>
+                            <div style={{ height: 240 }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chatInsights.dailyVolume}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                                        <XAxis dataKey="date" tickFormatter={d => formatDate(d)} fontSize={10} axisLine={false} tickLine={false} />
+                                        <YAxis fontSize={10} axisLine={false} tickLine={false} />
+                                        <Tooltip labelFormatter={d => formatDate(d)} />
+                                        <Area type="monotone" dataKey="count" stroke="var(--primary)" fill="var(--primary-muted)" strokeWidth={2} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+

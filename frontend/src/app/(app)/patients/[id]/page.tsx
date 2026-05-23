@@ -5,13 +5,13 @@ import { useRouter, useParams } from 'next/navigation';
 import {
     ArrowLeft, Edit2, Calendar, FileText, Phone, Mail,
     User, Cake, StickyNote, Clock, Loader2, CreditCard, MapPin,
-    DollarSign, Plus, Info, ChevronsUp, ChevronsDown
+    DollarSign, Plus, Info, ChevronsUp, ChevronsDown, MessageSquare
 } from 'lucide-react';
 import { patientApi, clinicalNoteApi, financeApi, Patient, ClinicalNote, Payment } from '@/lib/api';
 import PatientModal from '../patient-modal';
 import { PatientCanvas } from '@/components/patient/PatientCanvas';
 import { addRecentPatient } from '@/lib/recent-patients';
-import { maskTC, formatPhone } from '@/lib/format';
+import { formatPhone } from '@/lib/format';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { useAuthStore } from '@/lib/auth-store';
@@ -184,11 +184,12 @@ export default function PatientDetailPage() {
         );
     }
 
-    const tabs: { id: TabId; label: string; icon: React.ElementType; count?: number; hidden?: boolean }[] = [
+    const tabs: { id: TabId | 'messages'; label: string; icon: React.ElementType; count?: number; hidden?: boolean }[] = [
         { id: 'appointments', label: 'Randevular', icon: Calendar, count: patient._count?.appointments, hidden: isAccountant },
         { id: 'notes', label: 'Klinik Notları', icon: FileText, count: patient._count?.clinicalNotes, hidden: isAccountant },
+        { id: 'messages', label: 'Mesajlar', icon: MessageSquare, hidden: isAccountant },
         { id: 'payments', label: 'Finansal Hareketler', icon: DollarSign, count: patient._count?.payments, hidden: isDoctor },
-    ].filter(t => !t.hidden) as { id: TabId; label: string; icon: React.ElementType; count?: number; hidden?: boolean }[];
+    ].filter(t => !t.hidden) as { id: TabId | 'messages'; label: string; icon: React.ElementType; count?: number; hidden?: boolean }[];
 
     return (
         <div>
@@ -210,100 +211,45 @@ export default function PatientDetailPage() {
                 <ArrowLeft size={16} /> Hastalar
             </button>
 
-            {/* Patient Header */}
-            <div className="card" style={{ marginBottom: '20px', overflow: 'hidden' }}>
-                {/* Always visible: name row + collapse toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                        <div style={{
-                            width: '48px', height: '48px', borderRadius: '50%', background: 'var(--primary-muted)',
-                            color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.125rem', fontWeight: 700, flexShrink: 0,
-                        }}>
-                            {patient.firstName[0]}{patient.lastName[0]}
-                        </div>
-                        <div>
-                            <h1 style={{ fontSize: '1.25rem', margin: 0 }}>{patient.firstName} {patient.lastName}</h1>
-                            {!infoOpen && (
-                                <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '2px' }}>
-                                    {formatPhone(patient.phone)} · {maskTC(patient.tcKimlik)}
-                                </p>
-                            )}
-                        </div>
+            {/* Patient Header (Minimalist) */}
+            <div style={{
+                marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                paddingBottom: '16px', borderBottom: '1px solid var(--border)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{
+                        width: '44px', height: '44px', borderRadius: '50%', background: 'var(--primary-muted)',
+                        color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '1.125rem', fontWeight: 600, flexShrink: 0
+                    }}>
+                        {patient.firstName[0]}{patient.lastName[0]}
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        {!isDoctor && balance && (
-                            <div style={{ padding: '4px 12px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                <div style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)' }}>Bakiye</div>
-                                <div style={{ fontSize: '1rem', fontWeight: 700, color: balance.balance < 0 ? 'var(--error)' : 'var(--success)' }}>
-                                    ₺{balance.balance.toLocaleString('tr-TR')}
-                                </div>
-                            </div>
-                        )}
-                        <button className="btn btn-secondary" onClick={() => setModalOpen(true)} style={{ padding: '6px 12px' }}>
-                            <Edit2 size={14} /> Düzenle
-                        </button>
-                        <button
-                            onClick={() => setInfoOpen(!infoOpen)}
-                            title={infoOpen ? 'Bilgileri gizle' : 'Bilgileri göster'}
-                            style={{
-                                background: 'transparent', border: 'none', cursor: 'pointer',
-                                padding: '6px', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)',
-                                display: 'flex', alignItems: 'center', transition: 'all 0.15s',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-                        >
-                            {infoOpen ? <ChevronsUp size={16} /> : <ChevronsDown size={16} />}
-                        </button>
+                    <div>
+                        <h1 style={{ fontSize: '1.25rem', margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {patient.firstName} {patient.lastName}
+                        </h1>
+                        <div style={{ display: 'flex', gap: '12px', fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Phone size={12}/> {formatPhone(patient.phone)}</span>
+                            {patient.email && <span>• {patient.email}</span>}
+                            {patient.dateOfBirth && <span>• Doğum: {format(new Date(patient.dateOfBirth), 'dd MMM yyyy', { locale: tr })}</span>}
+                        </div>
                     </div>
                 </div>
-
-                {/* Collapsible details */}
-                <div style={{
-                    maxHeight: infoOpen ? '500px' : '0px',
-                    opacity: infoOpen ? 1 : 0,
-                    overflow: 'hidden',
-                    transition: 'max-height 0.3s ease, opacity 0.25s ease',
-                }}>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginTop: '4px', marginBottom: 0, paddingLeft: '64px' }}>
-                        Kayıt: {format(new Date(patient.createdAt), 'dd MMMM yyyy', { locale: tr })}
-                    </p>
-
-                    {/* Info Grid */}
-                    <div className="detail-info-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginTop: '20px', padding: '20px 0', borderTop: '1px solid var(--border-color)' }}>
-                        <div className="detail-info-item">
-                            <span className="detail-info-label" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>TC Kimlik</span>
-                            <span className="detail-info-value" style={{ fontWeight: 500 }}>{maskTC(patient.tcKimlik)}</span>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    {!isDoctor && balance && (
+                        <div style={{ textAlign: 'right', marginRight: '8px' }}>
+                            <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Bakiye</div>
+                            <div style={{ fontSize: '1rem', fontWeight: 600, color: balance.balance < 0 ? 'var(--error)' : 'var(--success)' }}>
+                                ₺{balance.balance.toLocaleString('tr-TR')}
+                            </div>
                         </div>
-                        <div className="detail-info-item">
-                            <span className="detail-info-label" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Telefon</span>
-                            <span className="detail-info-value" style={{ fontWeight: 500 }}>{formatPhone(patient.phone)}</span>
-                        </div>
-                        <div className="detail-info-item">
-                            <span className="detail-info-label" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>E-posta</span>
-                            <span className="detail-info-value" style={{ fontWeight: 500 }}>{patient.email || '—'}</span>
-                        </div>
-                        <div className="detail-info-item">
-                            <span className="detail-info-label" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Doğum Tarihi</span>
-                            <span className="detail-info-value" style={{ fontWeight: 500 }}>
-                                {patient.dateOfBirth ? format(new Date(patient.dateOfBirth), 'dd MMM yyyy', { locale: tr }) : '—'}
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Notes Column */}
+                    )}
+                    <button className="btn btn-secondary btn-sm" onClick={() => setModalOpen(true)}>
+                        <Edit2 size={14} /> Düzenle
+                    </button>
                     {patient.notes && (
-                        <div style={{
-                            marginTop: '16px', padding: '12px 16px',
-                            background: 'var(--bg-hover)', borderRadius: 'var(--radius-md)',
-                            borderLeft: '4px solid var(--primary)',
-                        }}>
-                            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <StickyNote size={14} /> Genel Notlar
-                            </div>
-                            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
-                                {patient.notes}
-                            </div>
+                        <div title={`Genel Notlar: ${patient.notes}`} style={{ padding: '6px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-md)', cursor: 'help' }}>
+                            <Info size={16} style={{ color: 'var(--primary)' }} />
                         </div>
                     )}
                 </div>
@@ -317,7 +263,13 @@ export default function PatientDetailPage() {
                         <button
                             key={tab.id}
                             className={`tab ${activeTab === tab.id ? 'tab-active' : ''}`}
-                            onClick={() => setActiveTab(tab.id)}
+                            onClick={() => {
+                                if (tab.id === 'messages') {
+                                    router.push(`/messages?phone=${patient.phone}`);
+                                } else {
+                                    setActiveTab(tab.id as TabId);
+                                }
+                            }}
                             style={{
                                 padding: '10px 20px', fontSize: '0.9375rem', fontWeight: 500, color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-muted)',
                                 borderBottom: activeTab === tab.id ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', cursor: 'pointer',

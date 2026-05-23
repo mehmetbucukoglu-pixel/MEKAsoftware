@@ -55,7 +55,6 @@ export default api;
 export interface Patient {
     id: string;
     clinicId: string;
-    tcKimlik: string;
     firstName: string;
     lastName: string;
     phone: string;
@@ -72,6 +71,7 @@ export interface Patient {
     clinicalNotes?: any[];
     attachments?: any[];
     payments?: Payment[];
+    conversations?: { status: string; escalationReason?: string; unreadCount?: number }[];
     _count?: { appointments: number; clinicalNotes: number; payments: number };
 }
 
@@ -107,6 +107,7 @@ export interface Appointment {
     endTime: string;
     durationMin: number;
     status: 'CONFIRMED' | 'ARRIVED' | 'CANCELLED' | 'NO_SHOW' | 'COMPLETED';
+    reminderStatus?: 'PENDING' | 'SENT' | 'CONFIRMED' | 'CANCELLED';
     source: 'MANUAL' | 'WHATSAPP';
     notes?: string;
     cancelReason?: string;
@@ -158,6 +159,7 @@ export interface ExtendedKpis {
     pendingPayment: number;
     unreadMessages: number;
     preRegisteredCount: number;
+    pendingMessageCount: number;
 }
 
 
@@ -170,7 +172,6 @@ export interface PatientListResponse {
 }
 
 export interface CreatePatientInput {
-    tcKimlik: string;
     firstName: string;
     lastName: string;
     phone: string;
@@ -206,7 +207,7 @@ export const patientApi = {
     delete: (id: string) => api.delete(`/patients/${id}`),
     listDeleted: () => api.get('/patients/deleted'),
     restore: (id: string) => api.patch<Patient>(`/patients/${id}/restore`),
-    checkTc: (tc: string) => api.get<{ exists: boolean, patientName?: string }>(`/patients/check-tc?tc=${tc}`),
+    checkPhone: (phone: string) => api.get<{ exists: boolean, patientName?: string }>(`/patients/check-phone?phone=${phone}`),
 };
 
 // ========== Appointment API ==========
@@ -215,6 +216,7 @@ export const appointmentApi = {
     get: (id: string) => api.get(`/appointments/${id}`),
     create: (data: any) => api.post('/appointments', data),
     update: (id: string, data: any) => api.patch(`/appointments/${id}`, data),
+    remove: (id: string) => api.delete(`/appointments/${id}`),
     cancel: (id: string, reason?: string) => api.patch(`/appointments/${id}/cancel`, { cancelReason: reason }),
     complete: (id: string) => api.patch(`/appointments/${id}/complete`),
     arrived: (id: string) => api.patch(`/appointments/${id}/arrived`),
@@ -289,6 +291,13 @@ export interface VisitStats {
     hourly: { hour: number; count: number }[];
 }
 
+export interface ChatInsights {
+    modeDistribution: { status: string; count: number }[];
+    topEscalationReasons: { reason: string; count: number }[];
+    unlinkedPatients: number;
+    dailyVolume: { date: string; count: number }[];
+}
+
 export const statisticsApi = {
     getOverview: (params?: { startDate?: string; endDate?: string; doctorId?: string }) =>
         api.get<StatisticsOverview>('/statistics/overview', { params }),
@@ -296,4 +305,7 @@ export const statisticsApi = {
         api.get<VisitStats>('/statistics/visits', { params }),
     getRecentVisits: (limit?: number) =>
         api.get<Appointment[]>('/statistics/recent-visits', { params: { limit } }),
+    getChatInsights: () =>
+        api.get<ChatInsights>('/statistics/chat-insights'),
 };
+

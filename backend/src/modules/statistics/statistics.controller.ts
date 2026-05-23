@@ -49,4 +49,10 @@ export class StatisticsController {
     ) {
         return this.statisticsService.getRecentVisits(user.clinicId, Number(limit) || 20);
     }
+
+    @Get('chat-insights')
+    @ApiOperation({ summary: 'WhatsApp bot ve mesajlaşma istatistikleri' })
+    async getChatInsights(@CurrentUser() user: CurrentUserPayload) {
+        return this.statisticsService.getChatInsights(user.clinicId);
+    }
 }

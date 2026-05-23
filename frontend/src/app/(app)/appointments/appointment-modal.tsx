@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { appointmentApi, patientApi, doctorScheduleApi, userApi, Patient, Appointment } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth-store';
-import { X, Search, Clock, Calendar, FileText, Check, Loader2, AlertCircle, ExternalLink, MessageSquare } from 'lucide-react';
+import { X, Search, Clock, Calendar, FileText, Check, Loader2, AlertCircle, ExternalLink, MessageSquare, Trash2, Timer } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 interface AppointmentModalProps {
@@ -219,6 +219,20 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
         }
     };
 
+    const handleDelete = async () => {
+        if (!existingAppointment || !window.confirm('Bu randevuyu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
+        setIsSubmitting(true);
+        try {
+            await appointmentApi.remove(existingAppointment.id);
+            toast.success('Randevu başarıyla silindi');
+            onSuccess();
+        } catch (error: any) {
+            toast.error('Silinirken hata oluştu: ' + (error.response?.data?.message || error.message));
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -396,41 +410,56 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
                         </div>
 
                         {/* Müsait Slotlar Önerisi */}
-                        {!isEdit && availableSlots.length > 0 && (
-                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)' }}>
-                                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                    Müsait Saat Dilimleri:
+                        {!isEdit && doctorId && date && (
+                            <div style={{ background: 'var(--bg-elevated)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Timer size={16} style={{ color: 'var(--primary)' }} /> Müsait Saat Dilimleri
                                 </div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                    {availableSlots.slice(0, 10).map((slot, i) => {
-                                        const slotDate = new Date(slot.startTime);
-                                        const timeStr = `${String(slotDate.getHours()).padStart(2, '0')}:${String(slotDate.getMinutes()).padStart(2, '0')}`;
-                                        const isSelected = startTime === timeStr;
+                                
+                                {isLoadingSlots ? (
+                                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Saatler yükleniyor...</div>
+                                ) : availableSlots.length > 0 ? (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                        {availableSlots.slice(0, 15).map((slot, i) => {
+                                            const slotDate = new Date(slot.startTime);
+                                            const timeStr = `${String(slotDate.getHours()).padStart(2, '0')}:${String(slotDate.getMinutes()).padStart(2, '0')}`;
+                                            const isSelected = startTime === timeStr;
 
-                                        return (
-                                            <button
-                                                key={i}
-                                                type="button"
-                                                onClick={() => {
-                                                    setStartTime(timeStr);
-                                                    const diffMin = (new Date(slot.endTime).getTime() - slotDate.getTime()) / 60000;
-                                                    setDurationMin(diffMin);
-                                                }}
-                                                disabled={!slot.available}
-                                                style={{
-                                                    padding: '4px 10px', fontSize: '0.8125rem', borderRadius: 'var(--radius-sm)',
-                                                    background: isSelected ? 'var(--primary)' : (slot.available ? 'var(--bg-elevated)' : 'var(--error-muted)'),
-                                                    color: isSelected ? '#fff' : (slot.available ? 'var(--text-primary)' : 'var(--error)'),
-                                                    border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
-                                                    cursor: slot.available ? 'pointer' : 'not-allowed',
-                                                    opacity: slot.available ? 1 : 0.5
-                                                }}
-                                            >
-                                                {timeStr}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                            return (
+                                                <button
+                                                    key={i}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setStartTime(timeStr);
+                                                        const diffMin = (new Date(slot.endTime).getTime() - slotDate.getTime()) / 60000;
+                                                        setDurationMin(diffMin);
+                                                    }}
+                                                    disabled={!slot.available}
+                                                    style={{
+                                                        padding: '6px 12px', fontSize: '0.875rem', fontWeight: isSelected ? 600 : 500, borderRadius: 'var(--radius-sm)',
+                                                        background: isSelected ? 'var(--primary)' : (slot.available ? 'rgba(255,255,255,0.03)' : 'var(--error-muted)'),
+                                                        color: isSelected ? '#fff' : (slot.available ? 'var(--text-primary)' : 'var(--error)'),
+                                                        border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
+                                                        cursor: slot.available ? 'pointer' : 'not-allowed',
+                                                        opacity: slot.available ? 1 : 0.5,
+                                                        transition: 'all 0.2s ease'
+                                                    }}
+                                                >
+                                                    {timeStr}
+                                                </button>
+                                            );
+                                        })}
+                                        {availableSlots.length > 15 && (
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', alignSelf: 'center', marginLeft: '8px' }}>
+                                                +{availableSlots.length - 15} daha...
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                                        Seçili tarihte doktorun uygun saat dilimi bulunamadı. Lütfen başka bir gün seçin veya manuel saat girin.
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -440,11 +469,10 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
                                 <div className="form-group">
                                     <label className="label">Oturum Durumu</label>
                                     <select className="select" value={status} onChange={(e) => setStatus(e.target.value as any)}>
-                                        <option value="CONFIRMED">🔵 Onaylandı (Bekleniyor)</option>
-                                        <option value="ARRIVED">🟢 Hasta Geldi</option>
-                                        <option value="COMPLETED">✅ Tamamlandı</option>
-                                        <option value="NO_SHOW">⚠️ Hasta Gelmedi</option>
-                                        <option value="CANCELLED">🔴 İptal Edildi</option>
+                                        <option value="CONFIRMED">⏳ Bekliyor (Onaylandı)</option>
+                                        <option value="COMPLETED">✅ Geldi / Tamamlandı</option>
+                                        <option value="NO_SHOW">🔴 Gelmedi</option>
+                                        <option value="CANCELLED">❌ İptal Edildi</option>
                                     </select>
                                 </div>
                                 {status === 'CANCELLED' && (
@@ -462,64 +490,41 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
                             </>
                         )}
 
-                        {/* Hasta Geldi Hızlı Buton (Sadece CONFIRMED randevularda) */}
-                        {isEdit && existingAppointment.status === 'CONFIRMED' && (
-                            <button
-                                type="button"
-                                onClick={async () => {
-                                    try {
-                                        await appointmentApi.arrived(existingAppointment.id);
-                                        toast.success('Hasta geldi olarak işaretlendi');
-                                        onSuccess();
-                                    } catch (err: any) {
-                                        toast.error('Durum güncellenirken hata: ' + (err?.response?.data?.message || err.message));
-                                    }
-                                }}
-                                style={{
-                                    width: '100%', padding: '12px', borderRadius: 'var(--radius-md)',
-                                    background: 'rgba(74,222,128,0.15)', border: '2px solid #4ade80',
-                                    color: '#4ade80', fontWeight: 600, fontSize: '0.9375rem',
-                                    cursor: 'pointer', display: 'flex', alignItems: 'center',
-                                    justifyContent: 'center', gap: '8px',
-                                    transition: 'all 0.15s',
-                                }}
-                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(74,222,128,0.25)'; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(74,222,128,0.15)'; }}
-                            >
-                                <Check size={18} /> Hasta Geldi
-                            </button>
-                        )}
 
-                        {/* Randevu Notu */}
-                        <div className="form-group">
-                            <label className="label">Randevu Notu (İsteğe Bağlı)</label>
-                            <textarea
-                                className="textarea"
-                                rows={2}
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                                placeholder="Şikayet, hatırlatma veya ön muayene notu..."
-                            />
-                        </div>
 
                     </form>
                 </div>
 
                 <div style={{
                     padding: '16px 24px', borderTop: '1px solid var(--border)',
-                    background: 'var(--bg-elevated)', display: 'flex', justifyContent: 'flex-end', gap: '12px',
+                    background: 'var(--bg-elevated)', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     borderRadius: '0 0 var(--radius-lg) var(--radius-lg)'
                 }}>
-                    <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>
-                        İptal
-                    </button>
-                    <button type="button" className="btn btn-primary" onClick={handleSubmit} disabled={isSubmitting || !patientId}>
-                        {isSubmitting ? (
-                            <><Loader2 size={16} className="spin" /> Kaydediliyor...</>
-                        ) : (
-                            <><Check size={16} /> {isEdit ? 'Güncelle' : 'Randevu Oluştur'}</>
+                    <div>
+                        {isEdit && (
+                            <button 
+                                type="button" 
+                                className="btn btn-danger" 
+                                onClick={handleDelete} 
+                                disabled={isSubmitting}
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                            >
+                                <Trash2 size={16} /> Sil
+                            </button>
                         )}
-                    </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>
+                            İptal
+                        </button>
+                        <button type="button" className="btn btn-primary" onClick={handleSubmit} disabled={isSubmitting || !patientId}>
+                            {isSubmitting ? (
+                                <><Loader2 size={16} className="spin" /> Kaydediliyor...</>
+                            ) : (
+                                <><Check size={16} /> {isEdit ? 'Güncelle' : 'Randevu Oluştur'}</>
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

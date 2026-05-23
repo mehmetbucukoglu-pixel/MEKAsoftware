@@ -58,17 +58,8 @@ export default function LoginPage() {
             }}>
                 {/* Logo */}
                 <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-                    <img
-                        src="/logo.png"
-                        alt="MEKA"
-                        style={{
-                            height: '64px',
-                            width: 'auto',
-                            objectFit: 'contain',
-                            marginBottom: '16px',
-                        }}
-                    />
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>MEKA</h1>
+
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em' }}>MEKA</h1>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '4px' }}>
                         Klinik yönetim paneline giriş yapın
                     </p>
@@ -161,7 +152,7 @@ export default function LoginPage() {
                     </div>
                     <div style={{ display: 'grid', gap: '4px' }}>
                         <div>Admin: <span style={{ color: 'var(--text-primary)' }}>admin@demo.com / Admin123!</span></div>
-                        <div>Doktor: <span style={{ color: 'var(--text-primary)' }}>doctor@demo.com / Doctor123!</span></div>
+                        <div>Doktor: <span style={{ color: 'var(--text-primary)' }}>ayse@demo.com / Doctor123!</span></div>
                         <div>Asistan: <span style={{ color: 'var(--text-primary)' }}>asistan@demo.com / Assist123!</span></div>
                     </div>
                 </div>

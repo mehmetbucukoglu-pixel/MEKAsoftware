@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, User, Bot, UserCheck, Check, CheckCheck, Loader2 } from 'lucide-react';
+import { Send, User, Bot, UserCheck, Check, CheckCheck, Loader2, Lock, Unlock } from 'lucide-react';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import Link from 'next/link';
@@ -12,6 +12,7 @@ interface Message {
     status: string; // SENT, DELIVERED, READ, FAILED
     mediaUrl?: string | null;
     mediaType?: string | null;
+    createdBy?: string | null;
 }
 
 interface ChatWindowProps {
@@ -24,6 +25,8 @@ interface ChatWindowProps {
     loadingMore?: boolean;
     status: 'BOT' | 'HUMAN' | 'CLOSED';
     humanModeAt?: string | null;
+    humanModeLocked?: boolean;
+    lastOutboundAt?: string | null;
     patientName?: string;
     patientId?: string;
 }
@@ -33,56 +36,73 @@ export function ChatWindow({
     messages,
     onSendMessage,
     onSwitchMode,
+    onToggleLock,
     onLoadMore,
     hasMore,
     loadingMore,
     status,
     humanModeAt,
+    humanModeLocked,
+    lastOutboundAt,
     patientName,
-    patientId
-}: ChatWindowProps) {
+    patientId,
+    escalationReason
+}: ChatWindowProps & { onToggleLock?: (locked: boolean) => void, escalationReason?: string | null }) {
     const [inputText, setInputText] = useState('');
     const [timeLeft, setTimeLeft] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    // Countdown Timer
+    // Countdown Timer (3 hours based on lastOutboundAt or humanModeAt)
     useEffect(() => {
-        if (status !== 'HUMAN' || !humanModeAt) {
+        if (status !== 'HUMAN' || humanModeLocked) {
+            setTimeLeft(null);
+            return;
+        }
+
+        const baseTime = lastOutboundAt || humanModeAt;
+        if (!baseTime) {
             setTimeLeft(null);
             return;
         }
 
         const interval = setInterval(() => {
-            const start = new Date(humanModeAt).getTime();
+            const start = new Date(baseTime).getTime();
             const now = new Date().getTime();
             const elapsed = now - start;
-            const remaining = 3600000 - elapsed; // 1 hour in ms
+            const remaining = (3 * 3600000) - elapsed; // 3 hours in ms
 
             if (remaining <= 0) {
-                setTimeLeft('Süre doldu');
+                setTimeLeft('Süre doldu, bot devralıyor...');
                 clearInterval(interval);
             } else {
-                const mins = Math.floor(remaining / 60000);
-                const secs = Math.floor((remaining % 60000) / 1000);
-                setTimeLeft(`Bot ${mins} dk ${secs} sn sonra devralacak`);
+                const hours = Math.floor(remaining / 3600000);
+                const mins = Math.floor((remaining % 3600000) / 60000);
+                if (hours > 0) {
+                    setTimeLeft(`Bot ${hours}s ${mins}dk sonra devralacak`);
+                } else {
+                    const secs = Math.floor((remaining % 60000) / 1000);
+                    setTimeLeft(`Bot ${mins}dk ${secs}sn sonra devralacak`);
+                }
             }
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [status, humanModeAt]);
+    }, [status, humanModeAt, lastOutboundAt, humanModeLocked]);
 
 
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
         messagesEndRef.current?.scrollIntoView({ behavior });
     };
 
-    // Auto-scroll to bottom on new messages
+    const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null;
+
+    // Auto-scroll to bottom on initial load or new messages
     useEffect(() => {
         if (messages.length > 0) {
             scrollToBottom('smooth');
         }
-    }, [messages.length]);
+    }, [lastMessageId, conversationId]);
 
     const handleScroll = useCallback(() => {
         if (!scrollContainerRef.current || !onLoadMore || !hasMore || loadingMore) return;
@@ -134,23 +154,41 @@ export function ChatWindow({
                         <User style={{ color: 'var(--text-muted)' }} />
                     </div>
                     <div>
-                        {patientId ? (
-                            <Link
-                                href={`/patients/${patientId}`}
-                                style={{
-                                    fontWeight: 600,
-                                    color: 'var(--text-primary)',
-                                    textDecoration: 'none',
-                                    display: 'block'
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
-                            >
-                                {patientName}
-                            </Link>
-                        ) : (
-                            <div style={{ fontWeight: 600 }}>{patientName || 'Bilinmeyen Hasta'}</div>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {patientId ? (
+                                <Link
+                                    href={`/patients/${patientId}`}
+                                    style={{
+                                        fontWeight: 600,
+                                        color: 'var(--text-primary)',
+                                        textDecoration: 'none',
+                                        display: 'block'
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+                                >
+                                    {patientName}
+                                </Link>
+                            ) : (
+                                <div style={{ fontWeight: 600 }}>{patientName || 'Bilinmeyen Hasta'}</div>
+                            )}
+                            
+                            {escalationReason === 'Yeni Ön-Kayıt' && (
+                                <span style={{
+                                    fontSize: '0.65rem',
+                                    fontWeight: 700,
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    background: 'var(--info-muted, #e0f2fe)',
+                                    color: 'var(--info, #0284c7)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}>
+                                    🆕 Yeni Hasta
+                                </span>
+                            )}
+                        </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                             {status === 'HUMAN' ? 'Temsilci Tarafından Yanıtlanıyor' : 'Bot Devrede'}
                         </div>
@@ -158,7 +196,18 @@ export function ChatWindow({
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {status === 'HUMAN' && onToggleLock && (
+                        <button
+                            onClick={() => onToggleLock(!humanModeLocked)}
+                            title={humanModeLocked ? "Otomatik Bot'a geçişi aç" : "Bot devralmasını engelle"}
+                            className={`btn btn-sm ${humanModeLocked ? 'btn-primary' : 'btn-outline'}`}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 8px' }}
+                        >
+                            {humanModeLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                            {humanModeLocked ? 'Kilitli' : 'Kilitle'}
+                        </button>
+                    )}
                     <button
                         onClick={() => onSwitchMode(status === 'BOT' ? 'HUMAN' : 'BOT')}
                         className={`btn btn-sm ${status === 'HUMAN' ? 'btn-ghost' : 'btn-primary'}`}
@@ -219,6 +268,9 @@ export function ChatWindow({
                                 gap: '4px',
                                 opacity: 0.8
                             }}>
+                                {msg.direction === 'OUTBOUND' && !msg.createdBy && (
+                                    <span style={{ marginRight: 'auto', opacity: 1, fontWeight: 600 }}>🤖 Bot</span>
+                                )}
                                 {format(new Date(msg.createdAt), 'HH:mm', { locale: tr })}
                                 {msg.direction === 'OUTBOUND' && renderStatusIcon(msg.status)}
                             </div>
@@ -235,21 +287,24 @@ export function ChatWindow({
                         type="text"
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
-                        placeholder="Mesaj yazın..."
+                        placeholder={status === 'BOT' ? 'Bot devredeyken mesaj gönderemezsiniz...' : 'Mesaj yazın...'}
+                        readOnly={status === 'BOT'}
                         style={{
                             flex: 1,
                             padding: '12px 16px',
                             borderRadius: 'var(--radius-md)',
                             border: '1px solid var(--border)',
-                            background: 'var(--bg-elevated)',
-                            outline: 'none'
+                            background: status === 'BOT' ? 'var(--bg-hover)' : 'var(--bg-elevated)',
+                            outline: 'none',
+                            opacity: status === 'BOT' ? 0.7 : 1,
+                            cursor: status === 'BOT' ? 'not-allowed' : 'text'
                         }}
                     />
                     <button
                         type="submit"
                         className="btn btn-primary btn-icon"
-                        disabled={!inputText.trim()}
-                        style={{ padding: '12px', borderRadius: 'var(--radius-md)' }}
+                        disabled={status === 'BOT' || !inputText.trim()}
+                        style={{ padding: '12px', borderRadius: 'var(--radius-md)', opacity: status === 'BOT' ? 0.5 : 1 }}
                     >
                         <Send size={20} />
                     </button>

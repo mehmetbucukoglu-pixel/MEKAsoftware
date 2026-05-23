@@ -14,7 +14,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
     Search, ChevronRight, ChevronDown, Plus, ChevronsLeft,
-    FileText, Clock, Lock, Users, GripVertical, Trash2,
+    FileText, Clock, Lock, Users, GripVertical, Trash2, Home
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CreateTeamspaceDialog } from './CreateTeamspaceDialog';
@@ -54,21 +54,28 @@ function SortableDocRow({ doc, isActive, onSelect, onDelete }: {
                 }}
                 style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
-                    padding: '7px 10px', background: isActive ? 'var(--primary-muted)' : 'transparent',
-                    border: 'none', borderRadius: '8px', cursor: 'pointer', textAlign: 'left',
-                    transition: 'background 0.15s', color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
+                    padding: '6px 8px', background: isActive ? 'rgba(88, 166, 255, 0.08)' : 'transparent',
+                    border: 'none', borderRadius: '6px', cursor: 'pointer', textAlign: 'left',
+                    transition: 'all 0.2s ease', color: isActive ? '#58a6ff' : 'rgba(255,255,255,0.6)',
                     position: 'relative',
                     outline: 'none',
+                    marginBottom: '2px'
                 }}
                 onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.background = 'var(--bg-hover)';
+                    if (!isActive) {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                        e.currentTarget.style.color = 'rgba(255,255,255,0.85)';
+                    }
                     const grip = e.currentTarget.querySelector<HTMLElement>('.grip-handle');
                     if (grip) grip.style.opacity = '1';
                     const del = e.currentTarget.querySelector<HTMLElement>('.del-handle');
                     if (del) del.style.opacity = '1';
                 }}
                 onMouseLeave={(e) => {
-                    if (!isActive) e.currentTarget.style.background = 'transparent';
+                    if (!isActive) {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+                    }
                     const grip = e.currentTarget.querySelector<HTMLElement>('.grip-handle');
                     if (grip) grip.style.opacity = '0';
                     const del = e.currentTarget.querySelector<HTMLElement>('.del-handle');
@@ -82,46 +89,37 @@ function SortableDocRow({ doc, isActive, onSelect, onDelete }: {
                     {...listeners}
                     onClick={(e) => e.stopPropagation()}
                     style={{
-                        opacity: 0, transition: 'opacity 0.15s', background: 'none', border: 'none',
-                        padding: '0 2px', cursor: 'grab', display: 'flex', alignItems: 'center',
-                        color: 'var(--text-muted)', flexShrink: 0,
+                        opacity: 0, transition: 'opacity 0.2s', background: 'none', border: 'none',
+                        padding: '0 4px 0 0', cursor: 'grab', display: 'flex', alignItems: 'center',
+                        color: 'rgba(255,255,255,0.3)', flexShrink: 0,
                     }}
                 >
                     <GripVertical size={12} />
                 </button>
 
-                {/* Icon */}
-                <div style={{
-                    width: '28px', height: '28px', borderRadius: '7px',
-                    background: isActive ? 'var(--primary)' : 'var(--bg-elevated)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>
-                    <FileText size={13} style={{ color: isActive ? '#fff' : 'var(--text-muted)' }} />
-                </div>
-
-                {/* Text — title only, no date */}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Text */}
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <FileText size={12} style={{ color: isActive ? '#58a6ff' : 'rgba(255,255,255,0.4)', flexShrink: 0 }} />
                     <div style={{
-                        fontSize: '0.8125rem', fontWeight: 500, whiteSpace: 'nowrap',
+                        fontSize: '0.8125rem', fontWeight: isActive ? 500 : 400, whiteSpace: 'nowrap',
                         overflow: 'hidden', textOverflow: 'ellipsis',
-                        color: isActive ? 'var(--primary)' : 'var(--text-primary)',
                     }}>
                         {doc.title || 'Başlıksız'}
                     </div>
                 </div>
 
-                {/* Delete button — right side */}
+                {/* Delete button */}
                 <button
                     className="del-handle"
                     onClick={(e) => { e.stopPropagation(); onDelete(doc.id); }}
                     title="Sil"
                     style={{
-                        opacity: 0, transition: 'opacity 0.15s', background: 'none', border: 'none',
-                        padding: '2px 4px', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                        color: 'rgba(255,80,80,0.6)', flexShrink: 0, borderRadius: '4px',
+                        opacity: 0, transition: 'opacity 0.2s', background: 'none', border: 'none',
+                        padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                        color: 'rgba(255,80,80,0.5)', flexShrink: 0, borderRadius: '4px',
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = '#ff6b6b'; e.currentTarget.style.background = 'rgba(255,80,80,0.1)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,80,80,0.6)'; e.currentTarget.style.background = 'none'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,80,80,0.5)'; e.currentTarget.style.background = 'none'; }}
                 >
                     <Trash2 size={12} />
                 </button>
@@ -132,7 +130,7 @@ function SortableDocRow({ doc, isActive, onSelect, onDelete }: {
 
 // ── Section ───────────────────────────────────────────────────────────────────
 function Section({
-    title, icon: Icon, docs, isOpen, onToggle, onAdd, selectedDocId, onSelectDoc, onUpdateOrder, onDeleteDoc,
+    title, icon: Icon, docs, isOpen, onToggle, onAdd, selectedDocId, onSelectDoc, onUpdateOrder, onDeleteDoc, onDeleteTeamspace,
     accent, teamspaceEmoji,
 }: {
     title: string; icon?: any; teamspaceEmoji?: string;
@@ -140,6 +138,7 @@ function Section({
     onAdd?: () => void; selectedDocId: string | null; onSelectDoc: (id: string) => void;
     onUpdateOrder: (id: string, order: number) => void;
     onDeleteDoc: (id: string) => void;
+    onDeleteTeamspace?: () => void;
     accent?: string;
 }) {
     const sensors = useSensors(
@@ -164,76 +163,104 @@ function Section({
     };
 
     return (
-        <div style={{ marginBottom: '4px' }}>
+        <div style={{ marginBottom: '12px' }}>
             {/* Section header */}
             <div
+                className="section-header"
                 onClick={onToggle}
                 style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '5px 8px', marginBottom: '2px', cursor: 'pointer', borderRadius: '7px',
-                    transition: 'background 0.15s',
+                    padding: '4px 8px', marginBottom: '4px', cursor: 'pointer', borderRadius: '6px',
+                    transition: 'all 0.2s ease'
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {isOpen ? <ChevronDown size={11} style={{ color: 'var(--text-muted)' }} /> : <ChevronRight size={11} style={{ color: 'var(--text-muted)' }} />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: '16px', height: '16px', color: 'rgba(255,255,255,0.3)',
+                        transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0)'
+                    }}>
+                        <ChevronRight size={12} />
+                    </div>
                     {teamspaceEmoji ? (
-                        <span style={{ fontSize: '0.875rem', lineHeight: 1 }}>{teamspaceEmoji}</span>
+                        <span style={{ fontSize: '0.85rem', lineHeight: 1 }}>{teamspaceEmoji}</span>
                     ) : Icon ? (
-                        <Icon size={11} style={{ color: accent || 'var(--text-muted)' }} />
+                        <Icon size={12} style={{ color: accent || 'rgba(255,255,255,0.4)' }} />
                     ) : null}
                     <span style={{
-                        fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase',
-                        letterSpacing: '0.06em', color: accent || 'var(--text-muted)',
+                        fontSize: '0.7rem', fontWeight: 600, color: accent || 'rgba(255,255,255,0.4)',
+                        letterSpacing: '0.04em'
                     }}>
                         {title}
                     </span>
-                    {docs.length > 0 && (
-                        <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: '10px', padding: '1px 5px' }}>
-                            {docs.length}
-                        </span>
+                </div>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                    {onAdd && (
+                        <button
+                            className="section-add-btn"
+                            onClick={(e) => { e.stopPropagation(); onAdd(); }}
+                            style={{
+                                background: 'transparent', border: 'none', cursor: 'pointer',
+                                padding: '4px', borderRadius: '4px', color: 'rgba(255,255,255,0.3)', display: 'flex',
+                                opacity: 0, transition: 'all 0.2s'
+                            }}
+                            title="Yeni sayfa"
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#fff'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
+                        >
+                            <Plus size={12} />
+                        </button>
+                    )}
+                    {onDeleteTeamspace && (
+                        <button
+                            className="section-add-btn"
+                            onClick={(e) => { e.stopPropagation(); onDeleteTeamspace(); }}
+                            style={{
+                                background: 'transparent', border: 'none', cursor: 'pointer',
+                                padding: '4px', borderRadius: '4px', color: 'rgba(255,255,255,0.3)', display: 'flex',
+                                opacity: 0, transition: 'all 0.2s'
+                            }}
+                            title="Teamspace'i Sil"
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,80,80,0.1)'; e.currentTarget.style.color = '#ff6b6b'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
+                        >
+                            <Trash2 size={12} />
+                        </button>
                     )}
                 </div>
-                {onAdd && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onAdd(); }}
-                        style={{
-                            background: 'transparent', border: 'none', cursor: 'pointer',
-                            padding: '2px 3px', borderRadius: '4px', color: 'var(--text-muted)', display: 'flex',
-                        }}
-                        title="Yeni sayfa"
-                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-                    >
-                        <Plus size={13} />
-                    </button>
-                )}
             </div>
 
             {/* Docs */}
             {isOpen && (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={localDocs.map(d => d.id)} strategy={verticalListSortingStrategy}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                            {localDocs.map(doc => (
-                                <SortableDocRow
-                                    key={doc.id}
-                                    doc={doc}
-                                    isActive={selectedDocId === doc.id}
-                                    onSelect={onSelectDoc}
-                                    onDelete={onDeleteDoc}
-                                />
-                            ))}
-                            {localDocs.length === 0 && (
-                                <div style={{ padding: '6px 12px', fontSize: '0.8125rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                    Sayfa yok
-                                </div>
-                            )}
-                        </div>
-                    </SortableContext>
-                </DndContext>
+                <div style={{ paddingLeft: '24px' }}>
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={localDocs.map(d => d.id)} strategy={verticalListSortingStrategy}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                {localDocs.map(doc => (
+                                    <SortableDocRow
+                                        key={doc.id}
+                                        doc={doc}
+                                        isActive={selectedDocId === doc.id}
+                                        onSelect={onSelectDoc}
+                                        onDelete={onDeleteDoc}
+                                    />
+                                ))}
+                                {localDocs.length === 0 && (
+                                    <div style={{ padding: '6px 8px', fontSize: '0.75rem', color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' }}>
+                                        Sayfa yok
+                                    </div>
+                                )}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
+                </div>
             )}
+            
+            <style>{`
+                .section-header:hover .section-add-btn { opacity: 1 !important; }
+            `}</style>
         </div>
     );
 }
@@ -252,6 +279,19 @@ export function WorkspaceSidebar({
         queryKey: ['workspace-teamspaces'],
         queryFn: workspaceApi.getTeamspaces,
     });
+
+    const deleteTeamspaceMutation = useMutation({
+        mutationFn: workspaceApi.deleteTeamspace,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['workspace-teamspaces'] });
+        }
+    });
+
+    const handleDeleteTeamspace = (id: string) => {
+        if (confirm("Bu Teamspace'i silmek istediğinize emin misiniz?")) {
+            deleteTeamspaceMutation.mutate(id);
+        }
+    };
 
     useEffect(() => {
         setLocalDocs([...documents].sort((a, b) => a.order - b.order));
@@ -274,64 +314,48 @@ export function WorkspaceSidebar({
     const displayedDocs = localDocs.filter(doc =>
         doc.title.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    const recentDocs = [...displayedDocs]
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        .slice(0, 3);
     const privateDocs = displayedDocs.filter(doc => !doc.teamspaceId);
 
     return (
         <div style={{
             height: '100%',
-            width: isOpen ? '300px' : '0px',
-            minWidth: isOpen ? '300px' : '0px',
-            background: 'var(--bg-surface)',
-            borderRight: '1px solid var(--border)',
+            width: isOpen ? '260px' : '0px',
+            minWidth: isOpen ? '260px' : '0px',
+            background: '#0d1117',
+            borderRight: '1px solid rgba(255,255,255,0.05)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            transition: 'width 0.3s, min-width 0.3s, opacity 0.3s',
+            transition: 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s',
             opacity: isOpen ? 1 : 0,
             flexShrink: 0,
         }}>
-
-
-            {/* Search */}
-            <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+            {/* Header & Search */}
+            <div style={{ padding: '16px 12px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', paddingLeft: '4px' }}>
+                    <Home size={16} style={{ color: '#58a6ff' }} />
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Workspace</span>
+                </div>
                 <div style={{ position: 'relative' }}>
-                    <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)' }} />
                     <input
-                        placeholder="Sayfalarda ara..."
+                        placeholder="Sayfa ara..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         style={{
-                            width: '100%', background: 'var(--bg-elevated)',
-                            border: '1px solid var(--border)', borderRadius: '8px',
-                            padding: '6px 10px 6px 30px', fontSize: '0.8125rem',
-                            color: 'var(--text-primary)', outline: 'none',
+                            width: '100%', background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px',
+                            padding: '6px 10px 6px 32px', fontSize: '0.8rem',
+                            color: 'rgba(255,255,255,0.9)', outline: 'none', transition: 'all 0.2s'
                         }}
-                        onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; }}
-                        onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                        onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(88,166,255,0.5)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                        onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
                     />
                 </div>
             </div>
 
             {/* Sections */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-
-                {/* Recents */}
-                {recentDocs.length > 0 && !searchTerm && (
-                    <Section
-                        title="Son Açılanlar"
-                        icon={Clock}
-                        docs={recentDocs}
-                        isOpen={openSections['recents'] !== false}
-                        onToggle={() => toggleSection('recents')}
-                        selectedDocId={selectedDocId}
-                        onSelectDoc={onSelectDoc}
-                        onUpdateOrder={handleUpdateOrder}
-                        onDeleteDoc={onDeleteDoc}
-                    />
-                )}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 12px' }}>
 
                 {/* Private */}
                 <Section
@@ -347,7 +371,7 @@ export function WorkspaceSidebar({
                     onDeleteDoc={onDeleteDoc}
                 />
 
-                {/* Teamspaces — each one is a section like Özel */}
+                {/* Teamspaces */}
                 {teamspaces.map(ts => {
                     const tsDocs = displayedDocs.filter(d => d.teamspaceId === ts.id);
                     return (
@@ -363,6 +387,7 @@ export function WorkspaceSidebar({
                             onSelectDoc={onSelectDoc}
                             onUpdateOrder={handleUpdateOrder}
                             onDeleteDoc={onDeleteDoc}
+                            onDeleteTeamspace={() => handleDeleteTeamspace(ts.id)}
                         />
                     );
                 })}
@@ -371,33 +396,32 @@ export function WorkspaceSidebar({
                 <button
                     onClick={() => setIsCreateTeamspaceOpen(true)}
                     style={{
-                        width: '100%', display: 'flex', alignItems: 'center', gap: '6px',
-                        padding: '5px 8px', background: 'transparent', border: 'none',
-                        borderRadius: '7px', cursor: 'pointer', fontSize: '0.75rem',
-                        color: 'var(--text-muted)', marginTop: '8px', transition: 'all 0.15s',
+                        width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '6px 8px', background: 'transparent', border: 'none',
+                        borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem',
+                        color: 'rgba(255,255,255,0.3)', marginTop: '8px', transition: 'all 0.2s',
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
                 >
-                    <Users size={12} />
-                    <Plus size={10} />
+                    <Users size={14} />
                     <span>Yeni Teamspace</span>
                 </button>
 
             </div>
 
             {/* New page button */}
-            <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ padding: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                 <button
                     onClick={() => onCreateDoc()}
                     style={{
-                        width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
-                        padding: '8px 12px', borderRadius: '8px', background: 'transparent',
-                        border: '1px dashed var(--border)', color: 'var(--text-muted)',
-                        cursor: 'pointer', fontSize: '0.8125rem', transition: 'all 0.15s',
+                        width: '100%', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center',
+                        padding: '8px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)',
+                        cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500, transition: 'all 0.2s',
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--primary-muted)'; e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
                 >
                     <Plus size={14} />
                     Yeni Sayfa

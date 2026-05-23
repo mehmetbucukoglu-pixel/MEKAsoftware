@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, User, Loader2, X } from 'lucide-react';
 import { patientApi, Patient } from '@/lib/api';
-import { maskTC, formatPhone } from '@/lib/format';
+import { formatPhone } from '@/lib/format';
 
 interface PatientSearchInputProps {
     onSelect: (patient: Patient | null) => void;
@@ -164,8 +164,6 @@ export default function PatientSearchInput({
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{p.firstName} {p.lastName}</div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '8px' }}>
-                                    <span>TC: {maskTC(p.tcKimlik)}</span>
-                                    <span>•</span>
                                     <span>Tel: {formatPhone(p.phone)}</span>
                                 </div>
                             </div>

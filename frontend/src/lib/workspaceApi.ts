@@ -83,6 +83,11 @@ export const workspaceApi = {
         return response.data;
     },
 
+    deleteTeamspace: async (id: string) => {
+        const response = await api.delete(`/workspace/teamspaces/${id}`);
+        return response.data;
+    },
+
     addTeamspaceMembers: async (teamspaceId: string, userIds: string[]) => {
         const response = await api.post(`/workspace/teamspaces/${teamspaceId}/members`, { userIds });
         return response.data;

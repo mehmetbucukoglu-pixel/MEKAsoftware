@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search, X, Loader2, User } from 'lucide-react';
 import { patientApi, Patient } from '@/lib/api';
 import { Highlight } from './highlight';
-import { maskTC, formatPhone } from '@/lib/format';
+import { formatPhone } from '@/lib/format';
 
 export function QuickSearch({ hideButton = false }: { hideButton?: boolean } = {}) {
     const router = useRouter();
@@ -215,7 +215,7 @@ export function QuickSearch({ hideButton = false }: { hideButton?: boolean } = {
                                         </div>
                                         <div style={{ display: 'flex', gap: '12px', fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                                             <span style={{ fontFamily: 'monospace' }}>
-                                                TC: <Highlight text={maskTC(p.tcKimlik)} query={search} />
+                                                Telefon: <Highlight text={formatPhone(p.phone)} query={search} />
                                             </span>
                                             <span>
                                                 Tel: <Highlight text={formatPhone(p.phone)} query={search} />

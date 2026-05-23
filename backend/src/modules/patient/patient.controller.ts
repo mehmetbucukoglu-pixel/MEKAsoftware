@@ -38,14 +38,14 @@ export class PatientController {
         return this.patientService.findDeleted(user.clinicId);
     }
 
-    @Get('check-tc')
-    @ApiOperation({ summary: 'TC Kimlik mükerrer kontrolü' })
-    @ApiQuery({ name: 'tc', required: true })
-    checkTc(
+    @Get('check-phone')
+    @ApiOperation({ summary: 'Telefon mükerrer kontrolü' })
+    @ApiQuery({ name: 'phone', required: true })
+    checkPhone(
         @CurrentUser() user: CurrentUserPayload,
-        @Query('tc') tcKimlik: string,
+        @Query('phone') phone: string,
     ) {
-        return this.patientService.checkTc(user.clinicId, tcKimlik);
+        return this.patientService.checkPhone(user.clinicId, phone);
     }
 
     @Get(':id')

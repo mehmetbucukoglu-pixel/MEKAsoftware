@@ -6,8 +6,11 @@ import { CurrentUserPayload } from '../../common/decorators/current-user.decorat
 import { UserRole, MessageDirection, MessageStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { WhatsappWebhookDto } from './dto/whatsapp-webhook.dto';
-
+import { CryptoUtil } from '../../common/utils/crypto.util';
 import { NotificationService } from '../notification/notification.service';
+import { AppointmentService } from '../appointment/appointment.service';
+import { Inject, forwardRef } from '@nestjs/common';
+
 
 @Injectable()
 export class MessagingService {
@@ -17,70 +20,40 @@ export class MessagingService {
         private auditService: AuditService,
         private configService: ConfigService,
         private notificationService: NotificationService,
+        @Inject(forwardRef(() => AppointmentService))
+        private appointmentService: AppointmentService,
     ) { }
 
 
+
     async getConversations(user: CurrentUserPayload) {
-        const { clinicId, userId, role } = user;
+        const { clinicId } = user;
 
-        if (role === UserRole.ADMIN || role === UserRole.ASSISTANT) {
-            return this.prisma.conversation.findMany({
-                where: { clinicId },
-                include: { patient: { select: { id: true, firstName: true, lastName: true } } },
-                orderBy: { lastMessageAt: 'desc' },
-            });
-        }
-
-        // For DOCTOR: Filter by assignment OR patients with appointments
         return this.prisma.conversation.findMany({
-            where: {
-                clinicId,
-                OR: [
-                    { assignedTo: userId },
-                    {
-                        patient: {
-                            appointments: {
-                                some: { doctorId: userId }
-                            }
-                        }
-                    }
-                ]
-            },
+            where: { clinicId },
             include: { patient: { select: { id: true, firstName: true, lastName: true } } },
             orderBy: { lastMessageAt: 'desc' },
         });
     }
 
-    async getMessages(user: CurrentUserPayload, conversationId: string, page = 1, limit = 50) {
-        const { clinicId, userId, role } = user;
+    async getMessages(user: CurrentUserPayload, conversationId: string, page: string | number = 1, limit: string | number = 50) {
+        const { clinicId } = user;
 
-        // Security check for DOCTOR
-        if (role === UserRole.DOCTOR) {
-            const hasAccess = await this.prisma.conversation.findFirst({
-                where: {
-                    id: conversationId,
-                    clinicId,
-                    OR: [
-                        { assignedTo: userId },
-                        {
-                            patient: {
-                                appointments: {
-                                    some: { doctorId: userId }
-                                }
-                            }
-                        }
-                    ]
-                }
-            });
-            if (!hasAccess) throw new ForbiddenException('Bu konuşmaya erişim yetkiniz yok.');
-        }
+        const pageNum = Number(page) || 1;
+        const limitNum = Number(limit) || 50;
 
-        return this.prisma.message.findMany({
+        const messages = await this.prisma.message.findMany({
             where: { clinicId, conversationId },
             orderBy: { createdAt: 'desc' },
-            skip: (page - 1) * limit,
-            take: limit,
+            skip: (pageNum - 1) * limitNum,
+            take: limitNum,
         });
+
+        // Decrypt bodies
+        return messages.map(msg => ({
+            ...msg,
+            body: msg.body ? CryptoUtil.decrypt(msg.body) : msg.body
+        }));
     }
 
     async sendMessage(
@@ -98,7 +71,7 @@ export class MessagingService {
                 clinicId,
                 conversationId,
                 direction: MessageDirection.OUTBOUND,
-                body,
+                body: body ? CryptoUtil.encrypt(body) : body,
                 mediaUrl,
                 status: MessageStatus.SENT,
                 createdBy: userId
@@ -120,8 +93,10 @@ export class MessagingService {
             ipAddress
         });
 
+        const plainMessage = { ...message, body };
+
         // Emit to the specific conversation room for real-time update in chat window
-        this.socketGateway.emitToConversation(conversationId, 'new_message', message);
+        this.socketGateway.emitToConversation(conversationId, 'new_message', plainMessage);
 
         // Emit to clinic staff and relevant doctors for list updates
         this.socketGateway.emitToStaff(clinicId, 'conversation_updated', { id: conversationId, lastMessageAt: new Date() });
@@ -129,13 +104,27 @@ export class MessagingService {
         // Find conversation to notify assigned user if any
         const conv = await this.prisma.conversation.findUnique({ where: { id: conversationId } });
         if (conv?.assignedTo && conv.assignedTo !== userId) {
-            this.socketGateway.emitToUser(conv.assignedTo, 'new_message', message);
+            this.socketGateway.emitToUser(conv.assignedTo, 'new_message', plainMessage);
         }
 
         // --- Outbound WhatsApp relay via n8n ---
         // Only send if conversation is in HUMAN mode (bot handles BOT mode itself)
         if (conv?.status === 'HUMAN') {
             await this.relayToWhatsApp(conv.waPhone, body, mediaUrl);
+
+            // Update outbound timestamp + clear escalation reason (Bekleyen Mesaj badge clears)
+            // Stay in HUMAN mode — auto-revert handled by 3-hour cron task
+            const updatedConv = await this.prisma.conversation.update({
+                where: { id: conversationId },
+                data: {
+                    lastOutboundAt: new Date(),
+                    escalationReason: null,
+                },
+                include: { patient: true },
+            });
+
+            // Notify frontend to refresh badge/list
+            this.socketGateway.emitToStaff(clinicId, 'conversation_updated', updatedConv);
         }
 
         return message;
@@ -143,6 +132,7 @@ export class MessagingService {
 
     async handleInboundWebhook(data: WhatsappWebhookDto) {
         const { clinicId, waPhone, waMessageId, body, metadata } = data;
+        const cleanPhone = waPhone.replace(/\D/g, '');
 
         // Start async processing block
         (async () => {
@@ -155,15 +145,35 @@ export class MessagingService {
 
                 // Find or create conversation
                 let conversation = await this.prisma.conversation.findFirst({
-                    where: { clinicId, waPhone },
+                    where: { clinicId, waPhone: cleanPhone },
                     include: { patient: true }
                 });
 
                 if (!conversation) {
+                    const link = await this.prisma.phonePatientLink.findFirst({
+                        where: { clinicId, waPhone: cleanPhone }
+                    });
+
                     conversation = await this.prisma.conversation.create({
-                        data: { clinicId, waPhone },
+                        data: {
+                            clinicId,
+                            waPhone: cleanPhone,
+                            patientId: link?.patientId
+                        },
                         include: { patient: true }
                     });
+                } else if (!conversation.patientId) {
+                    // Try to link if not linked
+                    const link = await this.prisma.phonePatientLink.findFirst({
+                        where: { clinicId, waPhone: cleanPhone }
+                    });
+                    if (link) {
+                        conversation = await this.prisma.conversation.update({
+                            where: { id: conversation.id },
+                            data: { patientId: link.patientId },
+                            include: { patient: true }
+                        });
+                    }
                 }
 
                 // Auto-update patient info if metadata provided (e.g. from bot flow)
@@ -172,38 +182,59 @@ export class MessagingService {
                     const firstName = names[0];
                     const lastName = names.slice(1).join(' ') || '-';
 
-                    const patient = await this.prisma.patient.create({
-                        data: {
+                    // Check if patient already exists (like Parent 2 scenario)
+                    const existingPatient = await this.prisma.patient.findFirst({
+                        where: {
                             clinicId,
-                            firstName,
-                            lastName,
-                            phone: waPhone,
-                            registrationStatus: 'PRE_REGISTERED'
+                            firstName: { equals: firstName, mode: 'insensitive' },
+                            lastName: { equals: lastName, mode: 'insensitive' }
                         }
                     });
 
-                    await this.prisma.conversation.update({
-                        where: { id: conversation.id },
-                        data: { patientId: patient.id }
-                    });
+                    let targetPatientId = existingPatient?.id;
 
-                    // Re-fetch conversation
-                    const updatedConv = await this.prisma.conversation.findUnique({
+                    if (!targetPatientId) {
+                        const newPatient = await this.prisma.patient.create({
+                            data: {
+                                clinicId,
+                                firstName,
+                                lastName,
+                                phone: cleanPhone,
+                                registrationStatus: 'PRE_REGISTERED'
+                            }
+                        });
+                        targetPatientId = newPatient.id;
+                    }
+
+                    // Create Phone Link if not exists
+                    const existingLink = await this.prisma.phonePatientLink.findUnique({
+                        where: { clinicId_waPhone: { clinicId, waPhone: cleanPhone } }
+                    });
+                    
+                    if (!existingLink) {
+                        await this.prisma.phonePatientLink.create({
+                            data: { clinicId, waPhone: cleanPhone, patientId: targetPatientId }
+                        });
+                    }
+
+                    conversation = await this.prisma.conversation.update({
                         where: { id: conversation.id },
+                        data: { patientId: targetPatientId },
                         include: { patient: true }
                     });
-                    if (updatedConv) conversation = updatedConv as any;
                 }
 
                 if (!conversation) return;
+
+                const messageDirection = data.direction === 'OUTBOUND' ? MessageDirection.OUTBOUND : MessageDirection.INBOUND;
 
                 const message = await this.prisma.message.create({
                     data: {
                         clinicId,
                         conversationId: conversation.id,
                         waMessageId,
-                        direction: MessageDirection.INBOUND,
-                        body,
+                        direction: messageDirection,
+                        body: body ? CryptoUtil.encrypt(body) : body,
                         status: MessageStatus.READ,
                         metadata: metadata || {}
                     } as any,
@@ -212,11 +243,16 @@ export class MessagingService {
 
                 await this.prisma.conversation.update({
                     where: { id: conversation.id },
-                    data: { lastMessageAt: new Date(), unreadCount: { increment: 1 } },
+                    data: { 
+                        lastMessageAt: new Date(), 
+                        unreadCount: messageDirection === 'INBOUND' ? { increment: 1 } : undefined,
+                        lastOutboundAt: messageDirection === 'OUTBOUND' ? new Date() : undefined
+                    },
                 });
 
                 // WebSocket emits (real-time chat and list updates)
-                this.socketGateway.emitToConversation(conversation.id, 'new_message', message);
+                const plainMessage = { ...message, body: body || '' };
+                this.socketGateway.emitToConversation(conversation.id, 'new_message', plainMessage);
                 this.socketGateway.emitToStaff(clinicId, 'conversation_updated', conversation);
 
                 if ((message.conversation as any)?.patient?.appointments) {
@@ -224,7 +260,7 @@ export class MessagingService {
                         (message.conversation as any).patient.appointments.map((a: any) => a.doctorId)
                     ));
                     for (const docId of relevantDoctorIds) {
-                        this.socketGateway.emitToUser(docId as string, 'new_message', message);
+                        this.socketGateway.emitToUser(docId as string, 'new_message', plainMessage);
                         this.socketGateway.emitToUser(docId as string, 'conversation_updated', conversation);
                     }
                 }
@@ -268,30 +304,210 @@ export class MessagingService {
     }
 
     async getStatusByPhone(clinicId: string, waPhone: string) {
+        const cleanPhone = waPhone.replace(/\D/g, '');
         const conv = await this.prisma.conversation.findUnique({
-            where: { clinicId_waPhone: { clinicId, waPhone } }
+            where: { clinicId_waPhone: { clinicId, waPhone: cleanPhone } },
+            include: { patient: true },
         });
-        return conv?.status || 'BOT';
+
+        const mode = conv?.status || 'BOT';
+        let doctorName: string | null = null;
+        let doctorId: string | null = null;
+        let combinedText = '';
+        let patientName: string | null = null;
+        let patientPatterns: any = null;
+        let sentiment: 'HAPPY' | 'NEUTRAL' | 'ANGRY' = 'NEUTRAL';
+
+        if (conv) {
+            if (conv.patient) {
+                patientName = `${conv.patient.firstName} ${conv.patient.lastName}`;
+            }
+
+            // Fetch patient patterns
+            if (conv.patientId) {
+                patientPatterns = await this.appointmentService.getPatientPatterns(clinicId, conv.patientId);
+            }
+
+            // Find patient's most recent appointment to determine their doctor
+            if (conv.patientId) {
+                const lastAppointment = await this.prisma.appointment.findFirst({
+                    where: { patientId: conv.patientId, clinicId },
+                    orderBy: { startTime: 'desc' },
+                    include: { doctor: { select: { id: true, firstName: true, lastName: true } } },
+                });
+                if (lastAppointment?.doctor) {
+                    doctorId = lastAppointment.doctor.id;
+                    doctorName = `Dr. ${lastAppointment.doctor.firstName} ${lastAppointment.doctor.lastName}`;
+                }
+            }
+
+            // Fetch pending inbound messages for AI context
+            const messages = await this.prisma.message.findMany({
+                where: { 
+                    conversationId: conv.id,
+                    createdAt: { gt: conv.lastOutboundAt || new Date(0) }
+                },
+                orderBy: { createdAt: 'asc' },
+            });
+
+            // Filter only INBOUND and decrypt text
+            const inboundTexts = messages
+                .filter(m => m.direction === 'INBOUND' && m.contentType === 'TEXT' && m.body)
+                .map(m => CryptoUtil.decrypt(m.body!));
+            
+            combinedText = inboundTexts.join('\n');
+
+            // --- Simple Sentiment Analysis ---
+            if (combinedText) {
+                const text = combinedText.toLowerCase();
+                const angryKeywords = ['yeter', 'bıktım', 'hata', 'şikayet', 'kötü', 'rezalet', 'bekliyorum', 'cevap verin', 'sinir'];
+                const happyKeywords = ['teşekkür', 'sağol', 'harika', 'iyi', 'memnun', 'güzel'];
+
+                const angryCount = angryKeywords.filter(k => text.includes(k)).length;
+                const happyCount = happyKeywords.filter(k => text.includes(k)).length;
+
+                if (angryCount > 0) sentiment = 'ANGRY';
+                else if (happyCount > 1) sentiment = 'HAPPY';
+            }
+
+            // Mark these messages as processed by updating lastOutboundAt
+            if (inboundTexts.length > 0) {
+                await this.prisma.conversation.update({
+                    where: { id: conv.id },
+                    data: { lastOutboundAt: new Date() }
+                });
+            }
+        }
+
+        // Fetch all patients linked to this phone number
+        const links = await this.prisma.phonePatientLink.findMany({
+            where: { clinicId, waPhone: cleanPhone },
+            include: { patient: true }
+        });
+        const linkedPatients = links.map(link => ({
+            id: link.patient.id,
+            name: `${link.patient.firstName} ${link.patient.lastName}`
+        }));
+
+        return { mode, doctorName, doctorId, combinedText, patientName, patientPatterns, sentiment, linkedPatients };
+    }
+
+    /** Get the latest inbound message ID for debounce — n8n checks this after waiting */
+    async getLatestInboundId(clinicId: string, waPhone: string) {
+        const cleanPhone = waPhone.replace(/\D/g, '');
+        const conv = await this.prisma.conversation.findUnique({
+            where: { clinicId_waPhone: { clinicId, waPhone: cleanPhone } },
+        });
+        if (!conv) return { latestWaMessageId: null };
+
+        const latestMsg = await this.prisma.message.findFirst({
+            where: { conversationId: conv.id, direction: 'INBOUND' },
+            orderBy: { createdAt: 'desc' },
+            select: { waMessageId: true },
+        });
+        return { latestWaMessageId: latestMsg?.waMessageId || null };
+    }
+
+    /** Get all inbound messages since the last outbound message and concatenate them */
+    async getPendingInboundMessages(clinicId: string, waPhone: string) {
+        const cleanPhone = waPhone.replace(/\D/g, '');
+        const conv = await this.prisma.conversation.findUnique({
+            where: { clinicId_waPhone: { clinicId, waPhone: cleanPhone } },
+        });
+        if (!conv) return { combinedText: '' };
+
+        // Fetch messages since the last outbound message
+        const messages = await this.prisma.message.findMany({
+            where: { 
+                conversationId: conv.id,
+                createdAt: { gt: conv.lastOutboundAt || new Date(0) }
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+
+        // Filter only INBOUND and decrypt text
+        const inboundTexts = messages
+            .filter(m => m.direction === 'INBOUND' && m.contentType === 'TEXT' && m.body)
+            .map(m => CryptoUtil.decrypt(m.body!));
+
+        return { combinedText: inboundTexts.join(' ') };
+    }
+    /** Mark conversation as seen — clears unreadCount + escalationReason badge */
+    async markEscalationSeen(user: CurrentUserPayload, conversationId: string) {
+        const conv = await this.prisma.conversation.findUnique({ where: { id: conversationId } });
+        if (!conv || conv.clinicId !== user.clinicId) return { ok: false };
+
+        // Nothing to clear
+        if (!conv.escalationReason && conv.unreadCount === 0) return { ok: true };
+
+        const updated = await this.prisma.conversation.update({
+            where: { id: conversationId },
+            data: { escalationReason: null, unreadCount: 0 },
+            include: { patient: true },
+        });
+        this.socketGateway.emitToStaff(user.clinicId, 'conversation_updated', updated);
+        return { ok: true };
+    }
+
+    /** Toggle humanModeLocked — prevents cron from auto-reverting to BOT */
+    async toggleHumanLock(user: CurrentUserPayload, conversationId: string, locked: boolean) {
+        const conv = await this.prisma.conversation.findUnique({ where: { id: conversationId } });
+        if (!conv || conv.clinicId !== user.clinicId) return { ok: false };
+
+        const updated = await this.prisma.conversation.update({
+            where: { id: conversationId },
+            data: { humanModeLocked: locked },
+            include: { patient: true },
+        });
+        this.socketGateway.emitToStaff(user.clinicId, 'conversation_updated', updated);
+        return { ok: true, locked: updated.humanModeLocked };
     }
 
     async escalate(clinicId: string, data: { waPhone: string; reason: string; urgency: string; summary: string }) {
         const { waPhone, reason, summary } = data;
+        const cleanPhone = waPhone.replace(/\D/g, '');
 
         // 1. Find or create conversation
         let conv = await this.prisma.conversation.findUnique({
-            where: { clinicId_waPhone: { clinicId, waPhone } },
+            where: { clinicId_waPhone: { clinicId, waPhone: cleanPhone } },
             include: { patient: true }
         });
 
         if (!conv) {
+            // Check for existing patient link
+            const link = await this.prisma.phonePatientLink.findFirst({
+                where: { clinicId, waPhone: cleanPhone }
+            });
+
             conv = await this.prisma.conversation.create({
-                data: { clinicId, waPhone, status: 'HUMAN', humanModeAt: new Date() },
+                data: {
+                    clinicId,
+                    waPhone: cleanPhone,
+                    status: 'HUMAN',
+                    humanModeAt: new Date(),
+                    patientId: link?.patientId,
+                    escalationReason: reason.substring(0, 50)
+                },
                 include: { patient: true }
             }) as any;
         } else {
+            // If conversation exists but patient is not linked, try to link it
+            let patientIdToUpdate = conv.patientId;
+            if (!patientIdToUpdate) {
+                const link = await this.prisma.phonePatientLink.findFirst({
+                    where: { clinicId, waPhone: cleanPhone }
+                });
+                patientIdToUpdate = link?.patientId || null;
+            }
+
             conv = await this.prisma.conversation.update({
                 where: { id: (conv as any).id },
-                data: { status: 'HUMAN', humanModeAt: new Date(), escalationReason: reason.substring(0, 50) },
+                data: {
+                    status: 'HUMAN',
+                    humanModeAt: new Date(),
+                    escalationReason: reason.substring(0, 50),
+                    patientId: patientIdToUpdate
+                },
                 include: { patient: true }
             }) as any;
         }
@@ -299,7 +515,7 @@ export class MessagingService {
         if (!conv) return { success: false, message: 'Konuşma bulunamadı' };
 
         // 2. Notifications
-        const patientName = (conv as any).patient ? `${(conv as any).patient.firstName} ${(conv as any).patient.lastName}` : waPhone;
+        const patientName = (conv as any).patient ? `${(conv as any).patient.firstName} ${(conv as any).patient.lastName}` : cleanPhone;
         const note = `🔴 Eskalasyon (${reason}): ${patientName}\nÖzet: ${summary}`;
 
         // Notify staff via WebSocket
@@ -310,17 +526,17 @@ export class MessagingService {
             patientName
         });
 
-        // System notification for assistants
-        const assistants = await this.prisma.user.findMany({ where: { clinicId, role: 'ASSISTANT' } });
-        for (const assistant of assistants) {
-            await this.notificationService.create(clinicId, assistant.id, {
+        // System notification for assistants and admins
+        const staffToNotify = await this.prisma.user.findMany({ 
+            where: { clinicId, role: { in: ['ASSISTANT', 'ADMIN'] } } 
+        });
+        for (const staff of staffToNotify) {
+            await this.notificationService.create(clinicId, staff.id, {
                 type: 'ESCALATION',
-                title: 'Acil Müdahale Gerekli',
+                title: 'Asistan Desteği Bekleniyor',
                 body: note,
-                entityType: 'CONVERSATION',
-                entityId: (conv as any).id
             });
-            this.socketGateway.emitToUser(assistant.id, 'notification', { message: note });
+            this.socketGateway.emitToUser(staff.id, 'notification', { message: note });
         }
 
         // If patient has a doctor, notify them too
@@ -334,8 +550,6 @@ export class MessagingService {
                     type: 'ESCALATION',
                     title: 'Hastanızdan Soru Var',
                     body: note,
-                    entityType: 'CONVERSATION',
-                    entityId: (conv as any).id
                 });
                 this.socketGateway.emitToUser(lastAppt.doctorId, 'notification', { message: note });
             }
@@ -379,4 +593,3 @@ export class MessagingService {
         }
     }
 }
-

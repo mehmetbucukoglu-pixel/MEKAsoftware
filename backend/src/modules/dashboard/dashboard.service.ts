@@ -48,7 +48,19 @@ export class DashboardService {
                 status: { not: 'CANCELLED' }
             },
             include: {
-                patient: { select: { firstName: true, lastName: true } },
+                patient: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        registrationStatus: true,
+                        conversations: {
+                            where: { clinicId },
+                            select: { status: true, escalationReason: true, unreadCount: true },
+                            take: 1,
+                            orderBy: { updatedAt: 'desc' }
+                        }
+                    }
+                },
                 doctor: { select: { firstName: true, lastName: true } }
             },
             orderBy: { startTime: 'asc' },
@@ -70,18 +82,38 @@ export class DashboardService {
         const weekAgo = subDays(today, 7);
 
         const [
-            weeklyNewPatients,
+            weeklyAppointments,
+            monthlyAppointments,
+            createdToday,
+            appointmentChangesToday,
             bookedSlots,
-            pendingPayments,
             unreadMessages,
-            preRegisteredCount,
             doctorCount
         ] = await Promise.all([
-            // Weekly new patients
-            this.prisma.patient.count({
-                where: { clinicId, createdAt: { gte: weekAgo } }
+            // Weekly Appointments
+            this.prisma.appointment.count({
+                where: { clinicId, startTime: { gte: startOfWeek(today), lte: endOfWeek(today) }, status: { not: 'CANCELLED' } }
             }),
-            // Today's booked slots
+            // Monthly Appointments
+            this.prisma.appointment.count({
+                where: { clinicId, startTime: { gte: startOfMonth(today), lte: endOfMonth(today) }, status: { not: 'CANCELLED' } }
+            }),
+            // Created Today (by bot or clinic)
+            this.prisma.appointment.count({
+                where: { clinicId, createdAt: { gte: startOfDay(today), lte: endOfDay(today) } }
+            }),
+            // Appointment Changes Today (updated today but not created today, or cancelled today)
+            this.prisma.appointment.count({
+                where: {
+                    clinicId,
+                    updatedAt: { gte: startOfDay(today), lte: endOfDay(today) },
+                    OR: [
+                        { status: 'CANCELLED' },
+                        { createdAt: { lt: startOfDay(today) } }
+                    ]
+                }
+            }),
+            // Today's booked slots (for occupancy rate)
             this.prisma.appointment.count({
                 where: {
                     clinicId,
@@ -89,22 +121,10 @@ export class DashboardService {
                     status: { not: 'CANCELLED' },
                 }
             }),
-            // Pending payments (simplified)
-            this.prisma.appointment.count({
-                where: {
-                    clinicId,
-                    status: 'COMPLETED',
-                    startTime: { gte: startOfMonth(today), lte: endOfMonth(today) },
-                }
-            }),
-            // Unread messages
+            // Total Unread messages
             this.prisma.conversation.count({
                 where: { clinicId, unreadCount: { gt: 0 } }
             }).catch(() => 0),
-            // Pre-registered patients
-            this.prisma.patient.count({
-                where: { clinicId, registrationStatus: 'PRE_REGISTERED', isActive: true }
-            }),
             // Doctor count
             this.prisma.user.count({
                 where: { clinicId, role: 'DOCTOR' }
@@ -115,11 +135,12 @@ export class DashboardService {
         const occupancyRate = dailyCapacity > 0 ? Math.round((bookedSlots / dailyCapacity) * 100) : 0;
 
         return {
-            weeklyNewPatients,
+            weeklyAppointments,
+            monthlyAppointments,
+            createdToday,
+            appointmentChangesToday,
             occupancyRate: Math.min(occupancyRate, 100),
-            pendingPayment: pendingPayments,
             unreadMessages,
-            preRegisteredCount,
         };
     }
 }

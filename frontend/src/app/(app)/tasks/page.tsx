@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { workspaceApi, WorkspaceDocument } from '@/lib/workspaceApi';
 import { WorkspaceSidebar } from '@/components/workspace/WorkspaceSidebar';
@@ -35,16 +35,42 @@ export default function WorkspacePage() {
         queryFn: workspaceApi.getDocuments,
     });
 
+    useEffect(() => {
+        if (!selectedDocId && documents.length > 0) {
+            const lastId = localStorage.getItem('lastWorkspaceDocId');
+            if (lastId && documents.some((d: WorkspaceDocument) => d.id === lastId)) {
+                setSelectedDocId(lastId);
+            } else {
+                setSelectedDocId(documents[0].id); // default fallback
+            }
+        }
+    }, [documents, selectedDocId]);
+
+    const handleSelectDoc = (id: string) => {
+        setSelectedDocId(id);
+        localStorage.setItem('lastWorkspaceDocId', id);
+    };
+
     const selectedDoc = documents.find((d: WorkspaceDocument) => d.id === selectedDocId);
 
-    // Mutations
     const createDocMutation = useMutation({
-        mutationFn: (teamspaceId?: string) => workspaceApi.createDocument({
-            title: 'Yeni Çalışma Alanı',
-            content: '[]',
-            order: documents.length,
-            teamspaceId
-        }),
+        mutationFn: (teamspaceId?: string) => {
+            const defaultId = crypto.randomUUID();
+            const widgetId = crypto.randomUUID();
+            const initialContent = JSON.stringify([{
+                id: defaultId,
+                type: 'widget',
+                pos: { x: 100, y: 100 },
+                size: { w: 500, h: 100 },
+                widget: { id: widgetId, type: 'title', content: { text: 'Yeni Çalışma Alanı' } }
+            }]);
+            return workspaceApi.createDocument({
+                title: 'Yeni Çalışma Alanı',
+                content: initialContent,
+                order: documents.length,
+                teamspaceId
+            });
+        },
         onSuccess: (newDoc) => {
             queryClient.invalidateQueries({ queryKey: ['workspace-documents'] });
             setSelectedDocId(newDoc.id);
@@ -123,7 +149,7 @@ export default function WorkspacePage() {
                 documents={documents}
                 loading={loading}
                 selectedDocId={selectedDocId}
-                onSelectDoc={setSelectedDocId}
+                onSelectDoc={handleSelectDoc}
                 onCreateDoc={handleCreateDoc}
                 onDeleteDoc={handleDeleteDoc}
                 onSettingsClick={handleSettingsClick}

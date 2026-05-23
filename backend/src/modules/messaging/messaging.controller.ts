@@ -31,8 +31,8 @@ export class MessagingController {
     @UseGuards(AuthGuard('jwt'), RolesGuard)
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Konuşma mesajları' })
-    getMessages(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string, @Query('page') page?: number) {
-        return this.messagingService.getMessages(user, id, page);
+    getMessages(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string, @Query('page') page?: number, @Query('limit') limit?: number) {
+        return this.messagingService.getMessages(user, id, page, limit);
     }
 
     @Post('conversations/:id/messages')
@@ -61,5 +61,21 @@ export class MessagingController {
         @Headers('user-agent') userAgent: string
     ) {
         return this.messagingService.switchMode(user, id, data.mode, data.assignedTo, ip, userAgent);
+    }
+
+    @Patch('conversations/:id/mark-seen')
+    @UseGuards(AuthGuard('jwt'), RolesGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Eskalasyonu görüldü olarak işaretle (Bekleyen Mesaj badge temizler)' })
+    markEscalationSeen(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string) {
+        return this.messagingService.markEscalationSeen(user, id);
+    }
+
+    @Patch('conversations/:id/lock')
+    @UseGuards(AuthGuard('jwt'), RolesGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Human mode kilidini aç/kapat (otomatik BOT geçişini engeller)' })
+    toggleHumanLock(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string, @Body() data: { locked: boolean }) {
+        return this.messagingService.toggleHumanLock(user, id, data.locked);
     }
 }

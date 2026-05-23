@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/lib/auth-store';
 import { Calendar, Users, TrendingUp, Clock, Loader2, DollarSign, Settings2, X, UserX, Timer, LayoutDashboard, UserPlus, PieChart, MessageSquare, ExternalLink } from 'lucide-react';
 import { getRecentPatients, RecentPatient } from '@/lib/recent-patients';
 import { dashboardApi, DashboardData, ExtendedKpis, Appointment, statisticsApi } from '@/lib/api';
 import { PageHeader } from '@/lib/page-header';
+import { getSocket } from '@/lib/socket';
 
 const KPI_SELECTION_KEY = 'dashboard_kpi_selection';
 
@@ -38,12 +39,12 @@ const ALL_KPIS: KpiDefinition[] = [
         getValue: (d) => d?.stats?.totalPatients?.toString() || '0',
     },
     {
-        id: 'monthlyRevenue',
-        label: 'Aylık Net Gelir',
-        icon: TrendingUp,
-        color: 'var(--warning)',
-        bg: 'rgba(245,158,11,0.15)',
-        getValue: (d) => d?.stats ? `₺${d.stats.monthlyRevenue.toLocaleString('tr-TR')}` : '₺0',
+        id: 'occupancyRate',
+        label: 'Doluluk Oranı',
+        icon: PieChart,
+        color: '#ec4899',
+        bg: 'rgba(236,72,153,0.12)',
+        getValue: (_d, extra) => `%${extra?.extKpis?.occupancyRate ?? 0}`,
     },
     {
         id: 'noShowRate',
@@ -55,47 +56,6 @@ const ALL_KPIS: KpiDefinition[] = [
         hideForAccountant: true,
     },
     {
-        id: 'avgSessionDuration',
-        label: 'Ort. Seans Süresi',
-        icon: Timer,
-        color: '#8b5cf6',
-        bg: 'rgba(139,92,246,0.12)',
-        getValue: (_d, extra) => extra?.avgDuration != null ? `${extra.avgDuration} dk` : '0 dk',
-        hideForAccountant: true,
-    },
-    {
-        id: 'todayRevenue',
-        label: 'Bugünkü Gelir',
-        icon: DollarSign,
-        color: 'var(--success)',
-        bg: 'rgba(16,185,129,0.12)',
-        getValue: (d) => d?.stats ? `₺${(Math.floor(d.stats.monthlyRevenue / 20)).toLocaleString('tr-TR')}` : '₺0',
-    },
-    {
-        id: 'pendingPayment',
-        label: 'Bekleyen Ödeme',
-        icon: Clock,
-        color: '#f97316',
-        bg: 'rgba(249,115,22,0.12)',
-        getValue: (_d, extra) => extra?.extKpis?.pendingPayment?.toString() || '0',
-    },
-    {
-        id: 'weeklyNewPatients',
-        label: 'Haftalık Yeni Hasta',
-        icon: UserPlus,
-        color: '#06b6d4',
-        bg: 'rgba(6,182,212,0.12)',
-        getValue: (_d, extra) => extra?.extKpis?.weeklyNewPatients?.toString() || '0',
-    },
-    {
-        id: 'occupancyRate',
-        label: 'Doluluk Oranı',
-        icon: PieChart,
-        color: '#ec4899',
-        bg: 'rgba(236,72,153,0.12)',
-        getValue: (_d, extra) => `%${extra?.extKpis?.occupancyRate ?? 0}`,
-    },
-    {
         id: 'unreadMessages',
         label: 'Okunmamış Mesaj',
         icon: MessageSquare,
@@ -103,9 +63,41 @@ const ALL_KPIS: KpiDefinition[] = [
         bg: 'rgba(59,130,246,0.12)',
         getValue: (_d, extra) => extra?.extKpis?.unreadMessages?.toString() || '0',
     },
+    {
+        id: 'weeklyAppointments',
+        label: 'Haftalık Randevu Sayısı',
+        icon: TrendingUp,
+        color: '#8b5cf6',
+        bg: 'rgba(139,92,246,0.12)',
+        getValue: (_d, extra) => extra?.extKpis?.weeklyAppointments?.toString() || '0',
+    },
+    {
+        id: 'monthlyAppointments',
+        label: 'Aylık Randevu Sayısı',
+        icon: Calendar,
+        color: '#06b6d4',
+        bg: 'rgba(6,182,212,0.12)',
+        getValue: (_d, extra) => extra?.extKpis?.monthlyAppointments?.toString() || '0',
+    },
+    {
+        id: 'createdToday',
+        label: 'Bugün Oluşturulan Randevu',
+        icon: UserPlus,
+        color: '#f97316',
+        bg: 'rgba(249,115,22,0.12)',
+        getValue: (_d, extra) => extra?.extKpis?.createdToday?.toString() || '0',
+    },
+    {
+        id: 'appointmentChangesToday',
+        label: 'Randevu Düzenlemeleri',
+        icon: Settings2,
+        color: '#eab308',
+        bg: 'rgba(234,179,8,0.12)',
+        getValue: (_d, extra) => extra?.extKpis?.appointmentChangesToday?.toString() || '0',
+    },
 ];
 
-const DEFAULT_SELECTED = ['appointmentsToday', 'totalPatients', 'monthlyRevenue'];
+const DEFAULT_SELECTED = ['appointmentsToday', 'totalPatients', 'occupancyRate', 'unreadMessages'];
 
 export default function DashboardPage() {
     const { user, clinic } = useAuthStore();
@@ -144,36 +136,60 @@ export default function DashboardPage() {
 
     useEffect(() => {
         setRecent(getRecentPatients());
+    }, []);
 
-        const fetchDashboardData = async () => {
-            if (!clinic) return;
+    const fetchDashboardData = useCallback(async () => {
+        if (!clinic) return;
+        setIsLoading(true);
+        try {
+            const [dashRes] = await Promise.all([
+                dashboardApi.get(),
+            ]);
+            setData(dashRes.data);
+
+            // Fetch statistics + extended KPIs
             try {
-                const [dashRes] = await Promise.all([
-                    dashboardApi.get(),
+                const [statsRes, extKpisRes] = await Promise.all([
+                    statisticsApi.getOverview({}),
+                    dashboardApi.getExtendedKpis(),
                 ]);
-                setData(dashRes.data);
+                setExtraStats({
+                    noShowRate: statsRes.data.noShowRate,
+                    avgDuration: statsRes.data.avgSessionMinutes,
+                    extKpis: extKpisRes.data,
+                });
+            } catch { }
+        } catch (error) {
+            console.error("Dashboard verileri çekilemedi:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [clinic]);
 
-                // Fetch statistics + extended KPIs
-                try {
-                    const [statsRes, extKpisRes] = await Promise.all([
-                        statisticsApi.getOverview({}),
-                        dashboardApi.getExtendedKpis(),
-                    ]);
-                    setExtraStats({
-                        noShowRate: statsRes.data.noShowRate,
-                        avgDuration: statsRes.data.avgSessionMinutes,
-                        extKpis: extKpisRes.data,
-                    });
-                } catch { }
-            } catch (error) {
-                console.error("Dashboard verileri çekilemedi:", error);
-            } finally {
-                setIsLoading(false);
-            }
+    useEffect(() => {
+        fetchDashboardData();
+    }, [fetchDashboardData]);
+
+    // WebSocket refresh listener
+    useEffect(() => {
+        if (!clinic || !user) return;
+        const socket = getSocket(clinic.id, user.id, user.role);
+
+        const handleUpdate = () => {
+            console.log('Real-time update received, refreshing dashboard...');
+            fetchDashboardData();
         };
 
-        fetchDashboardData();
-    }, [clinic]);
+        socket.on('conversation_updated', handleUpdate);
+        socket.on('conversation_escalated', handleUpdate);
+        socket.on('appointment_created', handleUpdate);
+
+        return () => {
+            socket.off('conversation_updated', handleUpdate);
+            socket.off('conversation_escalated', handleUpdate);
+            socket.off('appointment_created', handleUpdate);
+        };
+    }, [clinic, user, fetchDashboardData]);
 
     const availableKpis = ALL_KPIS.filter(k => !(isAccountant && k.hideForAccountant));
     const visibleKpis = availableKpis.filter(k => selectedKpis.includes(k.id));
@@ -343,12 +359,18 @@ export default function DashboardPage() {
                                 data?.dailySchedule?.map((apt) => {
                                     const timeStr = new Date(apt.startTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 
-                                    let statusText = 'Onaylı';
-                                    let statusClass = 'badge-success';
+                                    let displayStatus = apt.status;
+                                    if (new Date(apt.endTime) < new Date() && displayStatus !== 'NO_SHOW' && displayStatus !== 'CANCELLED') {
+                                        displayStatus = 'COMPLETED';
+                                    }
 
-                                    if (apt.status === 'COMPLETED') { statusText = 'Tamamlandı'; statusClass = 'badge-primary'; }
-                                    if (apt.status === 'CANCELLED') { statusText = 'İptal'; statusClass = 'badge-error'; }
-                                    if (apt.status === 'NO_SHOW') { statusText = 'Gelmedi'; statusClass = 'badge-warning'; }
+                                    let statusText = 'Bekliyor';
+                                    let statusClass = 'badge-info';
+
+                                    if (displayStatus === 'COMPLETED') { statusText = 'Tamamlandı'; statusClass = 'badge-success'; }
+                                    if (displayStatus === 'ARRIVED') { statusText = 'Geldi'; statusClass = 'badge-success'; }
+                                    if (displayStatus === 'CANCELLED') { statusText = 'İptal'; statusClass = 'badge-error'; }
+                                    if (displayStatus === 'NO_SHOW') { statusText = 'Gelmedi'; statusClass = 'badge-error'; }
 
                                     return (
                                         <div key={apt.id} style={{
@@ -384,6 +406,22 @@ export default function DashboardPage() {
                                                             fontWeight: 600
                                                         }}>
                                                             Ön Kayıt
+                                                        </span>
+                                                    )}
+                                                    {apt.patient?.conversations && (apt.patient.conversations[0] as any)?.unreadCount > 0 && (
+                                                        <span style={{
+                                                            fontSize: '0.65rem',
+                                                            background: 'rgba(34, 197, 94, 0.15)',
+                                                            color: '#16a34a',
+                                                            padding: '1px 5px',
+                                                            borderRadius: '4px',
+                                                            fontWeight: 600,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '3px'
+                                                        }}>
+                                                            <div style={{ width: '5px', height: '5px', background: '#16a34a', borderRadius: '50%' }} />
+                                                            {apt.patient.conversations[0]?.unreadCount} Yeni Mesaj
                                                         </span>
                                                     )}
                                                 </div>

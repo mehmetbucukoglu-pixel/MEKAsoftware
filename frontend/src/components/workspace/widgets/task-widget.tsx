@@ -11,12 +11,15 @@ import {
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { workspaceApi } from '@/lib/workspaceApi';
+import api from '@/lib/api';
+import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 
 interface TaskWidgetProps {
     widget: BaseWidget;
     onChange: (id: string, newContent: any) => void;
     isReadOnly?: boolean;
+    teamspaceId?: string;
 }
 
 interface Task {
@@ -352,19 +355,37 @@ function TaskRow({ task, members, onToggle, onEdit, onRemove, onAssign, onDueDat
 
 // ─── Main Widget ──────────────────────────────────────────────────────────────
 
-export function TaskWidget({ widget, onChange, isReadOnly }: TaskWidgetProps) {
+export function TaskWidget({ widget, onChange, isReadOnly, teamspaceId }: TaskWidgetProps) {
     const content = (widget.content as TaskContent) || { tasks: [] };
     const tasks: Task[] = content.tasks || [];
     const [newTaskTitle, setNewTaskTitle] = useState('');
 
-    // Fetch teamspace members for assignment
+    // Fetch all clinic users
+    const { data: allUsers = [] } = useQuery<Member[]>({
+        queryKey: ['clinic-users'],
+        queryFn: async () => {
+            const { data } = await api.get('/users');
+            return data;
+        },
+    });
+
+    // Fetch teamspaces to filter members if needed
     const { data: teamspaces = [] } = useQuery<Teamspace[]>({
         queryKey: ['workspace-teamspaces'],
         queryFn: workspaceApi.getTeamspaces,
     });
 
-    const allMembers: Member[] = teamspaces.flatMap(ts => ts.members || [])
-        .filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i); // dedupe
+    let allMembers: Member[] = [];
+    if (teamspaceId) {
+        const ts = teamspaces.find(t => t.id === teamspaceId);
+        allMembers = ts?.members || [];
+    } else {
+        allMembers = allUsers.map((u: any) => ({
+            id: u.id,
+            firstName: u.firstName,
+            lastName: u.lastName
+        }));
+    }
 
     const updateTasks = useCallback((newTasks: Task[]) => {
         onChange(widget.id, { tasks: newTasks });
@@ -385,9 +406,26 @@ export function TaskWidget({ widget, onChange, isReadOnly }: TaskWidgetProps) {
         updateTasks(tasks.filter(t => t.id !== taskId));
     };
 
-    const handleAssign = (taskId: string, assigneeId?: string, assigneeName?: string) => {
+    const handleAssign = async (taskId: string, assigneeId?: string, assigneeName?: string) => {
         if (isReadOnly) return;
+        const taskToUpdate = tasks.find(t => t.id === taskId);
         updateTasks(tasks.map(t => t.id === taskId ? { ...t, assigneeId, assigneeName } : t));
+
+        if (assigneeId && taskToUpdate && assigneeId !== taskToUpdate.assigneeId) {
+            try {
+                await api.post('/notifications', {
+                    targetUserId: assigneeId,
+                    type: 'WORKSPACE_TASK',
+                    title: 'Yeni Görev',
+                    text: `Size bir görev atandı: "${taskToUpdate.title}"`,
+                    entityType: 'TASK',
+                    entityId: taskId
+                });
+                toast.success(`${assigneeName} adlı kullanıcıya bildirim gönderildi`);
+            } catch (error) {
+                console.error('Bildirim gönderilemedi', error);
+            }
+        }
     };
 
     const handleDueDate = (taskId: string, dueDate?: string) => {

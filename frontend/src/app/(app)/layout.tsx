@@ -10,7 +10,7 @@ import {
     LayoutDashboard, Calendar, MessageSquare, Users,
     Bell, Settings, LogOut, ChevronRight, ListTodo, CheckCircle2,
     PieChart, PanelLeftClose, PanelLeft, ChevronUp, Building2, Keyboard,
-    Edit2, ExternalLink, X as XIcon, Loader2
+    Edit2, ExternalLink, X as XIcon, Loader2, AlertCircle
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { useHeaderStore } from '@/lib/header-store';
@@ -20,6 +20,7 @@ import { queryClient } from '@/lib/query-client';
 import dynamic from 'next/dynamic';
 import { useKeyboardShortcuts } from '@/components/keyboard-shortcuts';
 import { useRealtimeNotifications } from '@/lib/use-realtime-notifications';
+import { FollowUpPrompts } from './dashboard/follow-up-prompts';
 
 const OnboardingTooltips = dynamic(
     () => import('@/components/onboarding-tooltips').then((mod) => mod.OnboardingTooltips),
@@ -42,7 +43,6 @@ const navItems = [
     { href: '/tasks', icon: ListTodo, label: 'Workspace' },
     { href: '/patients', icon: Users, label: 'Hastalar' },
     { href: '/messages', icon: MessageSquare, label: 'Mesajlar' },
-    { href: '/reports', icon: PieChart, label: 'Raporlar' },
 ];
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar_collapsed';
@@ -98,6 +98,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }, [isLoading, isAuthenticated, router]);
 
     const [preRegCount, setPreRegCount] = useState(0);
+    const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
     const [showPreRegPanel, setShowPreRegPanel] = useState(false);
     const [preRegPatients, setPreRegPatients] = useState<Patient[]>([]);
     const [preRegLoading, setPreRegLoading] = useState(false);
@@ -134,6 +135,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             ]);
             setNotifications(notifRes.data);
             setPreRegCount(extKpisRes.data.preRegisteredCount || 0);
+            setUnreadMessagesCount(extKpisRes.data.unreadMessages || 0);
         } catch (error) {
             console.error('Failed to fetch global stats', error);
         }
@@ -239,17 +241,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     minHeight: '64px',
                     borderBottom: '1px solid var(--border)',
                 }}>
-                    <img
-                        src="/logo.png"
-                        alt="MEKA"
-                        style={{
-                            height: collapsed ? '24px' : 'auto',
-                            width: collapsed ? '24px' : '70%',
-                            maxWidth: '140px',
-                            objectFit: 'contain',
-                            transition: 'all 0.2s ease',
-                        }}
-                    />
+                    <div style={{
+                        display: 'flex', alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '100%'
+                    }}>
+                        <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                            {collapsed ? 'M' : 'MEKA'}
+                        </span>
+                    </div>
                 </div>
 
                 {/* Navigation */}
@@ -470,30 +470,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} data-onboarding="shortcuts-toggle">
-                        <button
-                            className="btn-icon"
-                            onClick={() => setShowCheatSheet(true)}
-                            title="Klavye Kısayolları (Ctrl+/)"
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: '8px',
-                                background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-                                color: 'var(--text-secondary)', cursor: 'pointer', padding: '6px 12px',
-                                borderRadius: 'var(--radius-md)', fontSize: '0.8125rem', fontWeight: 500,
-                                transition: 'all 0.15s',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-                        >
-                            <Keyboard size={16} />
-                            <span>Kısayollar</span>
-                            <kbd style={{
-                                padding: '1px 5px', borderRadius: '4px', fontSize: '0.65rem',
-                                background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                                color: 'var(--text-muted)', marginLeft: '4px',
+                        {unreadMessagesCount > 0 && (
+                            <Link href="/messages" style={{
+                                background: 'var(--error-muted)', color: 'var(--error)', padding: '6px 12px',
+                                borderRadius: 'var(--radius-md)', fontSize: '0.8125rem', fontWeight: 600,
+                                border: '1px solid rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', gap: '6px',
+                                textDecoration: 'none'
                             }}>
-                                Ctrl+/
-                            </kbd>
-                        </button>
+                                <AlertCircle size={16} />
+                                {unreadMessagesCount} Bekleyen Mesaj
+                            </Link>
+                        )}
+                        <QuickSearch />
                         {/* Pre-Registered Patients Badge + Panel */}
                         {preRegCount > 0 && (
                             <div style={{ position: 'relative' }} ref={preRegRef}>
@@ -711,7 +699,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </main>
             <OnboardingTooltips />
             <ShortcutCheatSheet open={showCheatSheet} onClose={() => setShowCheatSheet(false)} />
-            <QuickSearch hideButton />
+            <FollowUpPrompts />
         </div >
     );
 }

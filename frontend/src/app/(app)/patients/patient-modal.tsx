@@ -14,7 +14,6 @@ interface PatientModalProps {
 
 export default function PatientModal({ isOpen, onClose, onSuccess, patient }: PatientModalProps) {
     const [form, setForm] = useState<CreatePatientInput>({
-        tcKimlik: '',
         firstName: '',
         lastName: '',
         phone: '',
@@ -27,7 +26,7 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState('');
-    const [tcWarning, setTcWarning] = useState<string | null>(null);
+    const [phoneWarning, setPhoneWarning] = useState<string | null>(null);
     const [successData, setSuccessData] = useState<Patient | null>(null);
     const router = useRouter();
 
@@ -36,7 +35,6 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
     useEffect(() => {
         if (patient) {
             setForm({
-                tcKimlik: patient.tcKimlik || '',
                 firstName: patient.firstName || '',
                 lastName: patient.lastName || '',
                 phone: patient.phone || '',
@@ -47,11 +45,11 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                 notes: patient.notes || '',
             });
         } else {
-            setForm({ tcKimlik: '', firstName: '', lastName: '', phone: '', email: '', address: '', dateOfBirth: '', gender: '', notes: '' });
+            setForm({ firstName: '', lastName: '', phone: '', email: '', address: '', dateOfBirth: '', gender: '', notes: '' });
         }
         setErrors({});
         setSubmitError('');
-        setTcWarning(null);
+        setPhoneWarning(null);
         setSuccessData(null);
     }, [patient, isOpen]);
 
@@ -59,36 +57,35 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
         if (!isOpen || isEdit) return;
 
         async function checkDuplicate() {
-            if (form.tcKimlik && form.tcKimlik.length === 11) {
+            if (form.phone && form.phone.length > 5) {
                 try {
-                    const res = await patientApi.checkTc(form.tcKimlik);
-                    if (res.data.exists) {
-                        setTcWarning(`Bu TC Kimlik numarasıyla kayıtlı bir hasta zaten var: ${res.data.patientName}`);
+                    const res = await patientApi.checkPhone(form.phone);
+                    if (res.data.exists && (!isEdit || patient?.phone !== form.phone)) {
+                        setPhoneWarning(`Bu telefon numarasıyla kayıtlı bir hasta zaten var: ${res.data.patientName}`);
                     } else {
-                        setTcWarning(null);
+                        setPhoneWarning(null);
                     }
                 } catch {
-                    setTcWarning(null);
+                    setPhoneWarning(null);
                 }
             } else {
-                setTcWarning(null);
+                setPhoneWarning(null);
             }
         }
 
         const timer = setTimeout(checkDuplicate, 500);
         return () => clearTimeout(timer);
-    }, [form.tcKimlik, isOpen, isEdit]);
+    }, [form.phone, isOpen, isEdit, patient]);
 
     if (!isOpen) return null;
 
     const validate = (): boolean => {
         const newErrors: Record<string, string> = {};
-        if (!form.tcKimlik || !/^\d{11}$/.test(form.tcKimlik)) newErrors.tcKimlik = 'TC Kimlik No 11 haneli rakam olmalıdır';
         if (!form.firstName || form.firstName.length < 2) newErrors.firstName = 'Ad en az 2 karakter olmalıdır';
         if (!form.lastName || form.lastName.length < 2) newErrors.lastName = 'Soyad en az 2 karakter olmalıdır';
         if (!form.phone) newErrors.phone = 'Telefon zorunludur';
         if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) newErrors.email = 'Geçerli bir e-posta giriniz';
-        if (!form.address || form.address.length < 5) newErrors.address = 'Adres en az 5 karakter olmalıdır';
+        if (form.address && form.address.length < 5) newErrors.address = 'Adres en az 5 karakter olmalıdır';
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -102,7 +99,6 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
 
         try {
             const payload: CreatePatientInput = {
-                tcKimlik: form.tcKimlik,
                 firstName: form.firstName,
                 lastName: form.lastName,
                 phone: form.phone,
@@ -209,28 +205,6 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                             </div>
                         ) : (
                             <>
-                                <div className="form-group" style={{ marginBottom: '12px' }}>
-                                    <label className="label">TC Kimlik No *</label>
-                                    <input
-                                        className="input"
-                                        value={form.tcKimlik}
-                                        onChange={(e) => handleChange('tcKimlik', e.target.value.replace(/\D/g, '').slice(0, 11))}
-                                        placeholder="12345678901"
-                                        maxLength={11}
-                                    />
-                                    {errors.tcKimlik && <div className="form-error">{errors.tcKimlik}</div>}
-                                    {tcWarning && (
-                                        <div style={{
-                                            display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px',
-                                            fontSize: '0.8125rem', color: 'var(--warning)',
-                                            background: 'rgba(var(--warning-rgb), 0.1)', padding: '6px 10px',
-                                            borderRadius: 'var(--radius-sm)'
-                                        }}>
-                                            <AlertCircle size={14} />
-                                            {tcWarning}
-                                        </div>
-                                    )}
-                                </div>
 
                                 <div className="form-row">
                                     <div className="form-group">
@@ -265,6 +239,17 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                                             placeholder="+905550001111"
                                         />
                                         {errors.phone && <div className="form-error">{errors.phone}</div>}
+                                        {phoneWarning && (
+                                            <div style={{
+                                                display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px',
+                                                fontSize: '0.8125rem', color: 'var(--warning)',
+                                                background: 'rgba(var(--warning-rgb), 0.1)', padding: '6px 10px',
+                                                borderRadius: 'var(--radius-sm)'
+                                            }}>
+                                                <AlertCircle size={14} />
+                                                {phoneWarning}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="form-group">
                                         <label className="label">E-posta</label>
@@ -280,7 +265,7 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                                 </div>
 
                                 <div className="form-group" style={{ marginBottom: '12px' }}>
-                                    <label className="label">Adres *</label>
+                                    <label className="label">Adres</label>
                                     <textarea
                                         className="textarea"
                                         value={form.address}

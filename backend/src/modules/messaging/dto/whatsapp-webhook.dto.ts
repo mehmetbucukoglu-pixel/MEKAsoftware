@@ -21,6 +21,11 @@ export class WhatsappWebhookDto {
     @ApiProperty({ required: false })
     @IsString()
     @IsOptional()
+    direction?: 'INBOUND' | 'OUTBOUND';
+
+    @ApiProperty({ required: false })
+    @IsString()
+    @IsOptional()
     mediaUrl?: string;
 
     @ApiProperty({ required: false })

@@ -16,32 +16,48 @@ export class HumanModeTimeoutTask {
     async handleCron() {
         this.logger.debug('Running HumanModeTimeoutTask...');
 
-        const oneHourAgo = new Date();
-        oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+        const threeHoursAgo = new Date();
+        threeHoursAgo.setHours(threeHoursAgo.getHours() - 3);
 
-        // Find HUMAN conversations that haven't been switched back and are older than 1 hour
+        // Find HUMAN conversations that:
+        // 1. Are NOT locked (humanModeLocked = false)
+        // 2. Last outbound activity was > 3 hours ago (or no outbound at all + humanModeAt > 3h ago)
         const expiredConversations = await this.prisma.conversation.findMany({
             where: {
                 status: 'HUMAN',
-                humanModeAt: { lt: oneHourAgo }
+                humanModeLocked: false,
+                OR: [
+                    // Has outbound activity, but last one was > 3 hours ago
+                    { lastOutboundAt: { lt: threeHoursAgo } },
+                    // No outbound at all, check humanModeAt
+                    {
+                        lastOutboundAt: null,
+                        humanModeAt: { lt: threeHoursAgo }
+                    },
+                ],
             },
         });
 
         if (expiredConversations.length === 0) return;
 
-        this.logger.log(`Found ${expiredConversations.length} conversations to revert to BOT mode.`);
+        this.logger.log(`Found ${expiredConversations.length} conversations to revert to BOT mode (3h inactivity).`);
 
         for (const conv of expiredConversations) {
             await this.prisma.conversation.update({
                 where: { id: conv.id },
-                data: { status: 'BOT', humanModeAt: null }
+                data: {
+                    status: 'BOT',
+                    humanModeAt: null,
+                    escalationReason: null,
+                    lastOutboundAt: null,
+                }
             });
 
             // Notify staff via WebSocket
             this.socketGateway.emitToStaff(conv.clinicId, 'conversation_updated', {
                 id: conv.id,
                 status: 'BOT',
-                message: 'Bot otomatik olarak devraldı.'
+                message: '3 saat inaktivite — Bot otomatik olarak devraldı.'
             });
 
             this.socketGateway.emitToConversation(conv.id, 'mode_changed', { status: 'BOT' });

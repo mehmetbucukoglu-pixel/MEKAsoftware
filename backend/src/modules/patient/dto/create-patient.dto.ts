@@ -2,12 +2,6 @@ import { IsString, IsNotEmpty, IsOptional, IsEmail, MinLength, MaxLength, Length
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePatientDto {
-    @ApiProperty({ example: '12345678901', description: 'TC Kimlik No (11 hane)' })
-    @IsString()
-    @IsNotEmpty({ message: 'TC Kimlik No zorunludur' })
-    @Length(11, 11, { message: 'TC Kimlik No 11 haneli olmalıdır' })
-    @Matches(/^\d{11}$/, { message: 'TC Kimlik No sadece rakamlardan oluşmalıdır' })
-    tcKimlik: string;
 
     @ApiProperty({ example: 'Ali', description: 'Hastanın adı' })
     @IsString()
@@ -31,11 +25,10 @@ export class CreatePatientDto {
     @IsEmail({}, { message: 'Geçerli bir e-posta adresi giriniz' })
     email?: string;
 
-    @ApiProperty({ example: 'Ankara, Çankaya, Atatürk Bulvarı No:123', description: 'Adres' })
+    @ApiPropertyOptional({ example: 'Ankara, Çankaya, Atatürk Bulvarı No:123', description: 'Adres' })
+    @IsOptional()
     @IsString()
-    @IsNotEmpty({ message: 'Adres zorunludur' })
-    @MinLength(5, { message: 'Adres en az 5 karakter olmalıdır' })
-    address: string;
+    address?: string;
 
     @ApiPropertyOptional({ example: '1990-05-15', description: 'Doğum tarihi (YYYY-MM-DD)' })
     @IsOptional()

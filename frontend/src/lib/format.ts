@@ -52,7 +52,4 @@ export function stripPhone(formatted: string): string {
     return `+${digits}`; // Eğer başka bir formatta rakam geldiyse, direkt başına + koyuyoruz 
 }
 
-export function maskTC(tcKimlik: string | null | undefined): string {
-    if (!tcKimlik || tcKimlik.length !== 11) return tcKimlik || '';
-    return `${tcKimlik.substring(0, 3)}****${tcKimlik.substring(7)}`;
-}
+

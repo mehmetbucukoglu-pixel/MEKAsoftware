@@ -171,6 +171,61 @@ export class StatisticsService {
         });
     }
 
+    async getChatInsights(clinicId: string) {
+        const last30Days = new Date();
+        last30Days.setDate(last30Days.getDate() - 30);
+
+        const [
+            convStats,
+            escalationReasons,
+            unlinkedCount,
+            dailyMsgCounts
+        ] = await Promise.all([
+            // Mode distribution
+            this.prisma.conversation.groupBy({
+                by: ['status'],
+                where: { clinicId, updatedAt: { gte: last30Days } },
+                _count: { id: true },
+            }),
+            // Common escalation reasons
+            this.prisma.conversation.groupBy({
+                by: ['escalationReason'],
+                where: { 
+                    clinicId, 
+                    escalationReason: { not: null },
+                    updatedAt: { gte: last30Days }
+                },
+                _count: { id: true },
+                orderBy: { _count: { id: 'desc' } },
+                take: 5
+            }),
+            // Unlinked phone numbers
+            this.prisma.conversation.count({
+                where: { clinicId, patientId: null }
+            }),
+            // Daily message volume
+            this.prisma.message.groupBy({
+                by: ['createdAt'],
+                where: { clinicId, createdAt: { gte: last30Days } },
+                _count: { id: true }
+            })
+        ]);
+
+        // Process daily volume
+        const dailyMap = new Map<string, number>();
+        dailyMsgCounts.forEach(m => {
+            const date = format(m.createdAt, 'yyyy-MM-dd');
+            dailyMap.set(date, (dailyMap.get(date) || 0) + m._count.id);
+        });
+
+        return {
+            modeDistribution: convStats.map(s => ({ status: s.status, count: s._count.id })),
+            topEscalationReasons: escalationReasons.map(r => ({ reason: r.escalationReason, count: r._count.id })),
+            unlinkedPatients: unlinkedCount,
+            dailyVolume: Array.from(dailyMap.entries()).map(([date, count]) => ({ date, count }))
+        };
+    }
+
     // --- Helpers ---
 
     private parseDateRange(filters: DateFilter) {
