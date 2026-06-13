@@ -317,3 +317,17 @@ export const statisticsApi = {
         api.get('/statistics/new-patients', { params: { period } }),
 };
 
+export const messagingApi = {
+    getConversations: (params?: { status?: string; limit?: number }) =>
+        api.get('/conversations', { params }),
+    getConversation: (id: string) =>
+        api.get(`/conversations/${id}`),
+    getMessages: (conversationId: string, params?: { limit?: number; before?: string }) =>
+        api.get(`/conversations/${conversationId}/messages`, { params }),
+    sendMessage: (conversationId: string, body: string) =>
+        api.post(`/conversations/${conversationId}/messages`, { body }),
+    setMode: (conversationId: string, mode: string) =>
+        api.patch(`/conversations/${conversationId}/mode`, { mode }),
+    markSeen: (conversationId: string) =>
+        api.patch(`/conversations/${conversationId}/mark-seen`),
+};

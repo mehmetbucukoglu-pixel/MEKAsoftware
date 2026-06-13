@@ -34,13 +34,15 @@ model Clinic {
   expenses           Expense[]
   clinicalNotes      ClinicalNote[]
   patientAttachments PatientAttachment[]
-  notifications      Notification[]
-  auditLogs          AuditLog[]
-  tasks              Task[]
-  taskComments       TaskComment[]
-  workspaceDocuments WorkspaceDocument[]
-  teamspaces         Teamspace[]
-  phonePatientLinks  PhonePatientLink[]
+  notifications           Notification[]
+  auditLogs               AuditLog[]
+  tasks                   Task[]
+  taskComments            TaskComment[]
+  workspaceDocuments      WorkspaceDocument[]
+  teamspaces              Teamspace[]
+  phonePatientLinks       PhonePatientLink[]
+  pushSubscriptions       PushSubscription[]
+  notificationPreferences NotificationPreference[]
 
   @@map("clinics")
 }
@@ -80,16 +82,17 @@ model User {
   clinicalNotes       ClinicalNote[]
   createdPayments     Payment[]
   createdExpenses     Expense[] @relation("CreatedExpenses")
-  notifications       Notification[]
-  auditLogs           AuditLog[]
-  createdTasks        Task[]    @relation("TaskCreator")
-  assignedTasks       Task[]    @relation("TaskAssignee")
-  taskComments        TaskComment[]
-  createdDocuments    WorkspaceDocument[] @relation("DocumentCreator")
-  sharedDocuments     WorkspaceDocument[] @relation("DocumentCollaborators")
-  
-  createdTeamspaces  Teamspace[]         @relation("TeamspaceCreator")
-  teamspaces         Teamspace[]         @relation("TeamspaceMembers")
+  notifications            Notification[]
+  auditLogs                AuditLog[]
+  createdTasks             Task[]    @relation("TaskCreator")
+  assignedTasks            Task[]    @relation("TaskAssignee")
+  taskComments             TaskComment[]
+  createdDocuments         WorkspaceDocument[] @relation("DocumentCreator")
+  sharedDocuments          WorkspaceDocument[] @relation("DocumentCollaborators")
+  createdTeamspaces        Teamspace[]         @relation("TeamspaceCreator")
+  teamspaces               Teamspace[]         @relation("TeamspaceMembers")
+  pushSubscriptions        PushSubscription[]
+  notificationPreference   NotificationPreference?
 
   @@unique([clinicId, email])
   @@map("users")
@@ -586,4 +589,40 @@ model Teamspace {
 
   @@index([clinicId])
   @@map("teamspaces")
+}
+
+// ==========================================
+// PWA PUSH BİLDİRİMLERİ
+// ==========================================
+
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  clinicId  String   @map("clinic_id") @db.Uuid
+  endpoint  String   @unique @db.Text
+  p256dh    String   @db.Text
+  auth      String   @db.VarChar(200)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@index([userId])
+  @@index([clinicId])
+  @@map("push_subscriptions")
+}
+
+model NotificationPreference {
+  id                   String  @id @default(uuid()) @db.Uuid
+  userId               String  @unique @map("user_id") @db.Uuid
+  clinicId             String  @map("clinic_id") @db.Uuid
+  escalatedMessages    Boolean @default(true)  @map("escalated_messages")
+  appointmentCreated   Boolean @default(true)  @map("appointment_created")
+  appointmentCancelled Boolean @default(true)  @map("appointment_cancelled")
+  appointmentUpdated   Boolean @default(false) @map("appointment_updated")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@map("notification_preferences")
 }
