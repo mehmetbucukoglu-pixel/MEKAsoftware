@@ -1,0 +1,160 @@
+{
+  "name": "KlinikApp - Randevu Hatirlatma CRON (v1)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ],
+      "id": "cron-trigger-001",
+      "name": "Her Gun Saat 09:00"
+    },
+    {
+      "parameters": {
+        "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/reminder-due",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "klinikapp-n8n-secret-2024"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        460,
+        300
+      ],
+      "id": "fetch-reminders-001",
+      "name": "Hatirlatilacak Randevulari Getir"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        680,
+        300
+      ],
+      "id": "split-001",
+      "name": "Her Randevu Icin"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1038350189365408",
+        "recipientPhoneNumber": "={{ $json.patientPhone }}",
+        "textBody": "=Merhaba {{ $json.patientName }}! 👋\n\nYarinki randevunuzu hatirlatmak istedik:\n📅 Tarih: {{ $now.plus({days:1}).setZone('Europe/Istanbul').setLocale('tr').toFormat('dd MMMM yyyy') }}\n⏰ Saat: {{ $json.timeFormatted }}\n👨‍⚕️ {{ $json.doctorName }}\n\nRandevunuzu onaylamak icin *EVET*, iptal etmek icin *HAYIR* yazabilirsiniz.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "id": "send-reminder-001",
+      "name": "Hatirlatma Gonder",
+      "continueOnFail": true,
+      "credentials": {
+        "whatsAppApi": {
+          "id": "pAHu8UjOiUUJ4ORt",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/{{ $('Her Randevu Icin').item.json.appointmentId }}/reminder-sent?token=klinikapp-n8n-secret-2024",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        300
+      ],
+      "id": "mark-sent-001",
+      "name": "Hatirlatmay SENT Yap",
+      "continueOnFail": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Her Gun Saat 09:00": {
+      "main": [
+        [
+          {
+            "node": "Hatirlatilacak Randevulari Getir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hatirlatilacak Randevulari Getir": {
+      "main": [
+        [
+          {
+            "node": "Her Randevu Icin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Her Randevu Icin": {
+      "main": [
+        [
+          {
+            "node": "Hatirlatma Gonder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hatirlatma Gonder": {
+      "main": [
+        [
+          {
+            "node": "Hatirlatmay SENT Yap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a2e63fae-49f9-48cb-9983-a4ffe1521fa7",
+  "meta": {
+    "instanceId": "87c0a25f5af05297c61afecbc1a76e1f62d2b42e620b33813844c0d8fb6d57aa"
+  },
+  "id": "CRON_REMINDER_V1",
+  "tags": []
+}

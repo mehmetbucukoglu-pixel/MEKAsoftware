@@ -27,7 +27,7 @@ export function TitleWidget({ widget, onChange }: TitleWidgetProps) {
     };
 
     return (
-        <div style={{ width: '100%', padding: '4px' }}>
+        <div style={{ width: '100%', height: '100%', padding: '4px', containerType: 'size' }}>
             <div
                 ref={contentRef}
                 contentEditable
@@ -36,10 +36,11 @@ export function TitleWidget({ widget, onChange }: TitleWidgetProps) {
                 data-placeholder="Sayfa Başlığı"
                 style={{
                     outline: 'none',
-                    fontSize: '2rem',
+                    fontSize: 'clamp(24px, 60cqmin, 200px)',
                     fontWeight: 700,
                     color: '#e6edf3',
-                    minHeight: '44px',
+                    minHeight: '100%',
+                    height: '100%',
                     wordBreak: 'break-word',
                     lineHeight: 1.3,
                     background: 'transparent',

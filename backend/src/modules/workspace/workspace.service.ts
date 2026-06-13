@@ -184,4 +184,10 @@ export class WorkspaceService {
 
         return ts;
     }
+
+    async deleteTeamspace(clinicId: string, id: string) {
+        return this.prisma.teamspace.delete({
+            where: { id, clinicId }
+        });
+    }
 }

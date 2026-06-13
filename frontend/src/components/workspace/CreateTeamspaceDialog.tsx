@@ -91,21 +91,26 @@ export function CreateTeamspaceDialog({ open, onOpenChange }: CreateTeamspaceDia
 
     return (
         <Dialog open={open} onOpenChange={(o) => { if (!o) resetAndClose(); }}>
-            <DialogContent className="sm:max-w-[700px] gap-0 p-0 overflow-hidden bg-[#0a0d14] border-white/10 text-white rounded-2xl">
-                <div className="flex h-[500px]">
+            <DialogContent className="sm:max-w-[850px] gap-0 p-0 overflow-hidden bg-[#0d1117] border-white/10 text-white rounded-[24px] shadow-[0_24px_80px_rgba(0,0,0,0.6)]">
+                <div className="flex h-[600px]">
                     {/* Sol Kısım: Detaylar */}
-                    <div className="w-1/2 border-r border-white/10 p-6 flex flex-col">
-                        <DialogHeader className="mb-6">
-                            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-                                <Building2 className="text-primary" size={20} />
+                    <div className="w-[55%] border-r border-white/5 p-8 flex flex-col relative overflow-hidden">
+                        {/* Gradient blur arka plan */}
+                        <div className="absolute top-0 left-0 w-full h-[300px] bg-primary/5 blur-[80px] pointer-events-none rounded-full transform -translate-y-1/2" />
+                        
+                        <DialogHeader className="mb-8 relative z-10">
+                            <DialogTitle className="text-2xl font-bold flex items-center gap-3 tracking-tight">
+                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                                    <Building2 className="text-primary" size={20} />
+                                </div>
                                 Yeni Teamspace
                             </DialogTitle>
-                            <DialogDescription className="text-white/50 text-sm">
-                                Ekibiniz için yeni bir çalışma alanı oluşturun.
+                            <DialogDescription className="text-white/50 text-[15px] mt-2">
+                                Ekibiniz için yepyeni, bağımsız bir çalışma alanı oluşturun.
                             </DialogDescription>
                         </DialogHeader>
 
-                        <div className="flex-1 space-y-4">
+                        <div className="flex-1 space-y-6 relative z-10 overflow-y-auto pr-2 custom-scrollbar">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-white/70">İkon</label>
                                 <div className="flex flex-wrap gap-2">
@@ -128,37 +133,37 @@ export function CreateTeamspaceDialog({ open, onOpenChange }: CreateTeamspaceDia
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-white/70">İsim *</label>
+                                <label className="text-[13px] font-semibold text-white/70 uppercase tracking-wider">İsim <span className="text-primary">*</span></label>
                                 <Input
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="Örn: Doktorlar, Resepsiyon..."
-                                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-primary/50"
+                                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-primary/50 h-12 text-base rounded-xl"
                                     autoFocus
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-white/70">Açıklama (opsiyonel)</label>
+                                <label className="text-[13px] font-semibold text-white/70 uppercase tracking-wider">Açıklama</label>
                                 <Textarea
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                     placeholder="Bu alanın amacı nedir?"
-                                    rows={2}
-                                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-primary/50 resize-none"
+                                    rows={3}
+                                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-primary/50 resize-none rounded-xl"
                                 />
                             </div>
                         </div>
                     </div>
 
                     {/* Sağ Kısım: Üyeler */}
-                    <div className="w-1/2 p-6 flex flex-col bg-white/[0.02]">
-                        <div className="mb-4 flex items-center justify-between">
-                            <div className="font-medium text-white/90 flex items-center gap-2">
-                                <Users size={16} className="text-primary" /> Üyeler
+                    <div className="w-[45%] p-8 flex flex-col bg-white/[0.015]">
+                        <div className="mb-6 flex items-center justify-between">
+                            <div className="text-lg font-semibold text-white flex items-center gap-2">
+                                <Users size={18} className="text-primary" /> Üyeler
                             </div>
-                            <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded-md">
-                                {selectedUsers.length} seçili
+                            <span className="text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20">
+                                {selectedUsers.length} kişi eklenecek
                             </span>
                         </div>
 
@@ -224,11 +229,16 @@ export function CreateTeamspaceDialog({ open, onOpenChange }: CreateTeamspaceDia
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-white/10 flex justify-end gap-2 bg-[#0a0d14]">
-                    <Button variant="ghost" onClick={resetAndClose} className="text-white/60 hover:text-white hover:bg-white/5">İptal</Button>
-                    <Button onClick={handleCreate} disabled={createMutation.isPending || !name.trim()} className="min-w-[120px]">
-                        {createMutation.isPending ? 'Oluşturuluyor...' : 'Oluştur'}
-                    </Button>
+                <div className="px-8 py-5 border-t border-white/5 flex justify-between items-center bg-black/20">
+                    <div className="text-xs text-white/40">
+                        {name ? 'Teamspace adınız hazır.' : 'Lütfen bir takım ismi girin.'}
+                    </div>
+                    <div className="flex gap-3">
+                        <Button variant="ghost" onClick={resetAndClose} className="text-white/60 hover:text-white hover:bg-white/5 rounded-xl h-10 px-5">İptal</Button>
+                        <Button onClick={handleCreate} disabled={createMutation.isPending || !name.trim()} className="min-w-[130px] rounded-xl h-10 font-medium">
+                            {createMutation.isPending ? 'Oluşturuluyor...' : 'Alanı Oluştur'}
+                        </Button>
+                    </div>
                 </div>
             </DialogContent>
             <style>{`

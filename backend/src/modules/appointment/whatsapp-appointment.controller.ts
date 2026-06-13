@@ -121,10 +121,21 @@ export class WhatsappAppointmentController {
         return this.appointmentService.getTomorrowAppointments(this.defaultClinicId);
     }
 
+    @Get('reminder-due')
+    @ApiOperation({ summary: 'Yarin hatirlama gonderilmesi gereken randevular (reminderStatus=PENDING)' })
+    getReminderDue() {
+        return this.appointmentService.getReminderDueAppointments(this.defaultClinicId);
+    }
+
+    @Patch(':id/reminder-sent')
+    @ApiOperation({ summary: 'Hatirlatma mesaji gonderildi olarak isaretle' })
+    markReminderSent(@Param('id') id: string) {
+        return this.appointmentService.markReminderSent(this.defaultClinicId, id);
+    }
+
     @Patch('complete-past')
-    @ApiOperation({ summary: 'Geçmiş CONFIRMED randevuları COMPLETED yap' })
+    @ApiOperation({ summary: 'Gecmis CONFIRMED randevulari COMPLETED yap' })
     whatsappCompletePast() {
         return this.appointmentService.completePastAppointments(this.defaultClinicId);
     }
 }
-

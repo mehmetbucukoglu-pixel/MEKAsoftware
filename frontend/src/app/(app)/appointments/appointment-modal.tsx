@@ -19,7 +19,7 @@ interface AppointmentModalProps {
 export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, initialEndDate, existingAppointment }: AppointmentModalProps) {
     const { clinic, user } = useAuthStore();
     const router = useRouter();
-    const isEdit = !!existingAppointment;
+    const isEdit = !!existingAppointment && !!existingAppointment.id;
 
     // Form State
     const [patientId, setPatientId] = useState('');
@@ -42,6 +42,7 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
     const [isLoadingSlots, setIsLoadingSlots] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [conflictError, setConflictError] = useState('');
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
 
     // Load initial data
     useEffect(() => {
@@ -82,21 +83,32 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
         }
 
         if (existingAppointment) {
+            // If it's a new appointment (FollowUp) and the user is a DOCTOR, force it to their own ID.
+            // Otherwise, use the existing doctorId (e.g. for edits, or for admins creating followups)
+            const isNewFollowUp = !existingAppointment.id;
+            setDoctorId(isNewFollowUp && user?.role === 'DOCTOR' ? user.id : existingAppointment.doctorId);
             setPatientId(existingAppointment.patientId);
             if (existingAppointment.patient) setSelectedPatient(existingAppointment.patient);
+            
+            if (existingAppointment.id) {
+                const apptDate = new Date(existingAppointment.startTime);
+                setDate(apptDate.toISOString().split('T')[0]);
 
-            setDoctorId(existingAppointment.doctorId);
-            const apptDate = new Date(existingAppointment.startTime);
-            setDate(apptDate.toISOString().split('T')[0]);
+                const hours = String(apptDate.getHours()).padStart(2, '0');
+                const mins = String(apptDate.getMinutes()).padStart(2, '0');
+                setStartTime(`${hours}:${mins}`);
 
-            const hours = String(apptDate.getHours()).padStart(2, '0');
-            const mins = String(apptDate.getMinutes()).padStart(2, '0');
-            setStartTime(`${hours}:${mins}`);
-
-            setDurationMin(existingAppointment.durationMin);
-            setNotes(existingAppointment.notes || '');
-            setStatus(existingAppointment.status);
-            setCancelReason(existingAppointment.cancelReason || '');
+                setDurationMin(existingAppointment.durationMin);
+                setNotes(existingAppointment.notes || '');
+                setStatus(existingAppointment.status);
+                setCancelReason(existingAppointment.cancelReason || '');
+            } else {
+                // Yeni planlanan takip randevusu için varsayılan tarih (1 hafta sonrası)
+                const targetDate = new Date();
+                targetDate.setDate(targetDate.getDate() + 7);
+                setDate(targetDate.toISOString().split('T')[0]);
+                setStartTime('');
+            }
         } else if (initialDate) {
             setDate(initialDate.toISOString().split('T')[0]);
             const hours = String(initialDate.getHours()).padStart(2, '0');
@@ -148,9 +160,14 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
         setIsLoadingSlots(true);
         try {
             const res = await appointmentApi.availableSlots(doctorId, date);
-            setAvailableSlots(res.data);
-        } catch (error) {
+            setAvailableSlots(Array.isArray(res.data) ? res.data : []);
+        } catch (error: any) {
             console.error('Slot çekme hatası', error);
+            // Sadece network/server hatalarını göster (401 değil — auth interceptor halleder)
+            if (error?.response?.status !== 401) {
+                toast.error('Saat dilimleri yüklenemedi');
+            }
+            setAvailableSlots([]);
         } finally {
             setIsLoadingSlots(false);
         }
@@ -170,6 +187,17 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
         if (!patientId || !doctorId || !date || !startTime) {
             toast.error('Lütfen zorunlu alanları doldurun');
             return;
+        }
+
+        // Geçmiş tarih engeli (sadece yeni randevularda)
+        if (!isEdit) {
+            const [h, m] = startTime.split(':').map(Number);
+            const proposed = new Date(date);
+            proposed.setHours(h, m, 0, 0);
+            if (proposed < new Date()) {
+                toast.error('Geçmiş bir tarihe randevu oluşturamazsınız.');
+                return;
+            }
         }
 
         setIsSubmitting(true);
@@ -220,7 +248,7 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
     };
 
     const handleDelete = async () => {
-        if (!existingAppointment || !window.confirm('Bu randevuyu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
+        if (!existingAppointment) return;
         setIsSubmitting(true);
         try {
             await appointmentApi.remove(existingAppointment.id);
@@ -230,6 +258,7 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
             toast.error('Silinirken hata oluştu: ' + (error.response?.data?.message || error.message));
         } finally {
             setIsSubmitting(false);
+            setConfirmingDelete(false);
         }
     };
 
@@ -253,14 +282,69 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
                     background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0'
                 }}>
                     <h2 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Calendar size={22} style={{ color: 'var(--primary)' }} />
-                        {isEdit ? 'Randevu Detayı' : 'Yeni Randevu Oluştur'}
+                        <Calendar size={22} style={{ color: isEdit && existingAppointment?.status === 'CANCELLED' ? 'var(--error)' : 'var(--primary)' }} />
+                        {isEdit && existingAppointment?.status === 'CANCELLED' ? 'İptal Edildi' : isEdit ? 'Randevu Detayı' : 'Yeni Randevu Oluştur'}
                     </h2>
                     <button onClick={onClose} className="btn-icon">
                         <X size={20} />
                     </button>
                 </div>
 
+                {/* ── İptal Randevu: Sadece Sil ── */}
+                {isEdit && existingAppointment?.status === 'CANCELLED' && (
+                    <div style={{ padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{
+                            padding: '16px 18px', background: 'rgba(239,68,68,0.08)',
+                            border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-md)',
+                            display: 'flex', flexDirection: 'column', gap: '8px'
+                        }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--error)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>İptal Edilmiş Randevu</div>
+                            <div style={{ fontSize: '1rem', fontWeight: 600 }}>
+                                {existingAppointment.patient?.firstName} {existingAppointment.patient?.lastName}
+                            </div>
+                            <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                                {new Date(existingAppointment.startTime).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                {' — '}
+                                {new Date(existingAppointment.startTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                {' - '}
+                                {new Date(existingAppointment.endTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            {existingAppointment.cancelReason && (
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(239,68,68,0.15)', paddingTop: '8px', marginTop: '4px' }}>
+                                    Neden: {existingAppointment.cancelReason}
+                                </div>
+                            )}
+                        </div>
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                            Bu slot silinmeden aynı saate yeni randevu eklenemez.
+                        </p>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            {!confirmingDelete ? (
+                                <button type="button" className="btn btn-danger"
+                                    onClick={() => setConfirmingDelete(true)} disabled={isSubmitting}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Trash2 size={16} /> Randevuyu Sil
+                                </button>
+                            ) : (
+                                <>
+                                    <span style={{ fontSize: '0.8125rem', color: 'var(--error)', fontWeight: 500 }}>Emin misiniz?</span>
+                                    <button type="button" className="btn btn-danger"
+                                        onClick={handleDelete} disabled={isSubmitting}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        {isSubmitting ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />} Evet, Sil
+                                    </button>
+                                    <button type="button" className="btn btn-secondary"
+                                        onClick={() => setConfirmingDelete(false)} disabled={isSubmitting}>Vazgeç</button>
+                                </>
+                            )}
+                            <button type="button" className="btn btn-secondary" onClick={onClose}>Kapat</button>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Normal Form (iptal değilse) ── */}
+                {!(isEdit && existingAppointment?.status === 'CANCELLED') && (
+                <>
                 <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
                     {conflictError && (
                         <div style={{
@@ -274,6 +358,7 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
                     )}
 
                     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
 
                         {/* Doktor Seçimi (Eğer kullanıcı admin vs ise) */}
                         {user?.role !== 'DOCTOR' && doctorsList.length > 0 && (
@@ -456,8 +541,14 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
                                         )}
                                     </div>
                                 ) : (
-                                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
-                                        Seçili tarihte doktorun uygun saat dilimi bulunamadı. Lütfen başka bir gün seçin veya manuel saat girin.
+                                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', padding: '10px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', lineHeight: 1.6 }}>
+                                        {(() => {
+                                            const d = date ? new Date(date) : null;
+                                            const isSat = d && d.getDay() === 6;
+                                            return isSat
+                                                ? '📅 Cumartesi için doktor programı tanımlanmamış. Aşağıdaki saat alanına istediğiniz saati manuel girerek randevu oluşturabilirsiniz.'
+                                                : 'Bu tarihte müsait saat dilimi bulunamadı. Saat alanına manuel giriş yapabilirsiniz.';
+                                        })()}
                                     </div>
                                 )}
                             </div>
@@ -501,16 +592,38 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
                     borderRadius: '0 0 var(--radius-lg) var(--radius-lg)'
                 }}>
                     <div>
-                        {isEdit && (
-                            <button 
-                                type="button" 
-                                className="btn btn-danger" 
-                                onClick={handleDelete} 
+                        {isEdit && !confirmingDelete && (
+                            <button
+                                type="button"
+                                className="btn btn-danger"
+                                onClick={() => setConfirmingDelete(true)}
                                 disabled={isSubmitting}
                                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                             >
                                 <Trash2 size={16} /> Sil
                             </button>
+                        )}
+                        {isEdit && confirmingDelete && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '0.8125rem', color: 'var(--error)', fontWeight: 500 }}>Emin misiniz?</span>
+                                <button
+                                    type="button"
+                                    className="btn btn-danger"
+                                    onClick={handleDelete}
+                                    disabled={isSubmitting}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    {isSubmitting ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />} Evet, Sil
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => setConfirmingDelete(false)}
+                                    disabled={isSubmitting}
+                                >
+                                    Vazgeç
+                                </button>
+                            </div>
                         )}
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>
@@ -526,6 +639,8 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, initialDate, init
                         </button>
                     </div>
                 </div>
+                </>
+                )}
             </div>
         </div>
     );

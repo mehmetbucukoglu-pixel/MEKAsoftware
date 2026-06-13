@@ -5,6 +5,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/a
 const api = axios.create({
     baseURL: API_BASE_URL,
     headers: { 'Content-Type': 'application/json' },
+    timeout: 15000, // 15sn — backend cevap vermezse loading takılmasın
 });
 
 // Request interceptor — JWT token ekleme
@@ -58,6 +59,7 @@ export interface Patient {
     firstName: string;
     lastName: string;
     phone: string;
+    phone2?: string;
     email?: string;
     address: string;
     dateOfBirth?: string;
@@ -65,9 +67,7 @@ export interface Patient {
     notes?: string;
     createdAt: string;
     updatedAt?: string;
-    registrationStatus?: 'FULL' | 'PRE_REGISTERED';
     appointments?: Appointment[];
-
     clinicalNotes?: any[];
     attachments?: any[];
     payments?: Payment[];
@@ -154,12 +154,12 @@ export interface DashboardData {
 }
 
 export interface ExtendedKpis {
-    weeklyNewPatients: number;
+    weeklyAppointments: number;
+    monthlyAppointments: number;
+    createdToday: number;
+    appointmentChangesToday: number;
     occupancyRate: number;
-    pendingPayment: number;
     unreadMessages: number;
-    preRegisteredCount: number;
-    pendingMessageCount: number;
 }
 
 
@@ -175,6 +175,7 @@ export interface CreatePatientInput {
     firstName: string;
     lastName: string;
     phone: string;
+    phone2?: string;
     email?: string;
     address: string;
     dateOfBirth?: string;
@@ -197,10 +198,8 @@ export const userApi = {
 
 // ========== Patient API ==========
 export const patientApi = {
-    list: (params?: { search?: string; page?: number; limit?: number; registrationStatus?: string }) =>
+    list: (params?: { search?: string; page?: number; limit?: number }) =>
         api.get<PatientListResponse>('/patients', { params }),
-    listPreRegistered: () =>
-        api.get<PatientListResponse>('/patients', { params: { registrationStatus: 'PRE_REGISTERED', limit: 50 } }),
     get: (id: string) => api.get<Patient>(`/patients/${id}`),
     create: (data: CreatePatientInput) => api.post<Patient>('/patients', data),
     update: (id: string, data: Partial<CreatePatientInput>) => api.patch<Patient>(`/patients/${id}`, data),
@@ -212,7 +211,7 @@ export const patientApi = {
 
 // ========== Appointment API ==========
 export const appointmentApi = {
-    list: (params?: any) => api.get('/appointments', { params }),
+    list: (params?: any, config?: any) => api.get('/appointments', { params, ...config }),
     get: (id: string) => api.get(`/appointments/${id}`),
     create: (data: any) => api.post('/appointments', data),
     update: (id: string, data: any) => api.patch(`/appointments/${id}`, data),
@@ -271,6 +270,9 @@ export const clinicalNoteApi = {
 export const dashboardApi = {
     get: () => api.get<DashboardData>('/dashboard'),
     getExtendedKpis: () => api.get<ExtendedKpis>('/dashboard/extended-kpis'),
+    getReminders: () => api.get('/dashboard/reminders'),
+    getActivity: () => api.get('/dashboard/activity'),
+    getEscalations: () => api.get('/dashboard/escalations'),
 };
 
 // ========== Statistics API ==========
@@ -307,5 +309,11 @@ export const statisticsApi = {
         api.get<Appointment[]>('/statistics/recent-visits', { params: { limit } }),
     getChatInsights: () =>
         api.get<ChatInsights>('/statistics/chat-insights'),
+    getEscalationStats: (period?: '14d' | '30d' | '3m') =>
+        api.get('/statistics/escalations', { params: { period } }),
+    getAutoAppointmentStats: (period?: '14d' | '30d' | '3m') =>
+        api.get('/statistics/auto-appointments', { params: { period } }),
+    getNewPatientStats: (period?: '14d' | '30d' | '3m') =>
+        api.get('/statistics/new-patients', { params: { period } }),
 };
 

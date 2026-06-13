@@ -11,7 +11,7 @@ interface PatientCanvasProps {
 
 export function PatientCanvas({ patientId, initialContent, onSave }: PatientCanvasProps) {
     return (
-        <div style={{ height: 'calc(100vh - 200px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+        <div style={{ height: 'calc(100vh - 120px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border)' }}>
             <WorkspaceEditor
                 mode="clinical"
                 initialContent={initialContent}

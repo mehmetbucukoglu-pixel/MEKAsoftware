@@ -17,6 +17,7 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
         firstName: '',
         lastName: '',
         phone: '',
+        phone2: '',
         email: '',
         address: '',
         dateOfBirth: '',
@@ -38,6 +39,7 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                 firstName: patient.firstName || '',
                 lastName: patient.lastName || '',
                 phone: patient.phone || '',
+                phone2: (patient as any).phone2 || '',
                 email: patient.email || '',
                 address: patient.address || '',
                 dateOfBirth: patient.dateOfBirth ? patient.dateOfBirth.split('T')[0] : '',
@@ -45,7 +47,7 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                 notes: patient.notes || '',
             });
         } else {
-            setForm({ firstName: '', lastName: '', phone: '', email: '', address: '', dateOfBirth: '', gender: '', notes: '' });
+            setForm({ firstName: '', lastName: '', phone: '', phone2: '', email: '', address: '', dateOfBirth: '', gender: '', notes: '' });
         }
         setErrors({});
         setSubmitError('');
@@ -104,6 +106,7 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                 phone: form.phone,
                 address: form.address,
             };
+            if (form.phone2) payload.phone2 = form.phone2;
             if (form.email) payload.email = form.email;
             if (form.dateOfBirth) payload.dateOfBirth = form.dateOfBirth;
             if (form.gender) payload.gender = form.gender;
@@ -252,16 +255,31 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                                         )}
                                     </div>
                                     <div className="form-group">
-                                        <label className="label">E-posta</label>
+                                        <label className="label">
+                                            Tel. 2
+                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '6px', fontWeight: 400 }}>
+                                                (veli / 2. kişi)
+                                            </span>
+                                        </label>
                                         <input
                                             className="input"
-                                            type="email"
-                                            value={form.email}
-                                            onChange={(e) => handleChange('email', e.target.value)}
-                                            placeholder="hasta@email.com"
+                                            value={(form as any).phone2 || ''}
+                                            onChange={(e) => handleChange('phone2' as any, e.target.value)}
+                                            placeholder="+905550002222"
                                         />
-                                        {errors.email && <div className="form-error">{errors.email}</div>}
                                     </div>
+                                </div>
+
+                                <div className="form-group" style={{ marginBottom: '12px' }}>
+                                    <label className="label">E-posta</label>
+                                    <input
+                                        className="input"
+                                        type="email"
+                                        value={form.email}
+                                        onChange={(e) => handleChange('email', e.target.value)}
+                                        placeholder="hasta@email.com"
+                                    />
+                                    {errors.email && <div className="form-error">{errors.email}</div>}
                                 </div>
 
                                 <div className="form-group" style={{ marginBottom: '12px' }}>

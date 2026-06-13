@@ -44,4 +44,9 @@ export class CreatePatientDto {
     @IsOptional()
     @IsString()
     notes?: string;
+
+    @ApiPropertyOptional({ example: '+905550002222', description: 'İkinci telefon numarası (opsiyonel, çocuk hastalarda veli)' })
+    @IsOptional()
+    @IsString()
+    phone2?: string;
 }

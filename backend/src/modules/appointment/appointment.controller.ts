@@ -57,12 +57,14 @@ export class AppointmentController {
     @ApiOperation({ summary: 'WhatsApp (n8n) üzerinden randevu oluştur' })
     async createFromWhatsApp(@Body() data: {
         clinicId: string;
-        patientName: string;
-        patientPhone: string;
+        waPhone: string;
         doctorName: string;
         startTime: string;
         durationMin: number;
         notes?: string;
+        // Legacy compat
+        patientName?: string;
+        patientPhone?: string;
     }) {
         const result = await this.appointmentService.createFromWhatsApp(data.clinicId, data);
         this.socketGateway.emitToStaff(data.clinicId, 'appointment_created', result);
@@ -94,7 +96,7 @@ export class AppointmentController {
     @Roles('ADMIN' as any, 'ASSISTANT' as any, 'DOCTOR' as any)
     @ApiOperation({ summary: 'Randevu sil' })
     remove(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string) {
-        return this.appointmentService.remove(user.clinicId, id);
+        return this.appointmentService.remove(user.clinicId, id, user.userId);
     }
 
     @Patch('appointments/:id/cancel')

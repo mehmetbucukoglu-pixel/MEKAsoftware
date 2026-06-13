@@ -63,4 +63,9 @@ export class WorkspaceController {
     addTeamspaceMembers(@CurrentUser() user: any, @Param('id') id: string, @Body() addMembersDto: AddTeamspaceMembersDto) {
         return this.workspaceService.addTeamspaceMembers(user.clinicId, id, addMembersDto);
     }
+
+    @Delete('teamspaces/:id')
+    deleteTeamspace(@CurrentUser() user: any, @Param('id') id: string) {
+        return this.workspaceService.deleteTeamspace(user.clinicId, id);
+    }
 }

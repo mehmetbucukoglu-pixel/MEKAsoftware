@@ -43,6 +43,11 @@ export default function StatisticsPage() {
     const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter'>('month');
     const [chatInsights, setChatInsights] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [botPeriod, setBotPeriod] = useState<'14d' | '30d' | '3m'>('30d');
+    const [escalationStats, setEscalationStats] = useState<any>(null);
+    const [autoAptStats, setAutoAptStats] = useState<any>(null);
+    const [newPatientStats, setNewPatientStats] = useState<any>(null);
+    const [botPeriodLoading, setBotPeriodLoading] = useState(false);
 
 
     const getDateParams = () => {
@@ -88,9 +93,31 @@ export default function StatisticsPage() {
         }
     };
 
+    const fetchBotPeriodData = async (period: '14d' | '30d' | '3m') => {
+        setBotPeriodLoading(true);
+        try {
+            const [escRes, autoRes, newPRes] = await Promise.all([
+                statisticsApi.getEscalationStats(period),
+                statisticsApi.getAutoAppointmentStats(period),
+                statisticsApi.getNewPatientStats(period),
+            ]);
+            setEscalationStats(escRes.data);
+            setAutoAptStats(autoRes.data);
+            setNewPatientStats(newPRes.data);
+        } catch (err) {
+            console.error('Failed to fetch bot period stats', err);
+        } finally {
+            setBotPeriodLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchData();
     }, [dateRange, selectedDoctor]);
+
+    useEffect(() => {
+        fetchBotPeriodData(botPeriod);
+    }, [botPeriod]);
 
     const formatDuration = (minutes: number) => {
         if (minutes < 60) return `${minutes} dk`;
@@ -646,7 +673,123 @@ export default function StatisticsPage() {
                     </div>
                 </div>
             )}
+
+            {/* Period Stats Section */}
+            <div style={{ marginTop: 40 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                    <div>
+                        <h3 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <TrendingUp size={20} style={{ color: 'var(--primary)' }} />
+                            Dönem Bazlı Özet
+                        </h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', marginTop: '4px', margin: 0 }}>
+                            WhatsApp otomasyonu, eskalasyon ve yeni hasta istatistikleri
+                        </p>
+                    </div>
+                    {/* Period Selector */}
+                    <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', height: '36px' }}>
+                        {(['14d', '30d', '3m'] as const).map((p, i) => (
+                            <button
+                                key={p}
+                                onClick={() => setBotPeriod(p)}
+                                style={{
+                                    padding: '0 14px',
+                                    border: 'none',
+                                    borderLeft: i > 0 ? '1px solid var(--border)' : 'none',
+                                    background: botPeriod === p ? 'var(--primary-muted)' : 'var(--bg-elevated)',
+                                    color: botPeriod === p ? 'var(--primary)' : 'var(--text-secondary)',
+                                    fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer',
+                                    transition: 'all 0.15s',
+                                }}
+                            >
+                                {p === '14d' ? '14 Gün' : p === '30d' ? '30 Gün' : '3 Ay'}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, opacity: botPeriodLoading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+                    {/* Auto Appointments */}
+                    <div style={{ padding: 20, borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(37,211,102,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <MessageSquare size={18} style={{ color: '#25d366' }} />
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>WA ile Oluşturulan Randevu</div>
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {autoAptStats?.total ?? '—'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>son {botPeriod}</div>
+                        {autoAptStats?.dailyChart?.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 32, marginTop: 12 }}>
+                                {autoAptStats.dailyChart.slice(-14).map((d: any, i: number) => {
+                                    const max = Math.max(...autoAptStats.dailyChart.map((x: any) => x.count), 1);
+                                    return (
+                                        <div key={i} style={{
+                                            flex: 1, background: 'rgba(37,211,102,0.4)',
+                                            height: `${Math.max((d.count / max) * 100, 4)}%`,
+                                            borderRadius: 2,
+                                        }} />
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Escalations */}
+                    <div style={{ padding: 20, borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <AlertTriangle size={18} style={{ color: '#ef4444' }} />
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>İnsana Devredilen Konuşma</div>
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {escalationStats?.total ?? '—'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>son {botPeriod}</div>
+                        {escalationStats?.reasons?.length > 0 && (
+                            <div style={{ marginTop: 12 }}>
+                                {escalationStats.reasons.slice(0, 3).map((r: any, i: number) => (
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{r.reason}</span>
+                                        <span style={{ fontWeight: 600, marginLeft: 8 }}>{r.count}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* New Patients */}
+                    <div style={{ padding: 20, borderRadius: 'var(--radius-lg)', background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Users size={18} style={{ color: '#10b981' }} />
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>Yeni Hasta Kaydı</div>
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {newPatientStats?.total ?? '—'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>son {botPeriod}</div>
+                        {newPatientStats?.dailyChart?.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 32, marginTop: 12 }}>
+                                {newPatientStats.dailyChart.slice(-14).map((d: any, i: number) => {
+                                    const max = Math.max(...newPatientStats.dailyChart.map((x: any) => x.count), 1);
+                                    return (
+                                        <div key={i} style={{
+                                            flex: 1, background: 'rgba(16,185,129,0.4)',
+                                            height: `${Math.max((d.count / max) * 100, 4)}%`,
+                                            borderRadius: 2,
+                                        }} />
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
-

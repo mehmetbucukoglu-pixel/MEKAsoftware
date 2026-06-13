@@ -14,6 +14,7 @@ import { AppointmentModal } from './appointment-modal';
 import { DoctorDayGrid } from './doctor-day-grid';
 import { PageHeader } from '@/lib/page-header';
 import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
+import { getSocket } from '@/lib/socket';
 
 /* ── Durum Renkleri (Gruplanmış) ── */
 const STATUS_COLOR_MAP: Record<string, string> = {
@@ -28,13 +29,15 @@ export default function AppointmentsPage() {
     const { clinic, user } = useAuthStore();
     const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
     const [events, setEvents] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const calendarRef = useRef<FullCalendar>(null);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [pickerValue, setPickerValue] = useState('');
 
     const [doctors, setDoctors] = useState<any[]>([]);
     const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
@@ -83,6 +86,7 @@ export default function AppointmentsPage() {
     }, [user?.id]);
 
     /* Randevu çekme — tarih aralığı ile */
+    const lastFetchRangeRef = useRef<string>('');
     const fetchAppointments = async (start: Date, end: Date) => {
         setIsLoading(true);
         try {
@@ -97,10 +101,10 @@ export default function AppointmentsPage() {
 
             const formattedEvents = eventsData.map((apt: Appointment) => {
                 let displayStatus = apt.status;
-                // Gelmedi veya İptal edilmediyse, saati biten randevuyu otomatik yeşil (COMPLETED) göster
                 if (new Date(apt.endTime) < new Date() && displayStatus !== 'NO_SHOW' && displayStatus !== 'CANCELLED') {
                     displayStatus = 'COMPLETED';
                 }
+                const isCancelled = apt.status === 'CANCELLED' || apt.status === 'NO_SHOW';
                 const color = STATUS_COLOR_MAP[displayStatus] || STATUS_COLOR_MAP.CONFIRMED;
                 return {
                     id: apt.id,
@@ -109,10 +113,11 @@ export default function AppointmentsPage() {
                     end: apt.endTime,
                     docId: apt.doctorId,
                     resourceId: apt.doctorId,
-                    backgroundColor: color,
-                    borderColor: 'transparent',
+                    backgroundColor: isCancelled ? '#ef4444' : color,
+                    borderColor: isCancelled ? '#dc2626' : 'transparent',
                     textColor: '#fff',
-                    extendedProps: { ...apt }
+                    editable: !isCancelled,
+                    extendedProps: { ...apt, isCancelled }
                 };
             });
 
@@ -125,7 +130,14 @@ export default function AppointmentsPage() {
         }
     };
 
-    // FullCalendar handles date changes via datesSet event
+    /* datesSet: aynı tarih aralığı için tekrar istek atma */
+    const handleDatesSet = (arg: any) => {
+        const key = `${arg.start.toISOString()}|${arg.end.toISOString()}`;
+        if (key === lastFetchRangeRef.current) return;
+        lastFetchRangeRef.current = key;
+        fetchAppointments(arg.start, arg.end);
+    };
+
 
     const handleDateSelect = (selectInfo: any) => {
         setSelectedDate(selectInfo.start);
@@ -197,13 +209,30 @@ export default function AppointmentsPage() {
         ? allAppointments
         : allAppointments.filter(a => a.doctorId === selectedDoctorId);
 
-    /* Ortak refresh fonksiyonu */
+    /* Ortak refresh fonksiyonu — dedup key sıfırlanarak her zaman istek atar */
     const handleRefresh = () => {
         if (calendarRef.current) {
             const api = calendarRef.current.getApi();
+            lastFetchRangeRef.current = '';
             fetchAppointments(api.view.activeStart, api.view.activeEnd);
         }
     };
+
+    /* Socket: WA bot değişikliklerinde anında güncelle — sadece auth hazırsa */
+    useEffect(() => {
+        if (!clinic?.id || !user?.id) return;
+        const socket = getSocket(clinic.id, user.id, user.role ?? '');
+        const refresh = () => handleRefresh();
+        socket.on('appointment:created', refresh);
+        socket.on('appointment:updated', refresh);
+        socket.on('appointment:cancelled', refresh);
+        return () => {
+            socket.off('appointment:created', refresh);
+            socket.off('appointment:updated', refresh);
+            socket.off('appointment:cancelled', refresh);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [clinic?.id, user?.id]);
 
     /* Grid'de randevu kartına tıklayınca */
     const handleGridEventClick = (apt: Appointment) => {
@@ -289,6 +318,52 @@ export default function AppointmentsPage() {
 
 
             <div className="card" style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+                {/* Jump-to-date floating picker */}
+                {showDatePicker && (
+                    <div
+                        style={{
+                            position: 'absolute', top: '54px', right: '16px', zIndex: 50,
+                            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius-md)', padding: '14px',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                            display: 'flex', flexDirection: 'column', gap: '10px',
+                        }}
+                    >
+                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Tarihe Git</div>
+                        <input
+                            type="date"
+                            autoFocus
+                            value={pickerValue}
+                            onChange={(e) => {
+                                setPickerValue(e.target.value);
+                                if (e.target.value && calendarRef.current) {
+                                    calendarRef.current.getApi().gotoDate(e.target.value);
+                                    setShowDatePicker(false);
+                                    setPickerValue('');
+                                }
+                            }}
+                            style={{
+                                background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                                borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)',
+                                padding: '6px 10px', fontSize: '0.875rem', colorScheme: 'dark',
+                                cursor: 'pointer',
+                            }}
+                        />
+                        <button
+                            onClick={() => setShowDatePicker(false)}
+                            style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'right' }}
+                        >
+                            Kapat
+                        </button>
+                    </div>
+                )}
+                {/* Click-away overlay */}
+                {showDatePicker && (
+                    <div
+                        style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+                        onClick={() => setShowDatePicker(false)}
+                    />
+                )}
                 {isLoading && (
                     <div style={{
                         position: 'absolute', inset: 0, zIndex: 10,
@@ -304,12 +379,19 @@ export default function AppointmentsPage() {
                         key={viewMode} // Force remount on view mode change
                         ref={calendarRef}
                         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, resourceTimeGridPlugin]}
+                        customButtons={{
+                            jumpToDate: {
+                                text: '📅',
+                                hint: 'Tarihe git',
+                                click: () => setShowDatePicker(prev => !prev),
+                            }
+                        }}
                         headerToolbar={{
                             left: 'prev,next today',
                             center: 'title',
                             right: viewMode === 'corporate'
-                                ? 'resourceTimeGridDay'
-                                : 'dayGridMonth,timeGridWeek,timeGridDay'
+                                ? 'jumpToDate resourceTimeGridDay'
+                                : 'jumpToDate dayGridMonth,timeGridWeek,timeGridDay'
                         }}
                         initialView={viewMode === 'corporate' ? "resourceTimeGridDay" : "timeGridWeek"}
                         locale={trLocale}
@@ -331,8 +413,10 @@ export default function AppointmentsPage() {
                         allDaySlot={false}
                         selectable={true}
                         selectMirror={true}
+                        selectAllow={(selectInfo) => selectInfo.start >= new Date()}
                         dayMaxEvents={true}
-                        weekends={false}
+                        weekends={true}
+                        hiddenDays={[0]}
                         editable={true}
                         eventDurationEditable={true}
                         select={handleDateSelect}
@@ -340,32 +424,53 @@ export default function AppointmentsPage() {
                         eventDrop={handleEventDrop}
                         eventResize={handleEventResize}
                         height="100%"
-                        datesSet={(arg) => fetchAppointments(arg.start, arg.end)}
+                        datesSet={handleDatesSet}
                         slotLabelFormat={{
                             hour: '2-digit',
                             minute: '2-digit',
                             hour12: false
                         }}
                         eventContent={(arg) => {
-                            const apt = arg.event.extendedProps as Appointment;
+                            const apt = arg.event.extendedProps as Appointment & { isCancelled?: boolean };
+                            const isCancelled = apt.status === 'CANCELLED' || apt.status === 'NO_SHOW';
                             const isPast = new Date(apt.startTime) < new Date();
+                            const statusLabel =
+                                apt.status === 'CONFIRMED' ? 'Teyit Bekleniyor' :
+                                apt.status === 'ARRIVED'   ? 'Geldi' :
+                                apt.status === 'COMPLETED' ? 'Tamamland\u0131' :
+                                apt.status === 'NO_SHOW'   ? 'Gelmedi' :
+                                apt.status === 'CANCELLED' ? '\u0130ptal Edildi' : apt.status;
                             return (
                                 <div style={{
                                     padding: '2px 6px', overflow: 'hidden',
                                     fontSize: '0.75rem', lineHeight: 1.4,
-                                    opacity: isPast ? 0.7 : 1, // Changed from 0.4 to 0.7 so it's not too faded since color logic handles it
+                                    opacity: isCancelled ? 0.8 : (isPast ? 0.75 : 1),
                                 }}>
-                                    <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {apt.patient?.firstName} {apt.patient?.lastName}
+                                    <div style={{
+                                        fontWeight: 600, whiteSpace: 'nowrap',
+                                        overflow: 'hidden', textOverflow: 'ellipsis',
+                                        textDecoration: isCancelled ? 'line-through' : 'none',
+                                    }}>
+                                        {isCancelled && '\u2715 '}{apt.patient?.firstName} {apt.patient?.lastName}
                                     </div>
-                                    {apt.doctor && (
-                                        <div style={{ fontSize: '0.6875rem', opacity: 0.85 }}>
-                                            Dr. {apt.doctor.firstName} {apt.doctor.lastName}
-                                        </div>
-                                    )}
+                                    <div style={{ fontSize: '0.6rem', opacity: 0.9, marginTop: '1px' }}>
+                                        {statusLabel}
+                                    </div>
                                 </div>
                             );
                         }}
+                        moreLinkContent={(args) => (
+                            <span style={{
+                                fontSize: '0.72rem', fontWeight: 600,
+                                color: 'var(--primary)',
+                                background: 'var(--primary-muted)',
+                                padding: '2px 8px',
+                                borderRadius: '999px',
+                                display: 'inline-block',
+                            }}>
+                                {args.num} Randevu
+                            </span>
+                        )}
                     />
                 </div>
             </div>

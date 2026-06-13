@@ -194,16 +194,10 @@ export class MessagingService {
                     let targetPatientId = existingPatient?.id;
 
                     if (!targetPatientId) {
-                        const newPatient = await this.prisma.patient.create({
-                            data: {
-                                clinicId,
-                                firstName,
-                                lastName,
-                                phone: cleanPhone,
-                                registrationStatus: 'PRE_REGISTERED'
-                            }
-                        });
-                        targetPatientId = newPatient.id;
+                        // Kayıtsız numara: hasta bulunamadı, otomatik oluşturma yapılmıyor.
+                        // Eskalasyon zaten n8n tarafından tetiklenecek.
+                        console.warn('[Messaging] Unknown number — no matching patient found. Skipping auto-create.');
+                        return;
                     }
 
                     // Create Phone Link if not exists
@@ -317,21 +311,53 @@ export class MessagingService {
         let patientName: string | null = null;
         let patientPatterns: any = null;
         let sentiment: 'HAPPY' | 'NEUTRAL' | 'ANGRY' = 'NEUTRAL';
+        let resolvedPatientId: string | null = conv?.patientId || null;
+
+        // --- phone2 / direct lookup (if conv has no patient yet) ---
+        if (!resolvedPatientId) {
+            // A. PhonePatientLink
+            const link = await this.prisma.phonePatientLink.findUnique({
+                where: { clinicId_waPhone: { clinicId, waPhone: cleanPhone } },
+            });
+            if (link) {
+                resolvedPatientId = link.patientId;
+            }
+        }
+        if (!resolvedPatientId) {
+            // B. Patient.phone or Patient.phone2
+            const byPhone = await this.prisma.patient.findFirst({
+                where: { clinicId, OR: [{ phone: cleanPhone }, { phone2: cleanPhone }], isActive: true },
+            });
+            if (byPhone) {
+                resolvedPatientId = byPhone.id;
+                // Auto-create PhonePatientLink for next time
+                await this.prisma.phonePatientLink.upsert({
+                    where: { clinicId_waPhone: { clinicId, waPhone: cleanPhone } },
+                    create: { clinicId, waPhone: cleanPhone, patientId: resolvedPatientId },
+                    update: {},
+                });
+            }
+        }
+
+        const isRegistered = !!resolvedPatientId;
 
         if (conv) {
             if (conv.patient) {
                 patientName = `${conv.patient.firstName} ${conv.patient.lastName}`;
+            } else if (resolvedPatientId) {
+                const p = await this.prisma.patient.findUnique({ where: { id: resolvedPatientId } });
+                if (p) patientName = `${p.firstName} ${p.lastName}`;
             }
 
             // Fetch patient patterns
-            if (conv.patientId) {
-                patientPatterns = await this.appointmentService.getPatientPatterns(clinicId, conv.patientId);
+            if (resolvedPatientId) {
+                patientPatterns = await this.appointmentService.getPatientPatterns(clinicId, resolvedPatientId);
             }
 
             // Find patient's most recent appointment to determine their doctor
-            if (conv.patientId) {
+            if (resolvedPatientId) {
                 const lastAppointment = await this.prisma.appointment.findFirst({
-                    where: { patientId: conv.patientId, clinicId },
+                    where: { patientId: resolvedPatientId, clinicId },
                     orderBy: { startTime: 'desc' },
                     include: { doctor: { select: { id: true, firstName: true, lastName: true } } },
                 });
@@ -389,7 +415,20 @@ export class MessagingService {
             name: `${link.patient.firstName} ${link.patient.lastName}`
         }));
 
-        return { mode, doctorName, doctorId, combinedText, patientName, patientPatterns, sentiment, linkedPatients };
+        const isNewConversation = !conv;
+
+        return {
+            mode,
+            isRegistered,
+            isNewConversation,
+            doctorName,
+            doctorId,
+            combinedText,
+            patientName,
+            patientPatterns,
+            sentiment,
+            linkedPatients,
+        };
     }
 
     /** Get the latest inbound message ID for debounce — n8n checks this after waiting */

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { format, startOfMonth, endOfMonth, isValid } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isValid, subDays, subMonths } from 'date-fns';
+
+type Period = '14d' | '30d' | '3m';
 
 interface DateFilter {
     startDate?: string;
@@ -226,7 +228,106 @@ export class StatisticsService {
         };
     }
 
+    async getEscalationStats(clinicId: string, period: Period = '30d') {
+        const { start, end } = this.periodToRange(period);
+
+        const conversations = await this.prisma.conversation.findMany({
+            where: {
+                clinicId,
+                status: 'HUMAN',
+                humanModeAt: { gte: start, lte: end },
+            },
+            select: { escalationReason: true, humanModeAt: true },
+        });
+
+        // Daily chart
+        const dailyMap = new Map<string, number>();
+        conversations.forEach(c => {
+            if (c.humanModeAt) {
+                const d = format(c.humanModeAt, 'yyyy-MM-dd');
+                dailyMap.set(d, (dailyMap.get(d) || 0) + 1);
+            }
+        });
+
+        // Reason breakdown
+        const reasonMap = new Map<string, number>();
+        conversations.forEach(c => {
+            const r = c.escalationReason || 'Belirtilmedi';
+            reasonMap.set(r, (reasonMap.get(r) || 0) + 1);
+        });
+
+        return {
+            total: conversations.length,
+            period,
+            dailyChart: Array.from(dailyMap.entries())
+                .map(([date, count]) => ({ date, count }))
+                .sort((a, b) => a.date.localeCompare(b.date)),
+            reasons: Array.from(reasonMap.entries())
+                .map(([reason, count]) => ({ reason, count }))
+                .sort((a, b) => b.count - a.count),
+        };
+    }
+
+    async getAutoAppointmentStats(clinicId: string, period: Period = '30d') {
+        const { start, end } = this.periodToRange(period);
+
+        const appointments = await this.prisma.appointment.findMany({
+            where: {
+                clinicId,
+                source: 'WHATSAPP',
+                createdAt: { gte: start, lte: end },
+            },
+            select: { createdAt: true, status: true },
+        });
+
+        const dailyMap = new Map<string, number>();
+        appointments.forEach(a => {
+            const d = format(a.createdAt, 'yyyy-MM-dd');
+            dailyMap.set(d, (dailyMap.get(d) || 0) + 1);
+        });
+
+        return {
+            total: appointments.length,
+            period,
+            dailyChart: Array.from(dailyMap.entries())
+                .map(([date, count]) => ({ date, count }))
+                .sort((a, b) => a.date.localeCompare(b.date)),
+        };
+    }
+
+    async getNewPatientStats(clinicId: string, period: Period = '30d') {
+        const { start, end } = this.periodToRange(period);
+
+        const patients = await this.prisma.patient.findMany({
+            where: { clinicId, isActive: true, createdAt: { gte: start, lte: end } },
+            select: { createdAt: true },
+        });
+
+        const dailyMap = new Map<string, number>();
+        patients.forEach(p => {
+            const d = format(p.createdAt, 'yyyy-MM-dd');
+            dailyMap.set(d, (dailyMap.get(d) || 0) + 1);
+        });
+
+        return {
+            total: patients.length,
+            period,
+            dailyChart: Array.from(dailyMap.entries())
+                .map(([date, count]) => ({ date, count }))
+                .sort((a, b) => a.date.localeCompare(b.date)),
+        };
+    }
+
     // --- Helpers ---
+
+    private periodToRange(period: Period): { start: Date; end: Date } {
+        const end = new Date();
+        let start: Date;
+        if (period === '14d') start = subDays(end, 14);
+        else if (period === '3m') start = subMonths(end, 3);
+        else start = subDays(end, 30); // default 30d
+        return { start, end };
+    }
 
     private parseDateRange(filters: DateFilter) {
         if (filters.startDate && filters.endDate) {
@@ -236,7 +337,6 @@ export class StatisticsService {
                 return { start: startDate, end: endDate };
             }
         }
-        // Default: current month
         const now = new Date();
         return { start: startOfMonth(now), end: endOfMonth(now) };
     }

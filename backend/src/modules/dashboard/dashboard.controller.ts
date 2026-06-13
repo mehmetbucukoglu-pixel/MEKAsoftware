@@ -23,4 +23,23 @@ export class DashboardController {
     async getExtendedKpis(@CurrentUser() user: CurrentUserPayload) {
         return this.dashboardService.getExtendedKpis(user.clinicId);
     }
+
+    @Get('reminders')
+    @ApiOperation({ summary: 'Bugünkü randevuların teyit durumlarını getir' })
+    async getTodayReminderStatus(@CurrentUser() user: CurrentUserPayload) {
+        return this.dashboardService.getTodayReminderStatus(user.clinicId);
+    }
+
+    @Get('activity')
+    @ApiOperation({ summary: 'Bugünkü randevu hareketlerini getir (oluşturma, güncelleme, iptal)' })
+    async getTodayAppointmentActivity(@CurrentUser() user: CurrentUserPayload) {
+        return this.dashboardService.getTodayAppointmentActivity(user.clinicId);
+    }
+
+    @Get('escalations')
+    @ApiOperation({ summary: 'Bekleyen eskalasyonları (HUMAN mode konuşmalar) getir' })
+    async getPendingEscalations(@CurrentUser() user: CurrentUserPayload) {
+        return this.dashboardService.getPendingEscalations(user.clinicId);
+    }
 }
+

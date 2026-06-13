@@ -178,11 +178,29 @@ export class AppointmentService {
         });
     }
 
-    async remove(clinicId: string, appointmentId: string) {
-        await this.findOne(clinicId, appointmentId);
-        return this.prisma.appointment.delete({
+    async remove(clinicId: string, appointmentId: string, userId?: string) {
+        const apt = await this.findOne(clinicId, appointmentId);
+        const deleted = await this.prisma.appointment.delete({
             where: { id: appointmentId },
         });
+        // Silme işlemini AuditLog'a kaydet (dashboard aktivite widget'i okur)
+        await this.prisma.auditLog.create({
+            data: {
+                clinicId,
+                userId: userId ?? null,
+                action: 'DELETE',
+                entityType: 'APPOINTMENT',
+                entityId: appointmentId,
+                oldValues: {
+                    patientName: `${apt.patient?.firstName ?? ''} ${apt.patient?.lastName ?? ''}`.trim(),
+                    patientPhone: apt.patient?.phone ?? null,
+                    doctorName: `${apt.doctor?.firstName ?? ''} ${apt.doctor?.lastName ?? ''}`.trim(),
+                    startTime: apt.startTime,
+                    source: apt.source ?? 'MANUAL',
+                },
+            },
+        });
+        return deleted;
     }
 
     async getAvailableSlots(clinicId: string, doctorId: string, date: string) {
@@ -191,10 +209,17 @@ export class AppointmentService {
         dayEnd.setDate(dayEnd.getDate() + 1);
         const dayOfWeek = dayStart.getDay() === 0 ? 6 : dayStart.getDay() - 1; // 0=Monday
 
-        // Get doctor schedule for this day
-        const schedule = await this.prisma.doctorSchedule.findFirst({
+        // Get doctor schedule for this day; if not configured (e.g. Saturday), fall back to nearest weekday schedule
+        let schedule = await this.prisma.doctorSchedule.findFirst({
             where: { clinicId, doctorId, dayOfWeek, isActive: true },
         });
+        if (!schedule) {
+            // Fallback: use any other active schedule from the same doctor (prefer Monday=0)
+            schedule = await this.prisma.doctorSchedule.findFirst({
+                where: { clinicId, doctorId, isActive: true },
+                orderBy: { dayOfWeek: 'asc' },
+            });
+        }
         if (!schedule) return [];
 
         // Get existing appointments
@@ -215,9 +240,11 @@ export class AppointmentService {
         current.setHours(startH, startM, 0, 0);
 
         const dayEndTime = new Date(dayStart);
-        dayEndTime.setHours(endH, endM, 0, 0);
+        const finalEndH = Math.min(endH, 19);
+        const finalEndM = finalEndH === 19 ? 0 : endM;
+        dayEndTime.setHours(finalEndH, finalEndM, 0, 0);
 
-        const slotDuration = schedule.slotDuration > 0 ? schedule.slotDuration : 60;
+        const slotDuration = 60; // 1 saatlik aralıklar
 
         let iterations = 0;
         while (current < dayEndTime) {
@@ -276,83 +303,54 @@ export class AppointmentService {
     }
 
     async createFromWhatsApp(clinicId: string, data: {
-        patientName: string;
-        patientPhone: string;
+        waPhone: string;
         doctorName: string;
         startTime: any;
         durationMin: number;
         notes?: string;
+        // Legacy fields (ignored if waPhone lookup succeeds)
+        patientName?: string;
+        patientPhone?: string;
     }) {
-        console.log('--- WHATSAPP APPT CREATION STARTED (v3) ---');
+        console.log('--- WHATSAPP APPT CREATION STARTED (v4 - registered only) ---');
 
-        // 1. Normalize phone
-        const normalizedPhone = data.patientPhone.replace(/\D/g, '');
+        // 1. Normalize phone — use waPhone first, fall back to patientPhone
+        const rawPhone = data.waPhone || data.patientPhone || '';
+        const normalizedPhone = rawPhone.replace(/\D/g, '');
         const phone = normalizedPhone.startsWith('+') ? normalizedPhone : `+${normalizedPhone}`;
 
-        // 2. Patient Recognition Logic
+        // 2. Patient lookup — ONLY registered patients can book
         let patientId: string | null = null;
-        let isNewPatient = false;
 
         // A. Check PhonePatientLink
         const link = await this.prisma.phonePatientLink.findUnique({
             where: { clinicId_waPhone: { clinicId, waPhone: phone } },
-            include: { patient: true }
         });
-
         if (link) {
             patientId = link.patientId;
             console.log('Found patient via PhonePatientLink:', patientId);
-        } else {
-            // B. Search by name (Fuzzy ILIKE-ish)
-            const nameParts = data.patientName.trim().split(' ');
-            const firstName = nameParts[0];
-            const lastName = nameParts.slice(1).join(' ') || '-';
+        }
 
-            const existingPatient = await this.prisma.patient.findFirst({
-                where: {
-                    clinicId,
-                    firstName: { equals: firstName, mode: 'insensitive' },
-                    lastName: { equals: lastName, mode: 'insensitive' }
-                }
+        // B. Check Patient.phone or Patient.phone2 directly
+        if (!patientId) {
+            const patient = await this.prisma.patient.findFirst({
+                where: { clinicId, OR: [{ phone }, { phone2: phone }], isActive: true },
             });
-
-            if (existingPatient) {
-                patientId = existingPatient.id;
-                console.log('Found patient via Name Search:', patientId);
-                // Create link for future
-                await this.prisma.phonePatientLink.create({
-                    data: { clinicId, waPhone: phone, patientId }
-                });
-            } else {
-                // C. Create PRE_REGISTERED patient
-                const newPatient = await this.prisma.patient.create({
-                    data: {
-                        clinicId,
-                        firstName,
-                        lastName,
-                        phone,
-                        registrationStatus: 'PRE_REGISTERED'
-                    }
-                });
-                patientId = newPatient.id;
-                isNewPatient = true;
-                console.log('Created NEW PRE_REGISTERED patient:', patientId);
-                // Create link
-                await this.prisma.phonePatientLink.create({
-                    data: { clinicId, waPhone: phone, patientId }
+            if (patient) {
+                patientId = patient.id;
+                console.log('Found patient via direct phone lookup:', patientId);
+                // Auto-create link for future
+                await this.prisma.phonePatientLink.upsert({
+                    where: { clinicId_waPhone: { clinicId, waPhone: phone } },
+                    create: { clinicId, waPhone: phone, patientId },
+                    update: {},
                 });
             }
         }
 
-        // Link patient to the active conversation immediately so UI updates
-        // If it's a new patient, flag the conversation as 'Yeni Ön-Kayıt' so the doctor gets notified
-        await this.prisma.conversation.updateMany({
-            where: { clinicId, waPhone: phone, patientId: null },
-            data: { 
-                patientId,
-                ...(isNewPatient ? { escalationReason: 'Yeni Ön-Kayıt', unreadCount: { increment: 1 } } : {})
-            }
-        });
+        if (!patientId) {
+            throw new BadRequestException('Bu telefon numarasına kayıtlı hasta bulunamadı. Sadece kayıtlı hastalar randevu alabilir.');
+        }
 
         // 3. Find Doctor
         const normalizedDoctorInput = data.doctorName.replace(/^Dr\.?\s*/i, '').trim().toLowerCase();
@@ -361,7 +359,6 @@ export class AppointmentService {
             const fullName = `${d.firstName} ${d.lastName}`.toLowerCase();
             return fullName.includes(normalizedDoctorInput) || normalizedDoctorInput.includes(fullName);
         });
-
         if (!doctor) throw new BadRequestException(`Doktor bulunamadı: "${data.doctorName}"`);
 
         // 4. Create Appointment
@@ -377,34 +374,33 @@ export class AppointmentService {
         // 5. Notifications
         const patient = await this.prisma.patient.findUnique({ where: { id: patientId! } });
         const patientName = `${patient?.firstName} ${patient?.lastName}`;
-        const dateStr = new Date(data.startTime).toLocaleString('tr-TR', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' });
+        const dateStr = new Date(data.startTime).toLocaleString('tr-TR', {
+            day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul'
+        });
+        const apptMsg = `📅 ${patientName} — ${dateStr} (WhatsApp)`;
 
-        const apptMsg = `📅 ${isNewPatient ? '🆕 YENİ HASTA: ' : ''}${patientName} — ${dateStr}${isNewPatient ? ' (Lütfen TC Kimlik eksiklerini tamamlayın)' : ''}`;
-
-        // Notify Doctor
         await this.notificationService.create(clinicId, doctor.id, {
             type: 'NEW_APPOINTMENT',
-            title: isNewPatient ? 'Yeni Randevu ve Ön-Kayıt (WhatsApp)' : 'Yeni Randevu (WhatsApp)',
+            title: 'Yeni Randevu (WhatsApp)',
             body: apptMsg,
             entityType: 'APPOINTMENT',
             entityId: appointment.id
         });
         this.socketGateway.emitToUser(doctor.id, 'notification', { message: apptMsg });
+        this.socketGateway.emitToClinic(clinicId, 'appointment:created', { appointmentId: appointment.id });
 
-        // Notify All Assistants
         const assistants = await this.prisma.user.findMany({ where: { clinicId, role: 'ASSISTANT' } });
         for (const assistant of assistants) {
             await this.notificationService.create(clinicId, assistant.id, {
                 type: 'NEW_APPOINTMENT',
-                title: isNewPatient ? 'Yeni Randevu ve Ön-Kayıt (WhatsApp)' : 'Yeni Randevu (WhatsApp)',
+                title: 'Yeni Randevu (WhatsApp)',
                 body: apptMsg,
                 entityType: 'APPOINTMENT',
                 entityId: appointment.id
             });
-            this.socketGateway.emitToUser(assistant.id, 'notification', { message: apptMsg });
         }
 
-        return { ...appointment, isNewPatient };
+        return appointment;
     }
 
 
@@ -488,17 +484,19 @@ export class AppointmentService {
         const appointment = await this.findOne(clinicId, appointmentId);
         if (appointment.status === 'CANCELLED') throw new BadRequestException('İptal edilmiş randevu güncellenemez');
 
-        return this.update(clinicId, appointmentId, {
+        const result = await this.update(clinicId, appointmentId, {
             startTime: data.startTime ? new Date(data.startTime) : undefined,
             durationMin: data.durationMin ? Number(data.durationMin) : undefined,
         });
+        this.socketGateway.emitToClinic(clinicId, 'appointment:updated', { appointmentId });
+        return result;
     }
 
     async cancelFromWhatsApp(clinicId: string, appointmentId: string) {
         const appointment = await this.findOne(clinicId, appointmentId);
         if (appointment.status === 'CANCELLED') throw new BadRequestException('Bu randevu zaten iptal edilmiş');
 
-        return this.prisma.appointment.update({
+        const cancelled = await this.prisma.appointment.update({
             where: { id: appointmentId },
             data: { status: 'CANCELLED', cancelReason: 'WhatsApp üzerinden iptal', reminderStatus: 'CANCELLED' },
             include: {
@@ -506,6 +504,8 @@ export class AppointmentService {
                 doctor: { select: { id: true, firstName: true, lastName: true } },
             },
         });
+        this.socketGateway.emitToClinic(clinicId, 'appointment:cancelled', { appointmentId });
+        return cancelled;
     }
 
     async confirmReminderFromWhatsApp(clinicId: string, appointmentId: string) {
@@ -623,12 +623,58 @@ export class AppointmentService {
                 clinicId,
                 doctorId,
                 id: excludeId ? { not: excludeId } : undefined,
-                status: 'CONFIRMED',
+                status: { in: ['CONFIRMED', 'CANCELLED'] }, // CANCELLED slotlar da bloke kalır
                 OR: [
                     { startTime: { lt: endTime }, endTime: { gt: startTime } },
                 ],
             },
         });
         return !!conflict;
+    }
+
+    /** n8n CRON: Yarin hatirlatmasi gonderilmesi gereken randevular (PENDING) */
+    async getReminderDueAppointments(clinicId: string) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(tomorrow);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        const appointments = await this.prisma.appointment.findMany({
+            where: {
+                clinicId,
+                status: 'CONFIRMED',
+                reminderStatus: 'PENDING',
+                startTime: { gte: tomorrow, lt: dayEnd },
+            },
+            include: {
+                patient: {
+                    select: { id: true, firstName: true, lastName: true, phone: true },
+                },
+                doctor: { select: { firstName: true, lastName: true } },
+            },
+            orderBy: { startTime: 'asc' },
+        });
+
+        return appointments.map(apt => ({
+            appointmentId: apt.id,
+            patientName: `${apt.patient.firstName} ${apt.patient.lastName}`,
+            patientPhone: apt.patient.phone,
+            doctorName: `Dr. ${apt.doctor.firstName} ${apt.doctor.lastName}`,
+            startTime: apt.startTime,
+            timeFormatted: new Date(apt.startTime).toLocaleTimeString('tr-TR', {
+                hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul',
+            }),
+        }));
+    }
+
+    /** n8n CRON: Hatirlatma gonderildi, reminderStatus = SENT olarak guncelle */
+    async markReminderSent(clinicId: string, appointmentId: string) {
+        await this.findOne(clinicId, appointmentId); // throws if not found
+        return this.prisma.appointment.update({
+            where: { id: appointmentId },
+            data: { reminderStatus: 'SENT' },
+            select: { id: true, reminderStatus: true },
+        });
     }
 }

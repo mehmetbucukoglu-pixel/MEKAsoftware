@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/lib/auth-store';
-import { Calendar, Users, TrendingUp, Clock, Loader2, DollarSign, Settings2, X, UserX, Timer, LayoutDashboard, UserPlus, PieChart, MessageSquare, ExternalLink } from 'lucide-react';
-import { getRecentPatients, RecentPatient } from '@/lib/recent-patients';
+import { Calendar, Users, TrendingUp, Clock, Loader2, DollarSign, Settings2, X, UserX, Timer, LayoutDashboard, UserPlus, PieChart, MessageSquare, ExternalLink, CheckCircle2, AlertCircle, Activity, Phone } from 'lucide-react';
 import { dashboardApi, DashboardData, ExtendedKpis, Appointment, statisticsApi } from '@/lib/api';
 import { PageHeader } from '@/lib/page-header';
 import { getSocket } from '@/lib/socket';
@@ -106,8 +105,11 @@ export default function DashboardPage() {
     const [data, setData] = useState<DashboardData | null>(null);
     const [extraStats, setExtraStats] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [recent, setRecent] = useState<RecentPatient[]>([]);
+
     const [editingKpis, setEditingKpis] = useState(false);
+    const [reminders, setReminders] = useState<any[]>([]);
+    const [activity, setActivity] = useState<any[]>([]);
+    const [escalations, setEscalations] = useState<any[]>([]);
 
     const [selectedKpis, setSelectedKpis] = useState<string[]>(DEFAULT_SELECTED);
     const [mounted, setMounted] = useState(false);
@@ -134,9 +136,7 @@ export default function DashboardPage() {
         if (next.length > 0 && next.length <= 4) saveKpiSelection(next);
     };
 
-    useEffect(() => {
-        setRecent(getRecentPatients());
-    }, []);
+
 
     const fetchDashboardData = useCallback(async () => {
         if (!clinic) return;
@@ -147,20 +147,26 @@ export default function DashboardPage() {
             ]);
             setData(dashRes.data);
 
-            // Fetch statistics + extended KPIs
+            // Secondary fetches — non-blocking
             try {
-                const [statsRes, extKpisRes] = await Promise.all([
+                const [statsRes, extKpisRes, remindersRes, activityRes, escalationsRes] = await Promise.all([
                     statisticsApi.getOverview({}),
                     dashboardApi.getExtendedKpis(),
+                    dashboardApi.getReminders(),
+                    dashboardApi.getActivity(),
+                    dashboardApi.getEscalations(),
                 ]);
                 setExtraStats({
                     noShowRate: statsRes.data.noShowRate,
                     avgDuration: statsRes.data.avgSessionMinutes,
                     extKpis: extKpisRes.data,
                 });
+                setReminders(remindersRes.data || []);
+                setActivity(activityRes.data || []);
+                setEscalations(escalationsRes.data || []);
             } catch { }
         } catch (error) {
-            console.error("Dashboard verileri çekilemedi:", error);
+            console.error('Dashboard verileri çekilemedi:', error);
         } finally {
             setIsLoading(false);
         }
@@ -310,8 +316,8 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Content Grid — only Today's Appointments + Recent Patients */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
+            {/* Content Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
 
                 {/* Accountant Specific View */}
                 {isAccountant && (
@@ -338,161 +344,191 @@ export default function DashboardPage() {
                     </div>
                 )}
 
-                {/* Upcoming Appointments (Hidden for Accountant) */}
+
+
+                {/* Bugünkü Teyit Durumu */}
                 {!isAccountant && (
-                    <div className="card">
+                    <div className="card" style={{ minHeight: '420px', display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                             <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Clock size={18} style={{ color: 'var(--primary)' }} />
-                                Bugünkü Randevular
+                                <CheckCircle2 size={18} style={{ color: '#10b981' }} />
+                                Bugünkü Teyit Durumu
                             </h3>
-                            <a href="/appointments" style={{ fontSize: '0.8125rem', color: 'var(--primary)', textDecoration: 'none' }}>
-                                Tümünü Gör →
-                            </a>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {reminders.length} randevu
+                            </span>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            {data?.dailySchedule?.length === 0 ? (
-                                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                                    Bugün için randevu bulunmuyor.
-                                </div>
-                            ) : (
-                                data?.dailySchedule?.map((apt) => {
-                                    const timeStr = new Date(apt.startTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-
-                                    let displayStatus = apt.status;
-                                    if (new Date(apt.endTime) < new Date() && displayStatus !== 'NO_SHOW' && displayStatus !== 'CANCELLED') {
-                                        displayStatus = 'COMPLETED';
-                                    }
-
-                                    let statusText = 'Bekliyor';
-                                    let statusClass = 'badge-info';
-
-                                    if (displayStatus === 'COMPLETED') { statusText = 'Tamamlandı'; statusClass = 'badge-success'; }
-                                    if (displayStatus === 'ARRIVED') { statusText = 'Geldi'; statusClass = 'badge-success'; }
-                                    if (displayStatus === 'CANCELLED') { statusText = 'İptal'; statusClass = 'badge-error'; }
-                                    if (displayStatus === 'NO_SHOW') { statusText = 'Gelmedi'; statusClass = 'badge-error'; }
-
+                        {reminders.length === 0 ? (
+                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                                Bugün randevu yok.
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
+                                {reminders.map((r: any) => {
+                                    const rs = r.reminderStatus;
+                                    const badge =
+                                        rs === 'CONFIRMED' ? { text: 'Onaylandı', cls: 'badge-success' } :
+                                        rs === 'SENT' ? { text: 'Gönderildi', cls: 'badge-info' } :
+                                        rs === 'CANCELLED' ? { text: 'İptal', cls: 'badge-error' } :
+                                        { text: 'Bekliyor', cls: 'badge-warning' };
                                     return (
-                                        <div key={apt.id} style={{
-                                            display: 'flex', alignItems: 'center', gap: '12px',
-                                            padding: '10px 12px', borderRadius: 'var(--radius-md)',
-                                            transition: 'background var(--transition-fast)',
-                                            cursor: 'pointer',
-                                        }}
-                                            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                                        >
-                                            <div style={{
-                                                fontSize: '0.8125rem', fontWeight: 600, color: 'var(--primary)',
-                                                width: '48px', flexShrink: 0,
-                                            }}>
-                                                {timeStr}
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontSize: '0.875rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <a href={`/patients/${apt.patientId}`} style={{ color: 'inherit', textDecoration: 'none' }}
-                                                        onMouseEnter={(e) => { e.currentTarget.style.textDecoration = 'underline'; }}
-                                                        onMouseLeave={(e) => { e.currentTarget.style.textDecoration = 'none'; }}
-                                                    >
-                                                        {apt.patient?.firstName} {apt.patient?.lastName}
-                                                    </a>
-                                                    {apt.patient?.registrationStatus === 'PRE_REGISTERED' && (
-                                                        <span style={{
-                                                            fontSize: '0.65rem',
-                                                            background: 'var(--warning-muted)',
-                                                            color: 'var(--warning)',
-                                                            padding: '1px 5px',
-                                                            borderRadius: '4px',
-                                                            fontWeight: 600
-                                                        }}>
-                                                            Ön Kayıt
-                                                        </span>
-                                                    )}
-                                                    {apt.patient?.conversations && (apt.patient.conversations[0] as any)?.unreadCount > 0 && (
-                                                        <span style={{
-                                                            fontSize: '0.65rem',
-                                                            background: 'rgba(34, 197, 94, 0.15)',
-                                                            color: '#16a34a',
-                                                            padding: '1px 5px',
-                                                            borderRadius: '4px',
-                                                            fontWeight: 600,
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '3px'
-                                                        }}>
-                                                            <div style={{ width: '5px', height: '5px', background: '#16a34a', borderRadius: '50%' }} />
-                                                            {apt.patient.conversations[0]?.unreadCount} Yeni Mesaj
-                                                        </span>
-                                                    )}
+                                        <div key={r.appointmentId} style={{
+                                            display: 'flex', alignItems: 'center', gap: '10px',
+                                            padding: '8px 10px', borderRadius: 'var(--radius-md)',
+                                        }}>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary)', width: '42px', flexShrink: 0 }}>
+                                                {new Date(r.startTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: '0.8125rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {r.patientName}
                                                 </div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                    Dr. {apt.doctor?.firstName} {apt.doctor?.lastName}
-                                                </div>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Dr. {r.doctorName}</div>
                                             </div>
-
-                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                                {apt.patient?.phone && (
-                                                    <a href={`/messages?phone=${apt.patient.phone}`} title="Mesajları Aç"
-                                                        style={{ color: 'var(--text-muted)', padding: '4px', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
-                                                        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; }}
-                                                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-                                                    >
-                                                        <MessageSquare size={14} />
-                                                    </a>
-                                                )}
-                                                <span className={`badge ${statusClass}`}>{statusText}</span>
-                                            </div>
+                                            <span className={`badge ${badge.cls}`} style={{ fontSize: '0.65rem', flexShrink: 0 }}>
+                                                {badge.text}
+                                            </span>
                                         </div>
                                     );
-                                })
-                            )}
-                        </div>
+                                })}
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {/* Son Görüntülenen Hastalar (Hidden for Accountant) */}
+                {/* Bugünkü Hareketler */}
                 {!isAccountant && (
-                    <div className="card">
-                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                            <Users size={18} style={{ color: 'var(--success)' }} />
-                            Son Görüntülenenler
-                        </h3>
-                        {recent.length === 0 ? (
-                            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                                Henüz görüntülenen hasta yok.
+                    <div className="card" style={{ minHeight: '420px', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Activity size={18} style={{ color: '#8b5cf6' }} />
+                                Bugünkü Hareketler
+                            </h3>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {activity.length} işlem
+                            </span>
+                        </div>
+                        {activity.length === 0 ? (
+                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                                Bugün hareket yok.
                             </div>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                {recent.map((r, i) => (
-                                    <a
-                                        key={i}
-                                        href={`/patients/${r.id}`}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: '12px',
-                                            padding: '10px 12px', borderRadius: 'var(--radius-md)',
-                                            transition: 'background var(--transition-fast)',
-                                            textDecoration: 'none', color: 'inherit'
-                                        }}
-                                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                                    >
-                                        <div style={{
-                                            width: '32px', height: '32px', borderRadius: '50%',
-                                            background: 'var(--success-muted)', color: 'var(--success)',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            fontSize: '0.75rem', fontWeight: 600
-                                        }}>
-                                            {r.name.substring(0, 2).toUpperCase()}
-                                        </div>
-                                        <div style={{ flex: 1, fontSize: '0.875rem', fontWeight: 500 }}>
-                                            {r.name}
-                                        </div>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                            {new Date(r.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
-                                    </a>
-                                ))}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
+                                {activity.map((a: any, i: number) => {
+                                    const actionStyle =
+                                        a.action === 'CREATED'   ? { color: '#10b981', bg: 'rgba(16,185,129,0.1)',  label: '+ Yeni' } :
+                                        a.action === 'CANCELLED' ? { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: '✕ İptal' } :
+                                        a.action === 'DELETED'   ? { color: '#6b7280', bg: 'rgba(107,114,128,0.1)', label: '🗑 Silindi' } :
+                                        { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', label: '↻ Güncellendi' };
+                                    const isWA = a.source === 'WHATSAPP';
+                                    const canLink = isWA && a.patientPhone;
+                                    const Wrapper = canLink ? 'a' : 'div';
+                                    const wrapperProps = canLink
+                                        ? { href: `/messages?phone=${a.patientPhone}`, style: { textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', borderRadius: 'var(--radius-md)', cursor: 'pointer' } as React.CSSProperties }
+                                        : { style: { display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', borderRadius: 'var(--radius-md)' } as React.CSSProperties };
+                                    return (
+                                        <Wrapper key={i} {...wrapperProps}
+                                            onMouseEnter={(e: any) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                            onMouseLeave={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
+                                        >
+                                            <span style={{
+                                                fontSize: '0.65rem', fontWeight: 700, padding: '2px 7px',
+                                                borderRadius: '999px', background: actionStyle.bg, color: actionStyle.color,
+                                                flexShrink: 0, marginTop: '2px',
+                                            }}>
+                                                {actionStyle.label}
+                                            </span>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: '0.8125rem', fontWeight: 500 }}>{a.patientName}</div>
+                                                {a.startTime && (
+                                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                                        {a.action === 'UPDATED'
+                                                            ? `Yeni tarih: ${new Date(a.startTime).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} ${new Date(a.startTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`
+                                                            : `${new Date(a.startTime).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} ${new Date(a.startTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`
+                                                        }
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', flexShrink: 0 }}>
+                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                                    {new Date(a.time).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                                {/* Source badge — Bot veya Manuel */}
+                                                <span style={{
+                                                    fontSize: '0.65rem',
+                                                    color: isWA ? '#25d366' : '#94a3b8',
+                                                    background: isWA ? 'rgba(37,211,102,0.1)' : 'rgba(148,163,184,0.1)',
+                                                    padding: '1px 6px', borderRadius: '4px', fontWeight: 700
+                                                }}>
+                                                    {isWA ? 'Bot' : 'Manuel'}
+                                                </span>
+                                            </div>
+                                        </Wrapper>
+                                    );
+                                })}
                             </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Bekleyen Mesajlar — full width */}
+                {!isAccountant && (
+                    <div className="card" style={{ borderLeft: '3px solid var(--error)', minHeight: '340px', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--error)' }}>
+                                <AlertCircle size={18} />
+                                Bekleyen Mesajlar
+                                <span style={{
+                                    background: 'var(--error)', color: '#fff',
+                                    fontSize: '0.65rem', fontWeight: 700,
+                                    padding: '1px 6px', borderRadius: '999px',
+                                }}>
+                                    {escalations.length}
+                                </span>
+                            </h3>
+                            <a href="/messages" style={{ fontSize: '0.8125rem', color: escalations.length > 0 ? 'var(--error)' : 'var(--primary)', textDecoration: 'none' }}>
+                                Mesajlara Git →
+                            </a>
+                        </div>
+                        {escalations.length === 0 ? (
+                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                                ✅ Bekleyen mesaj yok.
+                            </div>
+                        ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, overflowY: 'auto' }}>
+                            {escalations.slice(0, 8).map((esc: any) => (
+                                <a
+                                    key={esc.conversationId}
+                                    href={`/messages?phone=${esc.waPhone}`}
+                                    style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: 'var(--radius-md)', textDecoration: 'none', color: 'inherit', border: '1px solid var(--border)' }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                                >
+                                    <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--error-muted)', color: 'var(--error)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, flexShrink: 0 }}>
+                                        {esc.patientName?.substring(0, 2)?.toUpperCase() || '?'}
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: '0.8125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {esc.patientName}
+                                            {esc.escalationReason && (
+                                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                                                    — {esc.escalationReason}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {esc.lastMessageHint && (
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {esc.lastMessageHint}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, color: 'var(--text-muted)' }}>
+                                        <Phone size={12} />
+                                        <span style={{ fontSize: '0.7rem' }}>Görüşme</span>
+                                    </div>
+                                </a>
+                            ))}
+                        </div>
                         )}
                     </div>
                 )}
@@ -500,3 +536,4 @@ export default function DashboardPage() {
         </div>
     );
 }
+

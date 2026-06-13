@@ -19,7 +19,7 @@ import {
     ListTodo, Table as TableIcon, StickyNote, Loader2, Palette,
     Bold, Italic, Underline, Strikethrough, Highlighter,
     AlignLeft, AlignCenter, AlignRight, User, Pill, Paperclip, Link2,
-    Trash2, Plus, X, Command, Type
+    Trash2, Plus, X, Command, Type, GripHorizontal
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -101,6 +101,12 @@ const FloatingToolbar = memo(function FloatingToolbar() {
             background: 'rgba(20,24,30,0.95)', border: '1px solid rgba(255,255,255,0.12)',
             boxShadow: '0 8px 32px rgba(0,0,0,0.5)', backdropFilter: 'blur(20px)',
         }}>
+            <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                <button onMouseDown={() => cmd('formatBlock', 'H1')} style={{ padding: '4px 6px', borderRadius: '8px', background: 'transparent', border: 'none', color: '#e6edf3', cursor: 'pointer', display: 'flex', fontWeight: 800, fontSize: '13px' }} title="Büyük Başlık (H1)">H1</button>
+                <button onMouseDown={() => cmd('formatBlock', 'H2')} style={{ padding: '4px 6px', borderRadius: '8px', background: 'transparent', border: 'none', color: '#e6edf3', cursor: 'pointer', display: 'flex', fontWeight: 700, fontSize: '12px' }} title="Orta Başlık (H2)">H2</button>
+                <button onMouseDown={() => cmd('formatBlock', 'P')} style={{ padding: '4px 6px', borderRadius: '8px', background: 'transparent', border: 'none', color: '#e6edf3', cursor: 'pointer', display: 'flex', fontWeight: 500, fontSize: '12px' }} title="Normal Yazı">P</button>
+            </div>
+            <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.15)', margin: '0 2px' }} />
             {[
                 { icon: Bold, c: 'bold' }, { icon: Italic, c: 'italic' },
                 { icon: Underline, c: 'underline' }, { icon: Strikethrough, c: 'strikeThrough' },
@@ -220,6 +226,7 @@ const CanvasBlockItem = memo(function CanvasBlockItem({
 }) {
     const [dragging, setDragging] = useState(false);
     const [resizing, setResizing] = useState(false);
+    const [resizingRight, setResizingRight] = useState(false);
     const [focused, setFocused] = useState(false);
     const [hovered, setHovered] = useState(false);
     const dragStart = useRef<{ mx: number; my: number; bx: number; by: number } | null>(null);
@@ -305,6 +312,29 @@ const CanvasBlockItem = memo(function CanvasBlockItem({
         return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
     }, [resizing]);
 
+    // Right-only Resize
+    const onResizeRightMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault(); e.stopPropagation();
+        const b = blockRef.current;
+        resizeStart.current = { mx: e.clientX, my: e.clientY, bw: b.size.w, bh: b.size.h };
+        setResizingRight(true);
+    }, []);
+
+    useEffect(() => {
+        if (!resizingRight) return;
+        const onMove = (e: MouseEvent) => {
+            if (!resizeStart.current) return;
+            const dx = e.clientX - resizeStart.current.mx;
+            onChangeRef.current(blockRef.current.id, {
+                size: { w: Math.max(180, resizeStart.current.bw + dx), h: resizeStart.current.bh },
+            });
+        };
+        const onUp = () => setResizingRight(false);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    }, [resizingRight]);
+
     const handleTextInput = useCallback(() => {
         if (!contentRef.current) return;
         onChangeRef.current(blockRef.current.id, { html: contentRef.current.innerHTML });
@@ -375,6 +405,7 @@ const CanvasBlockItem = memo(function CanvasBlockItem({
             style={{
                 position: 'absolute', left: block.pos.x, top: block.pos.y,
                 width: block.size.w, minHeight: block.size.h,
+                height: block.widget?.type === 'title' ? block.size.h : undefined,
                 zIndex: focused || dragging ? 100 : 1,
                 userSelect: dragging ? 'none' : 'text',
                 cursor: dragging ? 'grabbing' : 'auto',
@@ -402,11 +433,27 @@ const CanvasBlockItem = memo(function CanvasBlockItem({
                 transition: 'border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease',
                 transform: dragging ? 'scale(1.02)' : 'scale(1)',
                 overflow: 'visible', position: 'relative', minHeight: block.size.h,
+                height: block.widget?.type === 'title' ? block.size.h : undefined,
             }}>
+                {/* Drag Handle */}
+                <div style={{
+                    position: 'absolute', top: '-14px', left: '16px',
+                    display: focused || dragging ? 'flex' : 'none',
+                    alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(20,24,30,0.95)', borderRadius: '10px',
+                    border: '1px solid rgba(255,255,255,0.1)', padding: '2px 8px', zIndex: 10,
+                    cursor: 'grab', color: 'rgba(255,255,255,0.5)',
+                    animation: 'fadeIn 0.2s ease-out', boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                }}
+                onMouseDown={onMouseDown}
+                >
+                    <GripHorizontal size={14} />
+                </div>
+
                 {/* Top toolbar */}
                 <div style={{
                     position: 'absolute', top: '-14px', right: '16px',
-                    display: focused || dragging || hovered ? 'flex' : 'none',
+                    display: focused || dragging ? 'flex' : 'none',
                     alignItems: 'center', gap: '4px',
                     background: 'rgba(20,24,30,0.95)', borderRadius: '10px',
                     border: '1px solid rgba(255,255,255,0.1)', padding: '4px', zIndex: 10,
@@ -426,7 +473,7 @@ const CanvasBlockItem = memo(function CanvasBlockItem({
                 </div>
 
                 {/* Connection Nodes */}
-                {(hovered || focused || dragging) && (
+                {(hovered || focused || dragging) && block.widget?.type !== 'title' && (
                     <>
                         <div className="connection-node top" onMouseDown={(e) => { e.stopPropagation(); onConnectStart(block.id); }} onMouseUp={() => onConnectEnd(block.id)} />
                         <div className="connection-node right" onMouseDown={(e) => { e.stopPropagation(); onConnectStart(block.id); }} onMouseUp={() => onConnectEnd(block.id)} />
@@ -441,13 +488,22 @@ const CanvasBlockItem = memo(function CanvasBlockItem({
                 <div onMouseDown={onResizeMouseDown} style={{
                     position: 'absolute', right: '4px', bottom: '4px',
                     width: '20px', height: '20px', cursor: 'se-resize',
-                    opacity: focused || dragging || hovered ? 0.6 : 0, transition: 'opacity 0.2s',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    opacity: focused || dragging ? 0.6 : 0, transition: 'opacity 0.2s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20
                 }}>
                     <svg width="12" height="12" viewBox="0 0 20 20">
                         <path d="M20 0L20 20L0 20Z" fill="currentColor" opacity="0.4" />
                     </svg>
                 </div>
+
+                {/* Right Resize handle */}
+                <div onMouseDown={onResizeRightMouseDown} style={{
+                    position: 'absolute', right: '-4px', top: '50%', transform: 'translateY(-50%)',
+                    width: '12px', height: '24px', cursor: 'e-resize',
+                    background: 'rgba(255,255,255,0.4)', borderRadius: '4px',
+                    opacity: focused || dragging ? 1 : 0, transition: 'opacity 0.2s',
+                    boxShadow: '0 0 4px rgba(0,0,0,0.5)', zIndex: 20
+                }} />
             </div>
             
             <style>{`
@@ -491,7 +547,6 @@ function CanvasContextMenu({
         { type: 'widget' as CanvasBlockType, wType: 'title' as WidgetType, label: 'Sayfa Başlığı', desc: 'Büyük başlık', icon: Type, color: '#e6edf3' },
         { type: 'text' as CanvasBlockType, label: 'Metin', desc: 'Serbest yazım', icon: StickyNote, color: '#79c0ff' },
         { type: 'widget' as CanvasBlockType, wType: 'task' as WidgetType, label: 'Görev', desc: 'Tamamlanabilir liste', icon: ListTodo, color: '#ffa657' },
-        { type: 'widget' as CanvasBlockType, wType: 'table' as WidgetType, label: 'Tablo', desc: 'Veri matrisi', icon: TableIcon, color: '#e3b341' },
         { type: 'widget' as CanvasBlockType, wType: 'prescription' as WidgetType, label: 'Reçete', desc: 'İlaç dozu', icon: Pill, color: '#7ee787' },
         { type: 'widget' as CanvasBlockType, wType: 'file' as WidgetType, label: 'Dosya', desc: 'Görsel/Belge', icon: Paperclip, color: '#ff79c6' },
         { type: 'widget' as CanvasBlockType, wType: 'link' as WidgetType, label: 'Bağlantı', desc: 'Web URL', icon: Link2, color: '#d2a8ff' },
@@ -551,13 +606,20 @@ export function WorkspaceEditor({ document: doc, onDelete, isSidebarClosed, mode
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [slashMenu, setSlashMenu] = useState<{ x: number, y: number, blockId: string } | null>(null);
     
-    const handleWheel = useCallback((e: React.WheelEvent) => {
-        if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            setScale(s => Math.min(Math.max(0.3, s - e.deltaY * 0.005), 2));
-        } else {
-            setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
-        }
+    const containerRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const onWheel = (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                setScale(s => Math.min(Math.max(0.3, s - e.deltaY * 0.005), 2));
+            } else {
+                setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
+            }
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
     }, []);
     
     const titleRef = useRef<HTMLDivElement>(null);
@@ -598,9 +660,9 @@ export function WorkspaceEditor({ document: doc, onDelete, isSidebarClosed, mode
     const debouncedSave = useCallback(
         debounce((b: CanvasBlock[]) => {
             if (mode === 'workspace' && doc) {
-                // Find first title widget to use as doc title
                 const titleBlock = b.find(block => block.widget?.type === 'title');
-                const docTitle = titleBlock?.widget?.content?.text || 'Başlıksız';
+                const docTitleHtml = titleBlock?.widget?.content?.text || 'Başlıksız';
+                const docTitle = docTitleHtml.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim() || 'Başlıksız';
                 updateMutation.mutate({ title: docTitle, content: JSON.stringify(b) });
             } else if (mode === 'clinical' && onSaveClinical) {
                 setIsSaving(true);
@@ -802,14 +864,26 @@ export function WorkspaceEditor({ document: doc, onDelete, isSidebarClosed, mode
             <FloatingToolbar />
 
             <div 
+                ref={containerRef}
                 className="flex-1 flex flex-col h-full overflow-hidden" 
-                style={{ backgroundColor: '#0a0d14' }}
-                onWheel={handleWheel}
+                style={{ 
+                    backgroundColor: '#0a0d14',
+                    backgroundImage: `
+                        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+                    `,
+                    backgroundSize: `${40 * scale}px ${40 * scale}px`,
+                    backgroundPosition: `${pan.x}px ${pan.y}px`
+                }}
             >
                 {/* Zoom Controls */}
-                <div style={{ position: 'absolute', bottom: 20, right: 20, zIndex: 100, display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(20,24,30,0.9)', padding: '6px 12px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>{(scale * 100).toFixed(0)}%</span>
-                    <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)' }}>Ctrl+Scroll: Zoom | Scroll: Kaydır</span>
+                <div style={{ position: 'absolute', bottom: 20, right: 20, zIndex: 100, display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(20,24,30,0.9)', padding: '6px 12px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                    <button onClick={() => { setScale(1); setPan({x:0, y:0}); }} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', transition: 'all 0.2s' }} title="Varsayılana Dön" onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; }}>
+                        <Command size={12} /> 
+                    </button>
+                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>{(scale * 100).toFixed(0)}%</span>
+                    <div style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.2)' }} />
+                    <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)' }}>Ctrl+Scroll: Zoom | Scroll: Kaydır</span>
                 </div>
 
                 {isSaving && (
@@ -830,11 +904,6 @@ export function WorkspaceEditor({ document: doc, onDelete, isSidebarClosed, mode
                         transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
                         transformOrigin: '0 0',
                         willChange: 'transform',
-                        backgroundImage: `
-                            linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-                            linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
-                        `,
-                        backgroundSize: '40px 40px',
                     }}
                 >
                     {blocks.length === 0 && (
@@ -845,7 +914,7 @@ export function WorkspaceEditor({ document: doc, onDelete, isSidebarClosed, mode
                             <Command size={48} style={{ marginBottom: '16px', opacity: 0.3, margin: '0 auto' }} />
                             <div style={{ fontSize: '1.1rem', fontWeight: 500, color: 'rgba(255,255,255,0.4)' }}>Boş Alan</div>
                             <div style={{ fontSize: '0.85rem', marginTop: '8px', opacity: 0.6, maxWidth: '250px' }}>
-                                Çift tıkla, sağ tıkla veya blokları birbirine bağla.
+                                Sağ tıkla, menüyü aç veya sürükleyip bırakarak yeni bloklar ekle.
                             </div>
                         </div>
                     )}

@@ -245,18 +245,6 @@ export default function PatientsPage() {
                                                 </div>
                                                 <span style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                     <Highlight text={`${p.firstName} ${p.lastName}`} query={search} />
-                                                    {p.registrationStatus === 'PRE_REGISTERED' && (
-                                                        <span style={{
-                                                            fontSize: '0.6rem',
-                                                            background: 'var(--warning-muted)',
-                                                            color: 'var(--warning)',
-                                                            padding: '1px 5px',
-                                                            borderRadius: '4px',
-                                                            fontWeight: 600
-                                                        }}>
-                                                            Ön Kayıt
-                                                        </span>
-                                                    )}
                                                     {p.conversations && (p.conversations[0]?.unreadCount ?? 0) > 0 && (
                                                         <span style={{
                                                             fontSize: '0.6rem',
@@ -363,3 +351,4 @@ export default function PatientsPage() {
         </div>
     );
 }
+

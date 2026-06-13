@@ -1,0 +1,1427 @@
+{
+  "name": "KlinikApp WhatsApp Bot v17 - Registered Only + Reminder CRON",
+  "nodes": [
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Data Normalization').first().json.wa_id }}\n",
+        "contextWindowLength": 30
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        48496,
+        18896
+      ],
+      "id": "33674d5b-4867-4ecf-9ba1-5934cd6af391",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "240eff3c-c037-498b-a975-49adc1dad8ca",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        48336,
+        18896
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "oJlIIXyMZDoHwhPW",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Check Conversation Status').first().json.combinedText || $json.mesaj_icerigi }}\n",
+        "options": {
+          "systemMessage": "=# 🎭 Rol & Kimlik\nSen Feneryolu Psikiyatri kliniğinin resmi dijital asistanısın. Samimi, profesyonel, anlayışlı ve çözüm odaklı olmalısın.\n\n# ⚡ ANA İŞ AKIŞI (2 YOL)\n\n## YOL 1: RANDEVU İŞLEMLERİ (Smooth Flow)\nRandevu alma, sorgulama, güncelleme ve iptal işlemleri bu yola girer.\n- **Kurallar:** \n  1. Gereksiz doğrulama yapma (İsim/Doktor biliniyorsa teyit sorma).\n  2. `musaitlik_kontrol` aracından gelen `suggestedSlots` (maks 3 adet) listesini kullan.\n  3. `patientPatterns` verisindeki favori saati/doktoru proaktif olarak teklif et.\n\n## YOL 2: KLİNİK İLETİŞİM (Eskalasyon)\nRandevu dışındaki her şey (fiyat, reçete, insan talebi vb.) ve Duygu Durumu 'ANGRY' olan hastalar bu yola girer.\n- **Kurallar:**\n  1. Onay/Özet istemeden HEMEN `eskalasyon` aracını çağır.\n  2. Müşteriye sadece iletildiğine dair kısa teyit ver.\n\n# 📊 Akıllı Bağlam (Context)\n- Bugün: {{ $now.setZone('Europe/Istanbul').setLocale('tr').toFormat('dd MMMM yyyy cccc HH:mm') }}\n- DİKKAT: ŞU ANKİ YIL 2026'DIR!\n- Müşteri Adı: {{ $('Check Conversation Status').first().json.patientName || 'Bilinmiyor' }}\n- Kayıt Durumu: {{ $('Check Conversation Status').first().json.isRegistered ? '✅ Kayıtlı Hasta' : '❌ Kayıtsız' }}\n- Duygu Durumu: {{ $('Check Conversation Status').first().json.sentiment }} (DİKKAT: Eğer 'ANGRY' ise direkt YOL 2 kurallarını uygula!)\n- Kayıtlı Doktor: {{ $('Check Conversation Status').first().json.doctorName || 'Bilinmiyor' }}\n- Tercihler: {{ JSON.stringify($('Check Conversation Status').first().json.patientPatterns) }}\n- Klinik Doktorları: 1. Dr. Ayşe Pınar Vural, 2. Dr. Ece Yılmaz\n\n# 📅 Takvim Referansı\nBugün: {{ $now.setZone('Europe/Istanbul').toFormat('yyyy-MM-dd') }} ({{ $now.setZone('Europe/Istanbul').setLocale('tr').toFormat('cccc') }})\nYarın: {{ $now.setZone('Europe/Istanbul').plus({days:1}).toFormat('yyyy-MM-dd') }}\n+2 Gün: {{ $now.setZone('Europe/Istanbul').plus({days:2}).toFormat('yyyy-MM-dd') }}\n\n# 🛡️ OPERASYONEL KURALLAR\n- **Randevu Kısıtı**: Sadece kayıtlı hastalar randevu alabilir. `isRegistered` false ise randevu aracını KULLANMA, sadece eskalasyon yap.\n- **Doktor İsim Karışıklığı**: \"Ayşe\", \"Ece\" isimleri DOKTORUN ismidir. Hastaya bu isimlerle hitap etme!\n- **Çoklu Mesaj**: Arka arkaya gelen mesajları bütün olarak değerlendir.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        49120,
+        18672
+      ],
+      "id": "e84d8c0d-7778-4658-b9f1-c569a29d3b73",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-mesaj-icerigi-isolation",
+              "name": "mesaj_icerigi",
+              "value": "={{ $('Data Normalization').first().json.mesaj_icerigi }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        48528,
+        18672
+      ],
+      "id": "f8197ec4-3833-4d6c-ad2d-03a6f7f3dc01",
+      "name": "Isolate AI Input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-is-message",
+              "leftValue": "={{ $json.body.entry[0].changes[0].value.messages ? 'true' : 'false' }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        47328,
+        18720
+      ],
+      "id": "9114ff23-27f4-432f-94aa-0b4cb01e87e9",
+      "name": "Filter Messages Only"
+    },
+    {
+      "parameters": {
+        "path": "whatsapp/webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        48560,
+        19168
+      ],
+      "id": "e4cc7efe-0669-466f-82a0-0ad7f3029a7f",
+      "name": "Webhook (GET Handshake)",
+      "webhookId": "a8dfca07-4d84-4bb0-bafc-e03b1faef447"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp/webhook",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        47200,
+        18720
+      ],
+      "id": "d8d556f3-303f-45b7-b052-61adb9ef3149",
+      "name": "Webhook (POST Messages)",
+      "webhookId": "50da6cb0-f18a-4d4d-ba5b-7a64a5847061"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-mode",
+              "leftValue": "={{ $json.query['hub.mode'] }}",
+              "rightValue": "subscribe",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        48784,
+        19168
+      ],
+      "id": "da895da6-eb93-4366-97bd-40df5c9ee79a",
+      "name": "Check Handshake"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        49040,
+        19168
+      ],
+      "id": "d10a1fdf-5266-4520-8c17-c92aca80064d",
+      "name": "Respond Challenge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-mesaj-icerigi",
+              "name": "mesaj_icerigi",
+              "value": "={{ $json.body.entry[0].changes[0].value.messages[0].text.body }}",
+              "type": "string"
+            },
+            {
+              "id": "set-gonderen-no",
+              "name": "gonderen_no",
+              "value": "={{ $json.body.entry[0].changes[0].value.messages[0].from }}",
+              "type": "string"
+            },
+            {
+              "id": "set-wa-id",
+              "name": "wa_id",
+              "value": "={{ $json.body.entry[0].changes[0].value.contacts[0].wa_id }}",
+              "type": "string"
+            },
+            {
+              "id": "46e351fd-91db-4fdb-bbc5-e5a409720f24",
+              "name": "=wa_message_id",
+              "value": "={{ $json.body.entry[0].changes[0].value.messages[0].id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        47488,
+        18720
+      ],
+      "id": "7398d26b-e669-4052-8dfc-c9009b8ccc4a",
+      "name": "Data Normalization"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1038350189365408",
+        "recipientPhoneNumber": "={{ $('Data Normalization').first().json.gonderen_no }}",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        49584,
+        18592
+      ],
+      "id": "958c609c-fd00-488e-9696-d86550c96fc8",
+      "name": "Send message",
+      "webhookId": "b22c848e-3196-4951-8c52-3c81ee9082ee",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "pAHu8UjOiUUJ4ORt",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Randevu referans kodu ile mevcut bir randevuyu sorgular. Referans kodu ile randevu detaylarını döndürür.",
+        "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/lookup?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "referenceCode"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        48672,
+        18896
+      ],
+      "id": "fd48cd13-652f-457f-b26e-af50e38fb6ea",
+      "name": "randevu_sorgula"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Yeni bir randevu oluşturur. Sadece waPhone (gönderenin WhatsApp numarası), doktor adı ve randevu zamanı gereklidir. Backend kayıtlı hastayı otomatik bulur.",
+        "method": "POST",
+        "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments?token=klinikapp-n8n-secret-2024",
+        "sendHeaders": true,
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Content-Type"
+            }
+          ]
+        },
+        "sendBody": true,
+        "parametersBody": {
+          "values": [
+            {
+              "name": "clinicId"
+            },
+            {
+              "name": "waPhone"
+            },
+            {
+              "name": "doctorName"
+            },
+            {
+              "name": "startTime"
+            },
+            {
+              "name": "durationMin"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        48880,
+        18896
+      ],
+      "id": "1eeb9d5e-9611-45fe-98e2-95bab8df70b3",
+      "name": "randevu_olustur"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Mevcut bir randevuyu günceller veya iptal eder. İptal etmek için URL path'te action /cancel olmalıdır.",
+        "method": "PATCH",
+        "url": "=https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/{{ $fromAI('appointmentId') }}?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024",
+        "sendHeaders": true,
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Content-Type"
+            }
+          ]
+        },
+        "sendBody": true,
+        "parametersBody": {
+          "values": [
+            {
+              "name": "startTime"
+            },
+            {
+              "name": "durationMin"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        49056,
+        18896
+      ],
+      "id": "9c203ea6-910b-4771-9129-15b6516d98f9",
+      "name": "randevu_guncelle"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Belirli bir doktorun belirli bir tarihteki müsait randevu saatlerini kontrol eder.",
+        "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/availability?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "doctorName"
+            },
+            {
+              "name": "date"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        49216,
+        18896
+      ],
+      "id": "8b98c034-50b9-42f2-a971-8ea27736a05e",
+      "name": "musaitlik_kontrol"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Hastanin kendi randevularini telefon numarasiyla sorgular. Hasta 'randevularim' veya 'randevumu goster' dediginde kullan.",
+        "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/lookup?token=klinikapp-n8n-secret-2024",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "phone"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        49392,
+        18896
+      ],
+      "id": "f36d50f8-cd4a-4a38-8861-ef0914362e3e",
+      "name": "randevu_sorgula_telefon"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Klinik dışı uzmanlık/fiyat sorularında veya müşterinin acil olarak doktor/insan ile görüşme talebinde bu aracı kullan.",
+        "method": "POST",
+        "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/escalate?token=klinikapp-n8n-secret-2024",
+        "sendBody": true,
+        "parametersBody": {
+          "values": [
+            {
+              "name": "waPhone"
+            },
+            {
+              "name": "reason"
+            },
+            {
+              "name": "urgency"
+            },
+            {
+              "name": "summary"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        49552,
+        18896
+      ],
+      "id": "442f4090-202a-46d8-8fe7-b9e9b05b30ed",
+      "name": "eskalasyon"
+    },
+    {
+      "parameters": {
+        "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/conversation-status",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "waPhone",
+              "value": "=={{ $('Data Normalization').first().json.gonderen_no }}"
+            },
+            {
+              "name": "token",
+              "value": "klinikapp-n8n-secret-2024"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        48048,
+        18672
+      ],
+      "id": "5cd7c4b8-06b4-4c0c-acd5-eac3b6981d69",
+      "name": "Check Conversation Status",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-bot-mode",
+              "leftValue": "={{ $json.status.mode }}",
+              "rightValue": "HUMAN",
+              "operator": {
+                "type": "string",
+                "operation": "notEqual"
+              }
+            },
+            {
+              "id": "34bac7c5-e6b5-4825-a5d2-0ec7cb70a543",
+              "leftValue": "={{ $json.mode }}",
+              "rightValue": "BOT",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        48288,
+        18672
+      ],
+      "id": "cb35d741-28a7-4bab-9eaa-c523eaba71bf",
+      "name": "If NOT Human Mode"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/webhooks/whatsapp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-secret",
+              "value": "klinikapp-n8n-secret-2024"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "clinicId",
+              "value": "135460d3-f612-457f-89e8-8ead3181c562"
+            },
+            {
+              "name": "waPhone",
+              "value": "={{ $json.gonderen_no }}"
+            },
+            {
+              "name": "waMessageId",
+              "value": "={{ $('Data Normalization').first().json.wa_message_id }}"
+            },
+            {
+              "name": "body",
+              "value": "={{ $json.mesaj_icerigi }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        48512,
+        18128
+      ],
+      "id": "c206e37c-ea99-4904-a1e3-32833d4203c9",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/webhooks/whatsapp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-secret",
+              "value": "klinikapp-n8n-secret-2024"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "clinicId",
+              "value": "135460d3-f612-457f-89e8-8ead3181c562"
+            },
+            {
+              "name": "waPhone",
+              "value": "={{ $('Data Normalization').first().json.gonderen_no }}"
+            },
+            {
+              "name": "waMessageId",
+              "value": "={{ $now }}"
+            },
+            {
+              "name": "body",
+              "value": "={{ $('AI Agent').item.json.output }}\""
+            },
+            {
+              "name": "direction",
+              "value": "OUTBOUND"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        49520,
+        18320
+      ],
+      "id": "45983b34-eb5c-47df-8ab2-2bc2cc3bd974",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "8d172bb2-ee5d-49b8-aadd-bb2b9cf3b1e0",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        48704,
+        19376
+      ],
+      "id": "d9191ee2-1159-4fc4-86c2-66a95c6bad19",
+      "name": "Webhook",
+      "webhookId": "8d172bb2-ee5d-49b8-aadd-bb2b9cf3b1e0"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1038350189365408",
+        "recipientPhoneNumber": "={{ $json.body.to }}",
+        "textBody": "={{ $json.body.message }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        48976,
+        19376
+      ],
+      "id": "f67cb128-cc16-478f-9846-bd5f3c8c1ad5",
+      "name": "Send message1",
+      "webhookId": "757f8619-e505-43c3-8b74-3bc8af331f2c",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "pAHu8UjOiUUJ4ORt",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 4
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        47568,
+        19120
+      ],
+      "id": "0de86e7d-17d0-4c1d-aacc-961a80702ae5",
+      "name": "Wait",
+      "webhookId": "9113bea4-6d0f-47f4-b162-d3df18a372f2"
+    },
+    {
+      "parameters": {
+        "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/latest-inbound",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "waPhone",
+              "value": "={{ $('Data Normalization').first().json.gonderen_no }}"
+            },
+            {
+              "name": "token",
+              "value": "klinikapp-n8n-secret-2024"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        47712,
+        19056
+      ],
+      "id": "b3d46cae-1996-4593-97ad-95dddbbb32fb",
+      "name": "Debounce Check"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b6ebbbe9-1731-48ef-848c-9887c54ef4f2",
+              "leftValue": "={{ $json.latestWaMessageId }}",
+              "rightValue": "={{ $('Data Normalization').first().json.wa_message_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": "={{ false }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        47856,
+        19056
+      ],
+      "id": "67dbfbc2-9c2f-40be-9923-e5234212e09d",
+      "name": "AM I LATEST msg?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-is-registered",
+              "leftValue": "={{ $json.isRegistered }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        48288,
+        18400
+      ],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Is Registered?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "unreg-reply",
+              "name": "output",
+              "value": "Merhaba! 👋 Numaranıza kayıtlı bir hastamız bulunamadı.\n\nRandevu alabilmek için kliniğimizde kayıtlı olmanız gerekmektedir. Kayıt yaptırmak için kliniğimizi arayabilirsiniz.\n\nDoktor, adres veya fiyat bilgisi almak isterseniz yardımcı olmaktan memnuniyet duyarım. 🏥",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        48528,
+        18550
+      ],
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Unregistered Reply"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1038350189365408",
+        "recipientPhoneNumber": "={{ $('Data Normalization').first().json.gonderen_no }}",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        48752,
+        18550
+      ],
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Send Unregistered Msg",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "pAHu8UjOiUUJ4ORt",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-new-conv",
+              "leftValue": "={{ $json.isNewConversation }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        48048,
+        18200
+      ],
+      "id": "f6a7b8c9-d0e1-2345-fabc-456789012345",
+      "name": "Is New Conversation?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "reg-greeting",
+              "name": "output",
+              "value": "=Merhaba! 👋 Numaranız {{ $('Check Conversation Status').first().json.patientName }} adına kayıtlıdır.\n\nSize nasıl yardımcı olabilirim?",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        48288,
+        18200
+      ],
+      "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+      "name": "Registered Greeting"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1038350189365408",
+        "recipientPhoneNumber": "={{ $('Data Normalization').first().json.gonderen_no }}",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        48528,
+        18200
+      ],
+      "id": "e5f6a7b8-c9d0-1234-efab-345678901234",
+      "name": "Send Registered Greeting",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "pAHu8UjOiUUJ4ORt",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-is-reg-first",
+              "leftValue": "={{ $('Check Conversation Status').first().json.isRegistered }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        48288,
+        18100
+      ],
+      "id": "a7b8c9d0-e1f2-3456-abcd-567890123456",
+      "name": "Is Registered? (First)"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        47200,
+        20000
+      ],
+      "id": "cron-sched-001",
+      "name": "CRON: Her Gun 09:00"
+    },
+    {
+      "parameters": {
+        "url": "https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/reminder-due",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "klinikapp-n8n-secret-2024"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        47440,
+        20000
+      ],
+      "id": "cron-fetch-001",
+      "name": "CRON: Hatirlama Listesi Al",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-has-items",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        47660,
+        20000
+      ],
+      "id": "cron-check-001",
+      "name": "CRON: Hatirlatilacak Var mi?"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        47880,
+        20000
+      ],
+      "id": "cron-split-001",
+      "name": "CRON: Her Randevu Icin"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1038350189365408",
+        "recipientPhoneNumber": "={{ $json.patientPhone }}",
+        "textBody": "=Merhaba {{ $json.patientName }}! 👋\n\nYarınki randevunuzu hatırlatmak istedik:\n📅 Tarih: {{ $now.plus({days:1}).setZone('Europe/Istanbul').setLocale('tr').toFormat('dd MMMM yyyy') }}\n⏰ Saat: {{ $json.timeFormatted }}\n👨‍⚕️ {{ $json.doctorName }}\n\nRandevunuzu onaylamak için *EVET*, iptal için *HAYIR* yazabilirsiniz.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        48100,
+        20000
+      ],
+      "id": "cron-send-001",
+      "name": "CRON: WA Hatirlama Gonder",
+      "continueOnFail": true,
+      "credentials": {
+        "whatsAppApi": {
+          "id": "pAHu8UjOiUUJ4ORt",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/{{ $('CRON: Her Randevu Icin').item.json.appointmentId }}/reminder-sent?token=klinikapp-n8n-secret-2024",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        48320,
+        20000
+      ],
+      "id": "cron-mark-001",
+      "name": "CRON: Hatirlatmayi SENT Yap",
+      "continueOnFail": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "randevu_sorgula": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "randevu_olustur": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "randevu_guncelle": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "musaitlik_kontrol": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Isolate AI Input": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Messages Only": {
+      "main": [
+        [
+          {
+            "node": "Data Normalization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Handshake": {
+      "main": [
+        [
+          {
+            "node": "Respond Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Normalization": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "randevu_sorgula_telefon": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "eskalasyon": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conversation Status": {
+      "main": [
+        [
+          {
+            "node": "If NOT Human Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If NOT Human Mode": {
+      "main": [
+        [
+          {
+            "node": "Is New Conversation?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Webhook (POST Messages)": {
+      "main": [
+        [
+          {
+            "node": "Filter Messages Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        []
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Send message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Debounce Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debounce Check": {
+      "main": [
+        [
+          {
+            "node": "AM I LATEST msg?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AM I LATEST msg?": {
+      "main": [
+        [
+          {
+            "node": "Check Conversation Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Registered?": {
+      "main": [
+        [
+          {
+            "node": "Isolate AI Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unregistered Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unregistered Reply": {
+      "main": [
+        [
+          {
+            "node": "Send Unregistered Msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Conversation?": {
+      "main": [
+        [
+          {
+            "node": "Is Registered? (First)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Registered?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Registered? (First)": {
+      "main": [
+        [
+          {
+            "node": "Registered Greeting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unregistered Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registered Greeting": {
+      "main": [
+        [
+          {
+            "node": "Send Registered Greeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRON: Her Gun 09:00": {
+      "main": [
+        [
+          {
+            "node": "CRON: Hatirlama Listesi Al",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRON: Hatirlama Listesi Al": {
+      "main": [
+        [
+          {
+            "node": "CRON: Hatirlatilacak Var mi?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRON: Hatirlatilacak Var mi?": {
+      "main": [
+        [
+          {
+            "node": "CRON: Her Randevu Icin",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "CRON: Her Randevu Icin": {
+      "main": [
+        [
+          {
+            "node": "CRON: WA Hatirlama Gonder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRON: WA Hatirlama Gonder": {
+      "main": [
+        [
+          {
+            "node": "CRON: Hatirlatmayi SENT Yap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "58efd5e3-5f36-4162-be4a-0401b2e4da26",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "87c0a25f5af05297c61afecbc1a76e1f62d2b42e620b33813844c0d8fb6d57aa"
+  },
+  "id": "QfwU_gm3uKxLZ5Fc2Qozc",
+  "tags": []
+}

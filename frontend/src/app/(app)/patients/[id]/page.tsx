@@ -228,8 +228,28 @@ export default function PatientDetailPage() {
                         <h1 style={{ fontSize: '1.25rem', margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
                             {patient.firstName} {patient.lastName}
                         </h1>
-                        <div style={{ display: 'flex', gap: '12px', fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Phone size={12}/> {formatPhone(patient.phone)}</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '4px', alignItems: 'center' }}>
+                            <a
+                                href={`/messages?phone=${patient.phone}`}
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', textDecoration: 'none' }}
+                                title="WhatsApp Mesajları Aç"
+                                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                            >
+                                <Phone size={12}/> {formatPhone(patient.phone)}
+                            </a>
+                            {(patient as any).phone2 && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ color: 'var(--border)' }}>|</span>
+                                    <Phone size={12}/>
+                                    <span>{formatPhone((patient as any).phone2)}</span>
+                                    <span style={{
+                                        fontSize: '0.65rem', background: 'var(--bg-hover)',
+                                        color: 'var(--text-muted)', padding: '1px 5px',
+                                        borderRadius: '4px', fontWeight: 500,
+                                    }}>Veli/2. Tel</span>
+                                </span>
+                            )}
                             {patient.email && <span>• {patient.email}</span>}
                             {patient.dateOfBirth && <span>• Doğum: {format(new Date(patient.dateOfBirth), 'dd MMM yyyy', { locale: tr })}</span>}
                         </div>

@@ -55,4 +55,34 @@ export class StatisticsController {
     async getChatInsights(@CurrentUser() user: CurrentUserPayload) {
         return this.statisticsService.getChatInsights(user.clinicId);
     }
+
+    @Get('escalations')
+    @ApiOperation({ summary: 'Dönem bazlı eskalasyon istatistikleri' })
+    @ApiQuery({ name: 'period', required: false, enum: ['14d', '30d', '3m'], description: 'Zaman dilimi (default: 30d)' })
+    async getEscalationStats(
+        @CurrentUser() user: CurrentUserPayload,
+        @Query('period') period?: '14d' | '30d' | '3m',
+    ) {
+        return this.statisticsService.getEscalationStats(user.clinicId, period || '30d');
+    }
+
+    @Get('auto-appointments')
+    @ApiOperation({ summary: 'WhatsApp üzerinden oluşturulan randevuların dönem istatistikleri' })
+    @ApiQuery({ name: 'period', required: false, enum: ['14d', '30d', '3m'] })
+    async getAutoAppointmentStats(
+        @CurrentUser() user: CurrentUserPayload,
+        @Query('period') period?: '14d' | '30d' | '3m',
+    ) {
+        return this.statisticsService.getAutoAppointmentStats(user.clinicId, period || '30d');
+    }
+
+    @Get('new-patients')
+    @ApiOperation({ summary: 'Dönem bazlı yeni hasta sayısı' })
+    @ApiQuery({ name: 'period', required: false, enum: ['14d', '30d', '3m'] })
+    async getNewPatientStats(
+        @CurrentUser() user: CurrentUserPayload,
+        @Query('period') period?: '14d' | '30d' | '3m',
+    ) {
+        return this.statisticsService.getNewPatientStats(user.clinicId, period || '30d');
+    }
 }

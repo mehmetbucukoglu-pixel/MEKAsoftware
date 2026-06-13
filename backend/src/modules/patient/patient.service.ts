@@ -8,20 +8,17 @@ import { CryptoUtil } from '../../common/utils/crypto.util';
 export class PatientService {
     constructor(private prisma: PrismaService) { }
 
-    async findAll(clinicId: string, search?: string, page = 1, limit = 20, registrationStatus?: string) {
+    async findAll(clinicId: string, search?: string, page = 1, limit = 20) {
         const skip = (Number(page) - 1) * Number(limit);
         const take = Number(limit);
         const where: any = { clinicId, isActive: true };
-
-        if (registrationStatus) {
-            where.registrationStatus = registrationStatus;
-        }
 
         if (search) {
             where.OR = [
                 { firstName: { contains: search, mode: 'insensitive' } },
                 { lastName: { contains: search, mode: 'insensitive' } },
                 { phone: { contains: search } },
+                { phone2: { contains: search } },
                 { email: { contains: search, mode: 'insensitive' } },
             ];
 
@@ -101,10 +98,10 @@ export class PatientService {
     async create(clinicId: string, dto: CreatePatientDto) {
         const data: any = {
             clinicId,
-            // tcKimlik removed
             firstName: dto.firstName,
             lastName: dto.lastName,
             phone: dto.phone,
+            phone2: (dto as any).phone2 || null,
             email: dto.email || null,
             address: dto.address,
             gender: dto.gender || null,
@@ -115,9 +112,7 @@ export class PatientService {
             data.dateOfBirth = new Date(dto.dateOfBirth);
         }
 
-        const created = await this.prisma.patient.create({ data });
-        // tcKimlik decryption removed
-        return created;
+        return this.prisma.patient.create({ data });
     }
 
     async update(clinicId: string, patientId: string, dto: UpdatePatientDto) {
@@ -130,27 +125,11 @@ export class PatientService {
         }
 
         const data: any = { ...dto };
-        // tcKimlik logic removed
-        if (dto.dateOfBirth) {
-            data.dateOfBirth = new Date(dto.dateOfBirth);
+        if (data.dateOfBirth) {
+            data.dateOfBirth = new Date(data.dateOfBirth);
         }
 
-        // Ön-kayıt tamamlandığında durumu güncelle ve bildirimleri sil
-        if (existing.registrationStatus === 'PRE_REGISTERED') {
-            data.registrationStatus = 'FULL';
-
-            await this.prisma.notification.deleteMany({
-                where: {
-                    clinicId,
-                    type: 'PRE_REGISTERED_PATIENT',
-                    entityId: patientId
-                }
-            });
-        }
-
-        const updated = await this.prisma.patient.update({ where: { id: patientId }, data });
-        // tcKimlik decryption removed
-        return updated;
+        return this.prisma.patient.update({ where: { id: patientId }, data });
     }
 
     async softDelete(clinicId: string, patientId: string) {
@@ -199,10 +178,13 @@ export class PatientService {
         return restored;
     }
 
-    // Yeni: Telefon duplicate kontrolü
+    // Telefon duplicate kontrolü (birincil ve ikincil numara)
     async checkPhone(clinicId: string, phone: string) {
         const existing = await this.prisma.patient.findFirst({
-            where: { clinicId, phone }
+            where: {
+                clinicId,
+                OR: [{ phone }, { phone2: phone }],
+            }
         });
 
         if (existing) {
