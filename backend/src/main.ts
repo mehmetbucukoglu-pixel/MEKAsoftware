@@ -40,15 +40,12 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = configService.get<number>('APP_PORT', 3000);
+  // Parse port safely — Coolify may inject extra text into APP_PORT env var
+  const rawPort = configService.get<string>('APP_PORT', '3000');
+  const port = parseInt(String(rawPort), 10) || 3000;
   await app.listen(port, '0.0.0.0');
 
-  // Debug: verify actual listening address
-  const httpServer = app.getHttpServer();
-  const addr = httpServer.address();
-  console.log(`🔍 Server address: ${JSON.stringify(addr)}`);
-  console.log(`🚀 KlinikApp API running on http://localhost:${port} ${process.env.APP_ENV} ${process.env.APP_NAME}`);
-  console.log(`📖 Swagger docs: http://localhost:${port}/api/docs`);
-
+  console.log(`🚀 KlinikApp API running on http://0.0.0.0:${port}`);
+  console.log(`📖 Swagger docs: http://0.0.0.0:${port}/api/docs`);
 }
 bootstrap();
