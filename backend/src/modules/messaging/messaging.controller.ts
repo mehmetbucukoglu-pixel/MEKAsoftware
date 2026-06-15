@@ -30,7 +30,15 @@ export class MessagingController {
     @Get('conversations/:id')
     @UseGuards(AuthGuard('jwt'), RolesGuard)
     @ApiBearerAuth()
-    @ApiOperation({ summary: 'Konuşma mesajları' })
+    @ApiOperation({ summary: 'Konuşma mesajları (eski route - geriye dönük uyum)' })
+    getConversationById(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string, @Query('page') page?: number, @Query('limit') limit?: number) {
+        return this.messagingService.getMessages(user, id, page, limit);
+    }
+
+    @Get('conversations/:id/messages')
+    @UseGuards(AuthGuard('jwt'), RolesGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Konuşma mesajları (yeni route - frontend bu endpoint çağırıyor)' })
     getMessages(@CurrentUser() user: CurrentUserPayload, @Param('id') id: string, @Query('page') page?: number, @Query('limit') limit?: number) {
         return this.messagingService.getMessages(user, id, page, limit);
     }

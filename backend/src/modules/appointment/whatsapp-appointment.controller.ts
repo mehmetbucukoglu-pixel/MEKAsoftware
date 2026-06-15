@@ -30,8 +30,13 @@ export class WhatsappAppointmentController {
 
     @Post('escalate')
     @ApiOperation({ summary: 'Konuşmayı HUMAN moduna çeker ve görevliyi uyarır' })
-    async escalate(@Body() data: { waPhone: string; reason: string; urgency: string; summary: string }) {
-        return this.messagingService.escalate(this.defaultClinicId, data);
+    @ApiQuery({ name: 'waPhone', required: false, description: 'Gönderenin WA numarası (n8n URL fixed param)' })
+    async escalate(
+        @Body() data: { waPhone: string; reason: string; urgency: string; summary: string },
+        @Query('waPhone') waPhoneQuery?: string,
+    ) {
+        const effectiveData = { ...data, waPhone: waPhoneQuery || data.waPhone };
+        return this.messagingService.escalate(this.defaultClinicId, effectiveData);
     }
 
     @Get('latest-inbound')
@@ -68,21 +73,51 @@ export class WhatsappAppointmentController {
     @ApiOperation({ summary: 'Doktor adı + tarih ile müsaitlik kontrol' })
     @ApiQuery({ name: 'doctorName', required: true })
     @ApiQuery({ name: 'date', required: true, description: 'YYYY-MM-DD' })
+    @ApiQuery({ name: 'preferredTime', required: false, description: 'Tercih edilen saat HH:MM (örn: 17:00)' })
     whatsappAvailability(
         @Query('doctorName') doctorName: string,
         @Query('date') date: string,
+        @Query('preferredTime') preferredTime?: string,
     ) {
-        return this.appointmentService.findAvailabilityByDoctorName(this.defaultClinicId, doctorName, date);
+        return this.appointmentService.findAvailabilityByDoctorName(this.defaultClinicId, doctorName, date, preferredTime);
     }
 
     @Post()
     @ApiOperation({ summary: 'WhatsApp üzerinden randevu oluştur' })
+    @ApiQuery({ name: 'waPhone', required: false, description: 'Gönderenin WA numarası (n8n fixed param olarak geçer)' })
     @UsePipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true }))
     async whatsappCreate(
         @Body() data: any,
+        @Query('waPhone') waPhoneQuery?: string,
     ) {
-        const result = await this.appointmentService.createFromWhatsApp(this.defaultClinicId, data);
+        // waPhone: query param öncelikli (n8n sabit expression), yoksa body'den al
+        const effectiveData = {
+            ...data,
+            waPhone: waPhoneQuery || data.waPhone,
+        };
+        const result = await this.appointmentService.createFromWhatsApp(this.defaultClinicId, effectiveData);
         this.socketGateway.emitToStaff(this.defaultClinicId, 'appointment_created', result);
+        return result;
+    }
+
+    @Post('update-by-id')
+    @ApiOperation({ summary: 'WhatsApp üzerinden randevu güncelle (appointmentId body\'den alınır — n8n AI tool için)' })
+    async whatsappUpdateById(
+        @Body() data: { appointmentId: string; startTime?: string; durationMin?: number },
+    ) {
+        const { appointmentId, ...rest } = data;
+        const result = await this.appointmentService.updateFromWhatsApp(this.defaultClinicId, appointmentId, rest);
+        this.socketGateway.emitToClinic(this.defaultClinicId, 'appointment:updated', { appointmentId });
+        return result;
+    }
+
+    @Post('cancel-by-id')
+    @ApiOperation({ summary: 'WhatsApp üzerinden randevu iptal (appointmentId body\'den alınır — n8n AI tool için)' })
+    async whatsappCancelById(
+        @Body() data: { appointmentId: string },
+    ) {
+        const result = await this.appointmentService.cancelFromWhatsApp(this.defaultClinicId, data.appointmentId);
+        this.socketGateway.emitToStaff(this.defaultClinicId, 'appointment_cancelled', result);
         return result;
     }
 

@@ -21,7 +21,9 @@ export default function LoginPage() {
 
         try {
             await login(email, password);
-            router.push('/dashboard');
+            // Mobil cihazlarda direkt /mobile/calendar — server redirect round-trip'ten kaçın
+            const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+            router.push(isMobile ? '/mobile/calendar' : '/dashboard');
         } catch (err: any) {
             setError(err.response?.data?.message?.[0] || 'Giriş başarısız. Bilgilerinizi kontrol edin.');
         } finally {

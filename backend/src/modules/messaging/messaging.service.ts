@@ -9,6 +9,7 @@ import { WhatsappWebhookDto } from './dto/whatsapp-webhook.dto';
 import { CryptoUtil } from '../../common/utils/crypto.util';
 import { NotificationService } from '../notification/notification.service';
 import { AppointmentService } from '../appointment/appointment.service';
+import { PushService } from '../push/push.service';
 import { Inject, forwardRef } from '@nestjs/common';
 
 
@@ -20,6 +21,7 @@ export class MessagingService {
         private auditService: AuditService,
         private configService: ConfigService,
         private notificationService: NotificationService,
+        private pushService: PushService,
         @Inject(forwardRef(() => AppointmentService))
         private appointmentService: AppointmentService,
     ) { }
@@ -112,16 +114,20 @@ export class MessagingService {
         if (conv?.status === 'HUMAN') {
             await this.relayToWhatsApp(conv.waPhone, body, mediaUrl);
 
-            // Update outbound timestamp + clear escalation reason (Bekleyen Mesaj badge clears)
-            // Stay in HUMAN mode — auto-revert handled by 3-hour cron task
+            // Mesaj gönderen kişi artık bu konuşmanın sahibi olur (assignedTo güncelle)
             const updatedConv = await this.prisma.conversation.update({
                 where: { id: conversationId },
                 data: {
                     lastOutboundAt: new Date(),
                     escalationReason: null,
+                    assignedTo: userId,  // mesajı gönderen kişi devralır
                 },
                 include: { patient: true },
             });
+
+            // Eski atanan kişinin (varsa) escalation bildirimlerini temizle
+            await this.notificationService.clearByConversation(clinicId, conversationId);
+            this.socketGateway.emitToStaff(clinicId, 'notifications_cleared', { conversationId });
 
             // Notify frontend to refresh badge/list
             this.socketGateway.emitToStaff(clinicId, 'conversation_updated', updatedConv);
@@ -147,7 +153,7 @@ export class MessagingService {
                 let conversation = await this.prisma.conversation.findFirst({
                     where: { clinicId, waPhone: cleanPhone },
                     include: { patient: true }
-                });
+                }) as any;
 
                 if (!conversation) {
                     const link = await this.prisma.phonePatientLink.findFirst({
@@ -249,6 +255,28 @@ export class MessagingService {
                 this.socketGateway.emitToConversation(conversation.id, 'new_message', plainMessage);
                 this.socketGateway.emitToStaff(clinicId, 'conversation_updated', conversation);
 
+                // --- HUMAN modunda mesaj gelince: devralmış kullanıcıya anlık bildirim ---
+                if (
+                    messageDirection === 'INBOUND' &&
+                    conversation.status === 'HUMAN' &&
+                    (conversation as any).assignedTo
+                ) {
+                    const assignedUserId = (conversation as any).assignedTo as string;
+                    const senderName = conversation.patient
+                        ? `${(conversation.patient as any).firstName} ${(conversation.patient as any).lastName}`
+                        : conversation.waPhone;
+                    const preview = (body || '').substring(0, 60);
+
+                    // DB notification (Bell badge)
+                    await this.notificationService.create(clinicId, assignedUserId, {
+                        type: 'MESSAGE_REPLY',
+                        title: `💬 ${senderName}`,
+                        body: preview || 'Yeni mesaj',
+                        entityType: 'conversation',
+                        entityId: conversation.id,
+                    });
+                }
+
                 if ((message.conversation as any)?.patient?.appointments) {
                     const relevantDoctorIds = Array.from(new Set(
                         (message.conversation as any).patient.appointments.map((a: any) => a.doctorId)
@@ -279,7 +307,8 @@ export class MessagingService {
             where: { id: conversationId, clinicId: user.clinicId },
             data: {
                 status: mode,
-                assignedTo,
+                // HUMAN'a geçince devralan kişi atanır; BOT'a geçince sahiplik temizlenir
+                assignedTo: mode === 'HUMAN' ? (assignedTo ?? user.userId) : null,
                 humanModeAt: mode === 'HUMAN' ? new Date() : null
             },
         });
@@ -293,6 +322,12 @@ export class MessagingService {
             newValues: { mode, assignedTo },
             ipAddress
         });
+
+        // Bota geri alınınca: bekleyen escalation bildirimlerini temizle
+        if (mode === 'BOT') {
+            await this.notificationService.clearByConversation(user.clinicId, conversationId);
+            this.socketGateway.emitToStaff(user.clinicId, 'notifications_cleared', { conversationId });
+        }
 
         return result;
     }
@@ -309,7 +344,6 @@ export class MessagingService {
         let doctorId: string | null = null;
         let combinedText = '';
         let patientName: string | null = null;
-        let patientPatterns: any = null;
         let sentiment: 'HAPPY' | 'NEUTRAL' | 'ANGRY' = 'NEUTRAL';
         let resolvedPatientId: string | null = conv?.patientId || null;
 
@@ -324,9 +358,17 @@ export class MessagingService {
             }
         }
         if (!resolvedPatientId) {
-            // B. Patient.phone or Patient.phone2
+            // B. Patient.phone or Patient.phone2 — try both with and without + prefix
+            const phoneVariants = [cleanPhone];
+            if (!cleanPhone.startsWith('+')) phoneVariants.push(`+${cleanPhone}`);
+            else phoneVariants.push(cleanPhone.slice(1));
+
             const byPhone = await this.prisma.patient.findFirst({
-                where: { clinicId, OR: [{ phone: cleanPhone }, { phone2: cleanPhone }], isActive: true },
+                where: {
+                    clinicId,
+                    OR: phoneVariants.flatMap(p => [{ phone: p }, { phone2: p }]),
+                    isActive: true,
+                },
             });
             if (byPhone) {
                 resolvedPatientId = byPhone.id;
@@ -347,11 +389,6 @@ export class MessagingService {
             } else if (resolvedPatientId) {
                 const p = await this.prisma.patient.findUnique({ where: { id: resolvedPatientId } });
                 if (p) patientName = `${p.firstName} ${p.lastName}`;
-            }
-
-            // Fetch patient patterns
-            if (resolvedPatientId) {
-                patientPatterns = await this.appointmentService.getPatientPatterns(clinicId, resolvedPatientId);
             }
 
             // Find patient's most recent appointment to determine their doctor
@@ -425,7 +462,6 @@ export class MessagingService {
             doctorId,
             combinedText,
             patientName,
-            patientPatterns,
             sentiment,
             linkedPatients,
         };
@@ -564,6 +600,19 @@ export class MessagingService {
             summary,
             patientName
         });
+
+        // Push notification — asistanlar ve adminler
+        await this.pushService.sendToRoles(
+            clinicId,
+            ['ASSISTANT', 'ADMIN'],
+            'escalatedMessages',
+            {
+                title: '🔴 Bekleyen Mesaj',
+                body: `${patientName} — ${reason}`,
+                url: '/mobile/messages',
+                tag: `escalation-${(conv as any).id}`,
+            },
+        );
 
         // System notification for assistants and admins
         const staffToNotify = await this.prisma.user.findMany({ 

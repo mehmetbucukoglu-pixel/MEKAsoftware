@@ -32,4 +32,20 @@ export class NotificationService {
         
         return notif;
     }
+
+    /**
+     * Konuşma çözümlenince (bota geri alınma veya cevap verilince)
+     * o konuşmaya ait okunmamış escalation bildirimlerini okundu yap.
+     */
+    async clearByConversation(clinicId: string, conversationId: string) {
+        await this.prisma.notification.updateMany({
+            where: {
+                clinicId,
+                isRead: false,
+                entityType: 'conversation',
+                entityId: conversationId,
+            },
+            data: { isRead: true },
+        });
+    }
 }

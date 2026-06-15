@@ -346,13 +346,13 @@ export default function DashboardPage() {
 
 
 
-                {/* Bugünkü Teyit Durumu */}
+                {/* Yarınki Randevular */}
                 {!isAccountant && (
                     <div className="card" style={{ minHeight: '420px', display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                             <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <CheckCircle2 size={18} style={{ color: '#10b981' }} />
-                                Bugünkü Teyit Durumu
+                                <Calendar size={18} style={{ color: '#6366f1' }} />
+                                Yarınki Randevular
                             </h3>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                 {reminders.length} randevu
@@ -360,7 +360,7 @@ export default function DashboardPage() {
                         </div>
                         {reminders.length === 0 ? (
                             <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                                Bugün randevu yok.
+                                Yarın randevu yok.
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
@@ -416,16 +416,31 @@ export default function DashboardPage() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
                                 {activity.map((a: any, i: number) => {
                                     const actionStyle =
-                                        a.action === 'CREATED'   ? { color: '#10b981', bg: 'rgba(16,185,129,0.1)',  label: '+ Yeni' } :
-                                        a.action === 'CANCELLED' ? { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: '✕ İptal' } :
-                                        a.action === 'DELETED'   ? { color: '#6b7280', bg: 'rgba(107,114,128,0.1)', label: '🗑 Silindi' } :
+                                        a.action === 'CREATED'          ? { color: '#10b981', bg: 'rgba(16,185,129,0.1)',  label: '+ Yeni' } :
+                                        a.action === 'CANCELLED'        ? { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: '✕ İptal' } :
+                                        a.action === 'WHATSAPP_CANCEL'  ? { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: '📵 İptal edildi' } :
+                                        a.action === 'DELETED'          ? { color: '#6b7280', bg: 'rgba(107,114,128,0.1)', label: '🗑 Silindi' } :
+                                        a.action === 'DELETE'           ? { color: '#6b7280', bg: 'rgba(107,114,128,0.1)', label: '🗑 Silindi' } :
+                                        a.action === 'WHATSAPP_UPDATE'  ? { color: '#3b82f6', bg: 'rgba(59,130,246,0.1)',  label: '📅 Düzenlendi' } :
                                         { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', label: '↻ Güncellendi' };
-                                    const isWA = a.source === 'WHATSAPP';
+                                    const isWA = a.action?.startsWith('WHATSAPP') || a.source === 'WHATSAPP';
                                     const canLink = isWA && a.patientPhone;
                                     const Wrapper = canLink ? 'a' : 'div';
                                     const wrapperProps = canLink
                                         ? { href: `/messages?phone=${a.patientPhone}`, style: { textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', borderRadius: 'var(--radius-md)', cursor: 'pointer' } as React.CSSProperties }
                                         : { style: { display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', borderRadius: 'var(--radius-md)' } as React.CSSProperties };
+
+                                    const fmtDate = (d: string | Date) =>
+                                        `${new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} ${new Date(d).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+
+                                    const dateLabel = (() => {
+                                        if (a.action === 'WHATSAPP_UPDATE' && a.oldStartTime && a.newStartTime)
+                                            return `${fmtDate(a.oldStartTime)} → ${fmtDate(a.newStartTime)}`;
+                                        if (a.startTime)
+                                            return fmtDate(a.startTime);
+                                        return null;
+                                    })();
+
                                     return (
                                         <Wrapper key={i} {...wrapperProps}
                                             onMouseEnter={(e: any) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
@@ -440,12 +455,9 @@ export default function DashboardPage() {
                                             </span>
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={{ fontSize: '0.8125rem', fontWeight: 500 }}>{a.patientName}</div>
-                                                {a.startTime && (
+                                                {dateLabel && (
                                                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                                        {a.action === 'UPDATED'
-                                                            ? `Yeni tarih: ${new Date(a.startTime).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} ${new Date(a.startTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`
-                                                            : `${new Date(a.startTime).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} ${new Date(a.startTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`
-                                                        }
+                                                        {dateLabel}
                                                     </div>
                                                 )}
                                             </div>

@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+// Relative URL — Next.js rewrites proxy'si üzerinden backend'e gider.
+// Hem masaüstü (localhost:3001 → localhost:3000) hem telefon (192.168.x.x:3001 → backend) çalışır.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -32,7 +34,7 @@ api.interceptors.response.use(
                 const refreshToken = localStorage.getItem('refreshToken');
                 if (!refreshToken) throw new Error('No refresh token');
 
-                const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
+                const { data } = await axios.post('/api/v1/auth/refresh', { refreshToken });
                 localStorage.setItem('accessToken', data.accessToken);
                 localStorage.setItem('refreshToken', data.refreshToken);
 
@@ -322,12 +324,12 @@ export const messagingApi = {
         api.get('/conversations', { params }),
     getConversation: (id: string) =>
         api.get(`/conversations/${id}`),
-    getMessages: (conversationId: string, params?: { limit?: number; before?: string }) =>
+    getMessages: (conversationId: string, params?: { limit?: number; page?: number; before?: string }) =>
         api.get(`/conversations/${conversationId}/messages`, { params }),
     sendMessage: (conversationId: string, body: string) =>
         api.post(`/conversations/${conversationId}/messages`, { body }),
-    setMode: (conversationId: string, mode: string) =>
-        api.patch(`/conversations/${conversationId}/mode`, { mode }),
+    setMode: (conversationId: string, mode: string, assignedTo?: string) =>
+        api.patch(`/conversations/${conversationId}/mode`, { mode, assignedTo }),
     markSeen: (conversationId: string) =>
         api.patch(`/conversations/${conversationId}/mark-seen`),
 };

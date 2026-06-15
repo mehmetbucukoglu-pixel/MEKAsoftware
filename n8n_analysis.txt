@@ -1,0 +1,73 @@
+﻿
+=== SET NODES ===
+  --- Isolate AI Input ---
+    mesaj_icerigi: ={{ $('Data Normalization').first().json.mesaj_icerigi }}
+  --- Data Normalization ---
+    mesaj_icerigi: ={{ $json.body.entry[0].changes[0].value.messages[0].text.body }}
+    gonderen_no: ={{ $json.body.entry[0].changes[0].value.messages[0].from }}
+    wa_id: ={{ $json.body.entry[0].changes[0].value.contacts[0].wa_id }}
+    =wa_message_id: ={{ $json.body.entry[0].changes[0].value.messages[0].id }}
+  --- Unregistered Reply ---
+    output: Merhaba! ­şæï Numaran─▒za kay─▒tl─▒ bir hastam─▒z bulunamad─▒.
+
+Randevu alabilmek i├ğin klini─şimizde kay─▒tl─▒ olman─▒z gerekmektedir. Kay─▒t yapt─▒rmak i├ğin klini─şimizi arayabilirsiniz.
+
+Doktor, adres veya fiyat b
+  --- Registered Greeting ---
+    output: =Merhaba! ­şæï Numaran─▒z {{ $('Check Conversation Status').first().json.patientName }} ad─▒na kay─▒tl─▒d─▒r.
+
+Size nas─▒l yard─▒mc─▒ olabilirim?
+
+=== IF NODES (conditions) ===
+  --- Filter Messages Only ---
+    Conditions: {'options': {'caseSensitive': True, 'leftValue': '', 'typeValidation': 'strict', 'version': 2}, 'conditions': [{'id': 'check-is-message', 'leftValue': "={{ $json.body.entry[0].changes[0].value.messages ? 'true' : 'false' }}", 'rightValue': 'true', 'operator': {'type': 'string', 'operation': 'equals'
+  --- Check Handshake ---
+    Conditions: {'options': {'caseSensitive': True, 'leftValue': '', 'typeValidation': 'strict', 'version': 2}, 'conditions': [{'id': 'check-mode', 'leftValue': "={{ $json.query['hub.mode'] }}", 'rightValue': 'subscribe', 'operator': {'type': 'string', 'operation': 'equals'}}], 'combinator': 'and'}
+  --- If NOT Human Mode ---
+    Conditions: {'options': {'caseSensitive': True, 'leftValue': '', 'typeValidation': 'strict', 'version': 2}, 'conditions': [{'id': 'check-bot-mode', 'leftValue': '={{ $json.status.mode }}', 'rightValue': 'HUMAN', 'operator': {'type': 'string', 'operation': 'notEqual'}}, {'id': '34bac7c5-e6b5-4825-a5d2-0ec7cb70a5
+  --- AM I LATEST msg? ---
+    Conditions: {'options': {'caseSensitive': True, 'leftValue': '', 'typeValidation': 'strict', 'version': 3}, 'conditions': [{'id': 'b6ebbbe9-1731-48ef-848c-9887c54ef4f2', 'leftValue': '={{ $json.latestWaMessageId }}', 'rightValue': "={{ $('Data Normalization').first().json.wa_message_id }}", 'operator': {'type':
+  --- Is Registered? ---
+    Conditions: {'options': {'caseSensitive': True, 'leftValue': '', 'typeValidation': 'strict', 'version': 2}, 'conditions': [{'id': 'check-is-registered', 'leftValue': '={{ $json.isRegistered }}', 'rightValue': True, 'operator': {'type': 'boolean', 'operation': 'true'}}], 'combinator': 'and'}
+  --- Is New Conversation? ---
+    Conditions: {'options': {'caseSensitive': True, 'leftValue': '', 'typeValidation': 'strict', 'version': 2}, 'conditions': [{'id': 'check-new-conv', 'leftValue': '={{ $json.isNewConversation }}', 'rightValue': True, 'operator': {'type': 'boolean', 'operation': 'true'}}], 'combinator': 'and'}
+  --- Is Registered? (First) ---
+    Conditions: {'options': {'caseSensitive': True, 'leftValue': '', 'typeValidation': 'strict', 'version': 2}, 'conditions': [{'id': 'check-is-reg-first', 'leftValue': "={{ $('Check Conversation Status').first().json.isRegistered }}", 'rightValue': True, 'operator': {'type': 'boolean', 'operation': 'true'}}], 'com
+  --- CRON: Hatirlatilacak Var mi? ---
+    Conditions: {'options': {'caseSensitive': True, 'leftValue': '', 'typeValidation': 'strict', 'version': 2}, 'conditions': [{'id': 'check-has-items', 'leftValue': '={{ $json.length }}', 'rightValue': 0, 'operator': {'type': 'number', 'operation': 'gt'}}], 'combinator': 'and'}
+
+=== WHATSAPP SEND NODES ===
+  --- Send message ---
+    operation: send
+    phoneNumberId: 1038350189365408
+    recipientPhoneNumber: ={{ $('Data Normalization').first().json.gonderen_no }}
+    textBody: ={{ $json.output }}
+    additionalFields: {}
+  --- Send message1 ---
+    operation: send
+    phoneNumberId: 1038350189365408
+    recipientPhoneNumber: ={{ $json.body.to }}
+    textBody: ={{ $json.body.message }}
+    additionalFields: {}
+  --- Send Unregistered Msg ---
+    operation: send
+    phoneNumberId: 1038350189365408
+    recipientPhoneNumber: ={{ $('Data Normalization').first().json.gonderen_no }}
+    textBody: ={{ $json.output }}
+    additionalFields: {}
+  --- Send Registered Greeting ---
+    operation: send
+    phoneNumberId: 1038350189365408
+    recipientPhoneNumber: ={{ $('Data Normalization').first().json.gonderen_no }}
+    textBody: ={{ $json.output }}
+    additionalFields: {}
+  --- CRON: WA Hatirlama Gonder ---
+    operation: send
+    phoneNumberId: 1038350189365408
+    recipientPhoneNumber: ={{ $json.patientPhone }}
+    textBody: =Merhaba {{ $json.patientName }}! ­şæï
+
+Yar─▒nki randevunuzu hat─▒rlatmak istedik:
+­şôà Tarih: {{ $now.plus({days:1}).setZone('Europe/Istanbul').setLocale('tr').toFormat('dd MMMM yyyy') }}
+ÔÅ░ Saat: {{ $json.ti
+    additionalFields: {}

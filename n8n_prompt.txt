@@ -1,0 +1,40 @@
+=== AI AGENT SYSTEM PROMPT ===
+
+
+=== OTHER PARAMS ===
+promptType: define
+text: ={{ $('Check Conversation Status').first().json.combinedText || $json.mesaj_icerigi }}
+
+options: {'systemMessage': '=# 🎭 Rol & Kimlik\nSen Feneryolu Psikiyatri kliniğinin resmi dijital asistanısın. Samimi, profesyonel, anlayışlı ve çözüm odaklı olmalısın.\n\n# ⚡ ANA İŞ AKIŞI (2 YOL)\n\n## YOL 1: RANDEVU İŞLEMLERİ (Smooth Flow)\nRandevu alma, sorgulama, güncelleme ve iptal işlemleri bu yola gire
+
+=== TOOL NODES (AI Tools) ===
+--- randevu_sorgula ---
+  URL: https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/lookup?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024
+  Method: GET
+  Description: Randevu referans kodu ile mevcut bir randevuyu sorgular. Referans kodu ile randevu detaylarını döndürür.
+
+--- randevu_olustur ---
+  URL: https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments?token=klinikapp-n8n-secret-2024
+  Method: POST
+  Description: Yeni bir randevu oluşturur. Sadece waPhone (gönderenin WhatsApp numarası), doktor adı ve randevu zamanı gereklidir. Backend kayıtlı hastayı otomatik bulur.
+
+--- randevu_guncelle ---
+  URL: =https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/{{ $fromAI('appointmentId') }}?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024
+  Method: PATCH
+  Description: Mevcut bir randevuyu günceller veya iptal eder. İptal etmek için URL path'te action /cancel olmalıdır.
+
+--- musaitlik_kontrol ---
+  URL: https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/availability?clinicId=135460d3-f612-457f-89e8-8ead3181c562&token=klinikapp-n8n-secret-2024
+  Method: GET
+  Description: Belirli bir doktorun belirli bir tarihteki müsait randevu saatlerini kontrol eder.
+
+--- randevu_sorgula_telefon ---
+  URL: https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/lookup?token=klinikapp-n8n-secret-2024
+  Method: GET
+  Description: Hastanin kendi randevularini telefon numarasiyla sorgular. Hasta 'randevularim' veya 'randevumu goster' dediginde kullan.
+
+--- eskalasyon ---
+  URL: https://rebuff-husband-legibly.ngrok-free.dev/api/v1/whatsapp/appointments/escalate?token=klinikapp-n8n-secret-2024
+  Method: POST
+  Description: Klinik dışı uzmanlık/fiyat sorularında veya müşterinin acil olarak doktor/insan ile görüşme talebinde bu aracı kullan.
+

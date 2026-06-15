@@ -11,6 +11,7 @@ type Appointment = {
     endTime: string;
     durationMin: number;
     status: string;
+    reminderStatus: 'PENDING' | 'SENT' | 'CONFIRMED' | 'CANCELLED';
     patient: { id: string; firstName: string; lastName: string; phone: string };
     doctor: { firstName: string; lastName: string };
     notes?: string;
@@ -31,8 +32,27 @@ const STATUS_COLOR: Record<string, string> = {
     NO_SHOW: '#f59e0b',
 };
 const STATUS_LABEL: Record<string, string> = {
-    CONFIRMED: 'Onaylı', ARRIVED: 'Geldi', COMPLETED: 'Tamamlandı', CANCELLED: 'İptal', NO_SHOW: 'Gelmedi',
+    // CONFIRMED label depend on reminderStatus — handled inline below
+    CONFIRMED: 'Bekliyor',
+    ARRIVED: 'Geldi',
+    COMPLETED: 'Tamamlandı',
+    CANCELLED: 'İptal',
+    NO_SHOW: 'Gelmedi',
 };
+
+// Derive the correct label for CONFIRMED status based on reminder
+function getStatusLabel(apt: Appointment): string {
+    if (apt.status === 'CONFIRMED') {
+        return apt.reminderStatus === 'CONFIRMED' ? 'Onayılandı' : 'Bekliyor';
+    }
+    return STATUS_LABEL[apt.status] ?? apt.status;
+}
+function getStatusColor(apt: Appointment): string {
+    if (apt.status === 'CONFIRMED' && apt.reminderStatus === 'CONFIRMED') {
+        return '#22c55e'; // green when patient confirmed
+    }
+    return STATUS_COLOR[apt.status] ?? '#6366f1';
+}
 
 export default function MobileCalendarPage() {
     const { user } = useAuthStore();
@@ -57,7 +77,10 @@ export default function MobileCalendarPage() {
         setIsLoading(true);
         try {
             const res = await appointmentApi.list({ date: dateStr, doctorId: user?.role === 'DOCTOR' ? user.id : undefined });
-            setAppointments(res.data || []);
+            // API returns { items: [], total: 0, ... } — extract items
+            const data = res.data;
+            const items = Array.isArray(data) ? data : (data?.items ?? []);
+            setAppointments(items);
         } catch { toast.error('Randevular yüklenemedi'); }
         finally { setIsLoading(false); }
     }, [dateStr, user]);
@@ -70,11 +93,10 @@ export default function MobileCalendarPage() {
         setSelectedDate(d);
     };
 
-    const loadSlots = async (date: string) => {
-        if (!user || !selectedApt) return;
+    const loadSlots = async (date: string, apt: Appointment) => {
+        if (!user) return;
         try {
-            const doctorId = selectedApt.doctor ? user.id : user.id;
-            const res = await appointmentApi.availableSlots(doctorId, date);
+            const res = await appointmentApi.availableSlots(user.id, date);
             setQbSlots(res.data || []);
         } catch { setQbSlots([]); }
     };
@@ -86,14 +108,12 @@ export default function MobileCalendarPage() {
         setQbSlots([]);
         setQbSlot('');
         setShowQuickBook(true);
-        setSelectedApt(null);
-        setSelectedApt(apt);
     };
 
     const handleQbDateSelect = async (date: string) => {
         setQbDate(date);
         setQbStep(2);
-        await loadSlots(date);
+        if (selectedApt) await loadSlots(date, selectedApt);
     };
 
     const handleQbSlotSelect = (slot: string) => {
@@ -122,6 +142,21 @@ export default function MobileCalendarPage() {
         } catch (e: any) {
             toast.error(e?.response?.data?.message || 'Randevu oluşturulamadı');
         } finally { setIsSubmitting(false); }
+    };
+
+    const handleComplete = async (apt: Appointment) => {
+        try {
+            await appointmentApi.complete(apt.id);
+            toast.success('✅ Randevu tamamlandı');
+            navigator.vibrate?.([80]);
+            // Optimistic update
+            setAppointments(prev =>
+                prev.map(a => a.id === apt.id ? { ...a, status: 'COMPLETED' } : a)
+            );
+            setSelectedApt(null);
+        } catch {
+            toast.error('Güncellenemedi, tekrar dene');
+        }
     };
 
     // Mini calendar date chips for week
@@ -203,38 +238,47 @@ export default function MobileCalendarPage() {
                     appointments.map(apt => {
                         const start = new Date(apt.startTime);
                         const end = new Date(apt.endTime);
-                        const color = STATUS_COLOR[apt.status] || '#6366f1';
+                        const isCancelled = apt.status === 'CANCELLED';
+                        const color = getStatusColor(apt);
+                        const label = getStatusLabel(apt);
                         return (
                             <button
                                 key={apt.id}
-                                onClick={() => setSelectedApt(apt)}
+                                onClick={() => !isCancelled && setSelectedApt(apt)}
                                 style={{
                                     display: 'flex', alignItems: 'stretch', gap: 12,
-                                    background: 'rgba(255,255,255,0.04)',
-                                    border: '1px solid rgba(255,255,255,0.07)',
+                                    background: isCancelled ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.04)',
+                                    border: `1px solid ${isCancelled ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.07)'}`,
                                     borderRadius: 14, padding: '14px 14px 14px 0',
-                                    cursor: 'pointer', textAlign: 'left', width: '100%',
+                                    cursor: isCancelled ? 'default' : 'pointer',
+                                    textAlign: 'left', width: '100%',
+                                    opacity: isCancelled ? 0.65 : 1,
                                     transition: 'transform 0.15s ease, background 0.15s ease',
                                     WebkitTapHighlightColor: 'transparent',
                                 }}
-                                onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.98)')}
+                                onTouchStart={e => { if (!isCancelled) e.currentTarget.style.transform = 'scale(0.98)'; }}
                                 onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
                             >
                                 <div style={{ width: 4, borderRadius: '0 4px 4px 0', background: color, flexShrink: 0 }} />
                                 <div style={{ flex: 1 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                        <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>
+                                        <span style={{
+                                            fontWeight: 700, fontSize: '0.9375rem',
+                                            textDecoration: isCancelled ? 'line-through' : 'none',
+                                            color: isCancelled ? '#94a3b8' : '#e2e8f0',
+                                        }}>
                                             {apt.patient.firstName} {apt.patient.lastName}
                                         </span>
                                         <span style={{
                                             fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px',
                                             borderRadius: 999, background: `${color}20`, color,
                                         }}>
-                                            {STATUS_LABEL[apt.status]}
+                                            {label}
                                         </span>
                                     </div>
                                     <div style={{ fontSize: '0.8125rem', color: '#94a3b8' }}>
                                         {fmtTime(start)} – {fmtTime(end)} · {apt.durationMin}dk
+                                        {isCancelled && <span style={{ marginLeft: 6, color: '#ef4444', fontSize: '0.7rem' }}>● iptal</span>}
                                     </div>
                                 </div>
                             </button>
@@ -250,13 +294,26 @@ export default function MobileCalendarPage() {
             {selectedApt && !showQuickBook && (
                 <BottomSheet onClose={() => setSelectedApt(null)}>
                     <div style={{ padding: '0 20px 20px' }}>
-                        <div style={{ fontWeight: 700, fontSize: '1.125rem', marginBottom: 4 }}>
-                            {selectedApt.patient.firstName} {selectedApt.patient.lastName}
+                        {/* Patient name + status badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <div style={{ fontWeight: 700, fontSize: '1.125rem' }}>
+                                {selectedApt.patient.firstName} {selectedApt.patient.lastName}
+                            </div>
+                            <span style={{
+                                fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px',
+                                borderRadius: 999,
+                                background: `${getStatusColor(selectedApt)}22`,
+                                color: getStatusColor(selectedApt),
+                            }}>
+                                {getStatusLabel(selectedApt)}
+                            </span>
                         </div>
                         <div style={{ fontSize: '0.8125rem', color: '#94a3b8', marginBottom: 20 }}>
                             {fmtTime(new Date(selectedApt.startTime))} – {fmtTime(new Date(selectedApt.endTime))}
                             {' · '}{selectedApt.durationMin}dk
                         </div>
+
+                        {/* Ara + Mesaj */}
                         <div style={{ display: 'flex', gap: 10 }}>
                             <a
                                 href={`tel:${selectedApt.patient.phone}`}
@@ -267,9 +324,28 @@ export default function MobileCalendarPage() {
                                 style={{ ...actionBtn, background: 'rgba(99,102,241,0.12)', color: '#818cf8', flex: 1 }}
                             >💬 Mesaj</button>
                         </div>
+
+                        {/* Tamamlandı butonu — sadece aktif randevular için */}
+                        {selectedApt.status !== 'COMPLETED' && selectedApt.status !== 'CANCELLED' && (
+                            <button
+                                onClick={() => handleComplete(selectedApt!)}
+                                style={{
+                                    ...actionBtn,
+                                    width: '100%', marginTop: 10,
+                                    background: 'rgba(34,197,94,0.12)',
+                                    color: '#22c55e',
+                                    border: '1px solid rgba(34,197,94,0.25)',
+                                    fontWeight: 700, fontSize: '0.9rem',
+                                }}
+                            >
+                                ✅ Randevuyu Tamamlandı Olarak İşaretle
+                            </button>
+                        )}
+
+                        {/* Hızlı randevu butonu */}
                         <button
                             onClick={() => { handleQuickBook(selectedApt!); }}
-                            style={{ ...primaryBtn, width: '100%', marginTop: 12 }}
+                            style={{ ...primaryBtn, width: '100%', marginTop: 10 }}
                         >
                             ⚡ Bu Hastaya Yeni Randevu Al
                         </button>

@@ -137,11 +137,13 @@ export class DashboardService {
     }
 
     async getTodayReminderStatus(clinicId: string) {
-        const today = new Date();
+        // Widget: "Yarınki Randevular" — teyit mesajları yarınki randevulara atılır
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
         const appointments = await this.prisma.appointment.findMany({
             where: {
                 clinicId,
-                startTime: { gte: startOfDay(today), lte: endOfDay(today) },
+                startTime: { gte: startOfDay(tomorrow), lte: endOfDay(tomorrow) },
                 status: { not: 'CANCELLED' },
             },
             include: {
@@ -161,10 +163,11 @@ export class DashboardService {
         }));
     }
 
+
     async getTodayAppointmentActivity(clinicId: string) {
         const today = new Date();
 
-        const [created, changed, deleted] = await Promise.all([
+        const [created, changed, deleted, waEvents] = await Promise.all([
             this.prisma.appointment.findMany({
                 where: {
                     clinicId,
@@ -179,16 +182,29 @@ export class DashboardService {
                     clinicId,
                     updatedAt: { gte: startOfDay(today), lte: endOfDay(today) },
                     createdAt: { lt: startOfDay(today) },
+                    // WhatsApp iptallerini çıkar — audit log'dan ayrıca okunacak
+                    NOT: { cancelReason: { startsWith: 'WhatsApp' } },
                 },
                 include: { patient: { select: { firstName: true, lastName: true, phone: true } } },
                 orderBy: { updatedAt: 'desc' },
                 take: 15,
             }),
-            // Bugün silinen randevular — AuditLog'dan okunur
+            // Manuel silinen randevular
             this.prisma.auditLog.findMany({
                 where: {
                     clinicId,
                     action: 'DELETE',
+                    entityType: 'APPOINTMENT',
+                    createdAt: { gte: startOfDay(today), lte: endOfDay(today) },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 15,
+            }),
+            // WhatsApp iptal + erteleme audit logları
+            this.prisma.auditLog.findMany({
+                where: {
+                    clinicId,
+                    action: { in: ['WHATSAPP_CANCEL', 'WHATSAPP_UPDATE'] },
                     entityType: 'APPOINTMENT',
                     createdAt: { gte: startOfDay(today), lte: endOfDay(today) },
                 },
@@ -216,7 +232,7 @@ export class DashboardService {
                 time: a.updatedAt,
                 startTime: a.startTime,
             })),
-            // Silinen randevular — oldValues JSON'dan veri alınır
+            // Manuel silinen randevular — oldValues JSON'dan veri alınır
             ...deleted.map(log => {
                 const old = (log.oldValues as any) ?? {};
                 return {
@@ -229,6 +245,22 @@ export class DashboardService {
                     startTime: old.startTime ?? null,
                 };
             }),
+            // WhatsApp kaynaklı iptal ve erteleme
+            ...waEvents.map(log => {
+                const old = (log.oldValues as any) ?? {};
+                const nw = (log.newValues as any) ?? {};
+                return {
+                    appointmentId: log.entityId ?? '',
+                    patientName: old.patientName ?? 'Bilinmeyen Hasta',
+                    patientPhone: old.patientPhone ?? null,
+                    action: log.action as 'WHATSAPP_CANCEL' | 'WHATSAPP_UPDATE',
+                    source: 'WHATSAPP' as const,
+                    time: log.createdAt,
+                    startTime: old.startTime ?? null,
+                    oldStartTime: old.startTime ?? null,
+                    newStartTime: nw.startTime ?? null,
+                };
+            }),
         ];
 
         return items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 20);
@@ -236,7 +268,11 @@ export class DashboardService {
 
     async getPendingEscalations(clinicId: string) {
         const conversations = await this.prisma.conversation.findMany({
-            where: { clinicId, status: 'HUMAN' },
+            where: {
+                clinicId,
+                status: 'HUMAN',
+                escalationReason: { not: null },   // sadece bot escalate ettiklerini göster
+            },
             include: {
                 patient: { select: { firstName: true, lastName: true } },
             },
@@ -244,25 +280,26 @@ export class DashboardService {
             take: 20,
         });
 
-        return Promise.all(conversations.map(async conv => {
-            const lastMsg = await this.prisma.message.findFirst({
-                where: { conversationId: conv.id, direction: 'INBOUND' },
-                orderBy: { createdAt: 'desc' },
-                select: { body: true, createdAt: true },
-            });
+        const normalizeTR = (str: string) =>
+            str
+                .replace(/ç/g, 'c').replace(/Ç/g, 'C')
+                .replace(/ş/g, 's').replace(/Ş/g, 'S')
+                .replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
+                .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+                .replace(/ö/g, 'o').replace(/Ö/g, 'O')
+                .replace(/ı/g, 'i').replace(/İ/g, 'I');
 
-            return {
-                conversationId: conv.id,
-                patientName: conv.patient
-                    ? `${conv.patient.firstName} ${conv.patient.lastName}`
-                    : conv.waPhone,
-                waPhone: conv.waPhone,
-                escalationReason: conv.escalationReason,
-                humanModeAt: conv.humanModeAt,
-                lastMessageHint: lastMsg?.body
-                    ? lastMsg.body.substring(0, 60) + (lastMsg.body.length > 60 ? '...' : '')
-                    : null,
-            };
+        return conversations.map(conv => ({
+            conversationId: conv.id,
+            patientName: conv.patient
+                ? normalizeTR(`${conv.patient.firstName} ${conv.patient.lastName}`)
+                : conv.waPhone,
+            waPhone: conv.waPhone,
+            escalationReason: conv.escalationReason ? normalizeTR(conv.escalationReason) : null,
+            humanModeAt: conv.humanModeAt,
+            lastMessageHint: conv.escalationReason
+                ? normalizeTR(conv.escalationReason)
+                : null,
         }));
     }
 }

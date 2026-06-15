@@ -3,6 +3,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { AppointmentStatus, AppointmentSource, UserRole } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
 import { SocketGateway } from '../../common/gateways/socket.gateway';
+import { PushService } from '../push/push.service';
 
 @Injectable()
 export class AppointmentService {
@@ -10,6 +11,7 @@ export class AppointmentService {
         private prisma: PrismaService,
         private notificationService: NotificationService,
         private socketGateway: SocketGateway,
+        private pushService: PushService,
     ) { }
     
     async getPatientPatterns(clinicId: string, patientId: string) {
@@ -145,10 +147,44 @@ export class AppointmentService {
 
     async updateStatus(clinicId: string, appointmentId: string, status: AppointmentStatus, cancelReason?: string) {
         const appointment = await this.findOne(clinicId, appointmentId);
-        return this.prisma.appointment.update({
+        const updated = await this.prisma.appointment.update({
             where: { id: appointmentId },
             data: { status, cancelReason },
+            include: {
+                patient: { select: { firstName: true, lastName: true } },
+                doctor: { select: { id: true, firstName: true, lastName: true } },
+            },
         });
+
+        // Push notification: iptal teyit mesajından geliyorsa özel bildirim
+        if (status === 'CANCELLED') {
+            const aptDate = new Date(appointment.startTime);
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const isTomorrow = aptDate.toDateString() === tomorrow.toDateString();
+
+            const timeStr = aptDate.toLocaleString('tr-TR', {
+                day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul'
+            });
+            const patientName = `${updated.patient?.firstName} ${updated.patient?.lastName}`;
+
+            await this.pushService.sendToRoles(
+                clinicId,
+                ['DOCTOR', 'ASSISTANT', 'ADMIN'],
+                'appointmentCancelled',
+                {
+                    title: isTomorrow ? '🚨 Yarınki Randevu İptal Edildi' : '❌ Randevu İptal',
+                    body: `${patientName} — ${timeStr}${cancelReason ? ` (${cancelReason})` : ''}`,
+                    url: '/mobile/calendar',
+                    tag: `cancel-${appointmentId}`,
+                },
+            );
+
+            // Socket real-time
+            this.socketGateway.emitToClinic(clinicId, 'appointment:cancelled', { appointmentId });
+        }
+
+        return updated;
     }
 
     async update(clinicId: string, appointmentId: string, data: { startTime?: Date; durationMin?: number; notes?: string }) {
@@ -353,11 +389,15 @@ export class AppointmentService {
         }
 
         // 3. Find Doctor
-        const normalizedDoctorInput = data.doctorName.replace(/^Dr\.?\s*/i, '').trim().toLowerCase();
+        const normalizedDoctorInput = this.normalizeTurkish(
+            data.doctorName.replace(/^Dr\.?\s*/i, '').trim()
+        );
         const doctors = await this.prisma.user.findMany({ where: { clinicId, role: 'DOCTOR' } });
         const doctor = doctors.find(d => {
-            const fullName = `${d.firstName} ${d.lastName}`.toLowerCase();
-            return fullName.includes(normalizedDoctorInput) || normalizedDoctorInput.includes(fullName);
+            const fullName = this.normalizeTurkish(`${d.firstName} ${d.lastName}`);
+            const firstName = this.normalizeTurkish(d.firstName);
+            return fullName.includes(normalizedDoctorInput) || normalizedDoctorInput.includes(fullName)
+                || firstName.includes(normalizedDoctorInput) || normalizedDoctorInput.includes(firstName);
         });
         if (!doctor) throw new BadRequestException(`Doktor bulunamadı: "${data.doctorName}"`);
 
@@ -389,6 +429,19 @@ export class AppointmentService {
         this.socketGateway.emitToUser(doctor.id, 'notification', { message: apptMsg });
         this.socketGateway.emitToClinic(clinicId, 'appointment:created', { appointmentId: appointment.id });
 
+        // Push notification — doktor + asistanlar
+        await this.pushService.sendToRoles(
+            clinicId,
+            ['DOCTOR', 'ASSISTANT', 'ADMIN'],
+            'appointmentCreated',
+            {
+                title: '📅 Yeni Randevu (WhatsApp)',
+                body: apptMsg,
+                url: '/mobile/calendar',
+                tag: `apt-created-${appointment.id}`,
+            },
+        );
+
         const assistants = await this.prisma.user.findMany({ where: { clinicId, role: 'ASSISTANT' } });
         for (const assistant of assistants) {
             await this.notificationService.create(clinicId, assistant.id, {
@@ -405,39 +458,74 @@ export class AppointmentService {
 
 
     async findByReferenceOrPhone(clinicId: string, query: { referenceCode?: string; phone?: string }) {
-        if (query.referenceCode) {
-            return this.prisma.appointment.findFirst({
-                where: { clinicId, referenceCode: query.referenceCode },
-                include: { patient: true, doctor: true },
+        const toLocal = (date: Date) =>
+            date.toLocaleString('tr-TR', {
+                timeZone: 'Europe/Istanbul',
+                day: '2-digit', month: 'long', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
             });
+
+        if (query.referenceCode) {
+            const appt = await this.prisma.appointment.findFirst({
+                where: { clinicId, referenceCode: query.referenceCode },
+                include: {
+                    patient: { select: { firstName: true, lastName: true, phone: true } },
+                    doctor: { select: { firstName: true, lastName: true } },
+                },
+            });
+            if (!appt) return null;
+            return { ...appt, startTimeLocal: toLocal(new Date(appt.startTime)) };
         }
 
         if (query.phone) {
             const normalizedPhone = query.phone.replace(/\D/g, '');
             const phone = normalizedPhone.startsWith('+') ? normalizedPhone : `+${normalizedPhone}`;
 
-            return this.prisma.appointment.findMany({
-                where: { clinicId, patient: { phone } },
-                include: { patient: true, doctor: true },
-                orderBy: { startTime: 'desc' },
+            const appts = await this.prisma.appointment.findMany({
+                where: {
+                    clinicId,
+                    patient: { OR: [{ phone }, { phone2: phone }] },
+                    status: { not: 'CANCELLED' },
+                },
+                include: {
+                    patient: { select: { firstName: true, lastName: true, phone: true } },
+                    doctor: { select: { firstName: true, lastName: true } },
+                },
+                orderBy: { startTime: 'asc' },
                 take: 5,
             });
+            return appts.map(a => ({ ...a, startTimeLocal: toLocal(new Date(a.startTime)) }));
         }
 
         return null;
     }
 
-    async findAvailabilityByDoctorName(clinicId: string, doctorName: string, date: string) {
-        const normalizedInput = doctorName.replace(/^Dr\.?\s*/i, '').trim().toLowerCase();
+    /** Normalize Turkish characters to ASCII for fuzzy doctor name matching */
+    private normalizeTurkish(str: string): string {
+        return str
+            .toLowerCase()
+            .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
+            .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+            .replace(/Ğ/g, 'g').replace(/Ü/g, 'u').replace(/Ş/g, 's')
+            .replace(/İ/g, 'i').replace(/Ö/g, 'o').replace(/Ç/g, 'c');
+    }
+
+    async findAvailabilityByDoctorName(clinicId: string, doctorName: string, date: string, preferredTime?: string) {
+        const normalizedInput = this.normalizeTurkish(
+            doctorName.replace(/^Dr\.?\s*/i, '').trim()
+        );
         const doctors = await this.prisma.user.findMany({
             where: { clinicId, role: 'DOCTOR' },
         });
 
         const doctor = doctors.find(d => {
-            const fullName = `${d.firstName} ${d.lastName}`.toLowerCase();
+            const fullName = this.normalizeTurkish(`${d.firstName} ${d.lastName}`);
+            const firstName = this.normalizeTurkish(d.firstName);
             const simpleInput = normalizedInput.replace(/\s+/g, '');
             const simpleFull = fullName.replace(/\s+/g, '');
-            return simpleFull.includes(simpleInput) || simpleInput.includes(simpleFull);
+            // Match by first name alone, full name, or partial
+            return simpleFull.includes(simpleInput) || simpleInput.includes(simpleFull)
+                || firstName.includes(simpleInput) || simpleInput.includes(firstName);
         });
 
         if (!doctor) throw new BadRequestException(`Doktor bulunamadı: "${doctorName}"`);
@@ -450,45 +538,117 @@ export class AppointmentService {
             return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
         });
 
-        // Smart Filtering: Suggest 3 best slots
-        // 1. If we have a preferred time, try to find a slot near it
-        // 2. Otherwise pick morning, noon, and afternoon
-        const suggestedSlots: string[] = [];
-        
-        // Pick one around 10:00 (morning)
-        const morning = allSlotsFormatted.find(s => s.includes(' 10:') || s.includes(' 09:'));
-        if (morning) suggestedSlots.push(morning);
+        if (allSlotsFormatted.length === 0) {
 
-        // Pick one around 14:00 (afternoon)
-        const afternoon = allSlotsFormatted.find(s => s.includes(' 14:') || s.includes(' 15:'));
-        if (afternoon) suggestedSlots.push(afternoon);
-
-        // Pick one around 18:00 (evening)
-        const evening = allSlotsFormatted.find(s => s.includes(' 18:') || s.includes(' 19:'));
-        if (evening) suggestedSlots.push(evening);
-
-        // If still empty or too few, just take the first 3
-        if (suggestedSlots.length < 2) {
-            suggestedSlots.push(...allSlotsFormatted.slice(0, 3));
+            return {
+                doctorId: doctor.id,
+                doctorName: `${doctor.firstName} ${doctor.lastName}`,
+                slots: [],
+                message: 'Bu tarihte musait randevu yok.',
+            };
         }
 
+        // preferredTime verilmişse: exact match → sadece o, yoksa 3 yakın öneri
+        if (preferredTime) {
+            const exactSlot = allSlotsFormatted.find(s => s.endsWith(` ${preferredTime}`));
+            if (exactSlot) {
+                return {
+                    doctorId: doctor.id,
+                    doctorName: `${doctor.firstName} ${doctor.lastName}`,
+                    slots: [exactSlot.split(' ')[1]],
+                    available: true,
+                };
+            }
+            // Exact slot dolu — 3 en yakın alternatif
+            const [prefH, prefM] = preferredTime.split(':').map(Number);
+            const prefMinutes = (prefH || 0) * 60 + (prefM || 0);
+            const nearest = [...allSlotsFormatted]
+                .sort((a, b) => {
+                    const [aH, aM] = a.split(' ')[1].split(':').map(Number);
+                    const [bH, bM] = b.split(' ')[1].split(':').map(Number);
+                    return Math.abs((aH * 60 + aM) - prefMinutes) - Math.abs((bH * 60 + bM) - prefMinutes);
+                })
+                .slice(0, 3)
+                .map(s => s.split(' ')[1]);
+            return {
+                doctorId: doctor.id,
+                doctorName: `${doctor.firstName} ${doctor.lastName}`,
+                slots: nearest,
+                available: false,
+                message: `${preferredTime} musait degil. En yakin alternatifler:`,
+            };
+        }
+
+        // preferredTime yoksa: tüm müsait saatleri döndür
         return {
             doctorId: doctor.id,
             doctorName: `${doctor.firstName} ${doctor.lastName}`,
-            suggestedSlots: Array.from(new Set(suggestedSlots)).slice(0, 3), // Ensure uniqueness
-            allSlotsCount: allSlotsFormatted.length,
+            slots: allSlotsFormatted.map(s => s.split(' ')[1]),
         };
+
     }
+
 
     async updateFromWhatsApp(clinicId: string, appointmentId: string, data: { startTime?: string; durationMin?: number }) {
         const appointment = await this.findOne(clinicId, appointmentId);
         if (appointment.status === 'CANCELLED') throw new BadRequestException('İptal edilmiş randevu güncellenemez');
+
+        // Eski saati push için sakla
+        const oldTimeStr = new Date(appointment.startTime).toLocaleString('tr-TR', {
+            day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul',
+        });
 
         const result = await this.update(clinicId, appointmentId, {
             startTime: data.startTime ? new Date(data.startTime) : undefined,
             durationMin: data.durationMin ? Number(data.durationMin) : undefined,
         });
         this.socketGateway.emitToClinic(clinicId, 'appointment:updated', { appointmentId });
+
+        // Push notification — randevu değişikliği bildirimi
+        const patientResult = await this.prisma.appointment.findUnique({
+            where: { id: appointmentId },
+            include: { patient: { select: { firstName: true, lastName: true } } },
+        });
+        const patName = patientResult?.patient
+            ? `${patientResult.patient.firstName} ${patientResult.patient.lastName}`
+            : 'Hasta';
+        const newTimeStr = data.startTime
+            ? new Date(data.startTime).toLocaleString('tr-TR', {
+                day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul',
+            })
+            : oldTimeStr;
+
+        await this.pushService.sendToRoles(
+            clinicId,
+            ['DOCTOR', 'ASSISTANT', 'ADMIN'],
+            'appointmentUpdated',
+            {
+                title: '📅 Randevu Değişikliği Yapıldı',
+                body: `${patName}: ${oldTimeStr} → ${newTimeStr}`,
+                url: '/mobile/calendar',
+                tag: `update-${appointmentId}`,
+            },
+        );
+
+        // Dashboard aktivite widget'i için audit log
+        await this.prisma.auditLog.create({
+            data: {
+                clinicId,
+                userId: null,
+                action: 'WHATSAPP_UPDATE',
+                entityType: 'APPOINTMENT',
+                entityId: appointmentId,
+                oldValues: {
+                    patientName: patName,
+                    startTime: appointment.startTime,
+                    source: 'WHATSAPP',
+                },
+                newValues: {
+                    startTime: data.startTime ? new Date(data.startTime) : appointment.startTime,
+                },
+            },
+        });
+
         return result;
     }
 
@@ -505,6 +665,46 @@ export class AppointmentService {
             },
         });
         this.socketGateway.emitToClinic(clinicId, 'appointment:cancelled', { appointmentId });
+
+        // Push notification — doktora ve asistanlara
+        const aptDate = new Date(appointment.startTime);
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const isTomorrow = aptDate.toDateString() === tomorrow.toDateString();
+        const patName = `${cancelled.patient?.firstName} ${cancelled.patient?.lastName}`;
+        const timeStr = aptDate.toLocaleString('tr-TR', {
+            day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul'
+        });
+
+        await this.pushService.sendToRoles(
+            clinicId,
+            ['DOCTOR', 'ASSISTANT', 'ADMIN'],
+            'appointmentCancelled',
+            {
+                title: isTomorrow ? '🚨 Yarınki Randevu İptal Edildi' : '❌ WA Randevu İptali',
+                body: `${patName} — ${timeStr}`,
+                url: '/mobile/calendar',
+                tag: `cancel-wa-${appointmentId}`,
+            },
+        );
+
+        // Dashboard aktivite widget'i için audit log
+        await this.prisma.auditLog.create({
+            data: {
+                clinicId,
+                userId: null,
+                action: 'WHATSAPP_CANCEL',
+                entityType: 'APPOINTMENT',
+                entityId: appointmentId,
+                oldValues: {
+                    patientName: patName,
+                    doctorName: `${cancelled.doctor?.firstName ?? ''} ${cancelled.doctor?.lastName ?? ''}`.trim(),
+                    startTime: appointment.startTime,
+                    source: 'WHATSAPP',
+                },
+            },
+        });
+
         return cancelled;
     }
 

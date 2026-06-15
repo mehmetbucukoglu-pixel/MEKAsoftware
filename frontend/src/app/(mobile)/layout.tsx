@@ -2,6 +2,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth-store';
 import { useEffect } from 'react';
+import { Toaster } from 'react-hot-toast';
 
 const NAV = [
     { href: '/mobile/calendar', icon: '📅', label: 'Takvim' },
@@ -12,7 +13,10 @@ const NAV = [
 export default function MobileLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
-    const { isAuthenticated, isLoading } = useAuthStore();
+    const { isAuthenticated, isLoading, loadUser } = useAuthStore();
+
+    // Load user from token on mount (critical for page refresh)
+    useEffect(() => { loadUser(); }, [loadUser]);
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
@@ -40,6 +44,13 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
             overscrollBehavior: 'none',
             WebkitTapHighlightColor: 'transparent',
         }}>
+            <Toaster
+                position="top-center"
+                toastOptions={{
+                    style: { background: '#1e2a3a', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.1)' },
+                    duration: 2500,
+                }}
+            />
             {/* Main content */}
             <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
                 {children}

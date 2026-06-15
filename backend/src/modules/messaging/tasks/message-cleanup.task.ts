@@ -12,19 +12,17 @@ export class MessageCleanupTask {
     async handleCron() {
         this.logger.debug('Running MessageCleanupTask...');
 
-        const fifteenDaysAgo = new Date();
-        fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180); // 6 ay saklama politikası
 
         const deleteResult = await this.prisma.message.deleteMany({
             where: {
-                createdAt: { lt: fifteenDaysAgo }
-                // Note: appointments are currently not directly linked in schema,
-                // so we delete all messages older than 15 days.
+                createdAt: { lt: sixMonthsAgo }
             }
         });
 
         if (deleteResult.count > 0) {
-            this.logger.log(`Deleted ${deleteResult.count} messages older than 15 days.`);
+            this.logger.log(`Deleted ${deleteResult.count} messages older than 180 days (6 months).`);
         }
     }
 }

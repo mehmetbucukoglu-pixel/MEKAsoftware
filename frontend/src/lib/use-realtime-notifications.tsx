@@ -93,22 +93,27 @@ export function useRealtimeNotifications() {
         };
 
         const handleNewMessage = (data: any) => {
-            if (window.location.pathname !== '/messages') {
-                const sender = data?.patient
-                    ? `${data.patient.firstName} ${data.patient.lastName}`
-                    : data?.waPhone || 'Bilinmeyen';
+            const onMessagesPage = window.location.pathname.startsWith('/messages') ||
+                window.location.pathname.startsWith('/mobile/messages');
+            if (onMessagesPage) return; // mesajlar açıkken toast bastırma
 
-                toast((t) => (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#10b981' }}>
-                            💬 Yeni Mesaj: {sender}
-                        </div>
-                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                            {(data?.body || '').substring(0, 60)}...
-                        </div>
+            const sender = data?.patient
+                ? `${data.patient.firstName} ${data.patient.lastName}`
+                : data?.waPhone || 'Bilinmeyen';
+            const preview = (data?.body || '').substring(0, 55);
+
+            toast((t) => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#10b981' }}>
+                        💬 {sender}
                     </div>
-                ), { duration: 3000 });
-            }
+                    {preview && (
+                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                            {preview}{preview.length >= 55 ? '…' : ''}
+                        </div>
+                    )}
+                </div>
+            ), { duration: 4000 });
         };
 
         const handleEscalation = (data: any) => {
@@ -123,11 +128,18 @@ export function useRealtimeNotifications() {
             toast.success('Bekleyen mesaj yanıtlandı', { duration: 2000 });
         };
 
+        // Bekleyen bildirimler temizlendi (bota geri al veya cevap verilince)
+        const handleNotificationsCleared = (_data: { conversationId: string }) => {
+            // Bell badge'ini anında yenile (desktop layout dinliyor)
+            window.dispatchEvent(new Event('app_notification_received'));
+        };
+
         socket.on('app_notification', handleAppNotification);
         socket.on('appointment_created', handleAppointmentCreated);
         socket.on('appointment_cancelled', handleAppointmentCancelled);
         socket.on('new_message', handleNewMessage);
         socket.on('escalation_resolved', handleEscalationResolved);
+        socket.on('notifications_cleared', handleNotificationsCleared);
 
         return () => {
             socket.off('app_notification', handleAppNotification);
@@ -135,6 +147,7 @@ export function useRealtimeNotifications() {
             socket.off('appointment_cancelled', handleAppointmentCancelled);
             socket.off('new_message', handleNewMessage);
             socket.off('escalation_resolved', handleEscalationResolved);
+            socket.off('notifications_cleared', handleNotificationsCleared);
         };
     }, [clinic?.id, user?.id, user?.role]);
 }

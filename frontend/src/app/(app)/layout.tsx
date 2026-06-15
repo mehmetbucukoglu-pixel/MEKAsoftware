@@ -20,13 +20,6 @@ import { queryClient } from '@/lib/query-client';
 import dynamic from 'next/dynamic';
 import { useKeyboardShortcuts } from '@/components/keyboard-shortcuts';
 import { useRealtimeNotifications } from '@/lib/use-realtime-notifications';
-import { FollowUpPrompts } from './dashboard/follow-up-prompts';
-
-const OnboardingTooltips = dynamic(
-    () => import('@/components/onboarding-tooltips').then((mod) => mod.OnboardingTooltips),
-    { ssr: false }
-);
-
 const ShortcutCheatSheet = dynamic(
     () => import('@/components/keyboard-shortcuts').then((mod) => mod.ShortcutCheatSheet),
     { ssr: false }
@@ -93,7 +86,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
-            router.push('/login');
+            router.replace('/login');
         }
     }, [isLoading, isAuthenticated, router]);
 
@@ -112,7 +105,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         if (isAuthenticated) {
             fetchGlobalStats();
             const interval = setInterval(fetchGlobalStats, 60000);
-            return () => clearInterval(interval);
+            // Socket hook'undan gelen anlık refresh sinyali (bildiri okundu/temizlendi)
+            window.addEventListener('app_notification_received', fetchGlobalStats);
+            return () => {
+                clearInterval(interval);
+                window.removeEventListener('app_notification_received', fetchGlobalStats);
+            };
         }
     }, [isAuthenticated]);
 
@@ -560,9 +558,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </QueryClientProvider>
                 </div>
             </main>
-            <OnboardingTooltips />
             <ShortcutCheatSheet open={showCheatSheet} onClose={() => setShowCheatSheet(false)} />
-            <FollowUpPrompts />
         </div >
     );
 }

@@ -281,35 +281,54 @@ export function ChatWindow({
             </div>
 
             {/* Input area */}
-            <div style={{ padding: '20px', background: 'var(--bg-surface)', borderTop: '1px solid var(--border)' }}>
-                <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '12px' }}>
-                    <input
-                        type="text"
-                        value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
-                        placeholder={status === 'BOT' ? 'Bot devredeyken mesaj gönderemezsiniz...' : 'Mesaj yazın...'}
-                        readOnly={status === 'BOT'}
-                        style={{
-                            flex: 1,
-                            padding: '12px 16px',
-                            borderRadius: 'var(--radius-md)',
-                            border: '1px solid var(--border)',
-                            background: status === 'BOT' ? 'var(--bg-hover)' : 'var(--bg-elevated)',
-                            outline: 'none',
-                            opacity: status === 'BOT' ? 0.7 : 1,
-                            cursor: status === 'BOT' ? 'not-allowed' : 'text'
-                        }}
-                    />
+            {status === 'BOT' ? (
+                <div style={{
+                    padding: '14px 20px',
+                    background: 'var(--bg-surface)',
+                    borderTop: '1px solid var(--border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                }}>
+                    <Bot size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                        Bot devrede — mesaj göndermek için sohbeti devralın
+                    </span>
                     <button
-                        type="submit"
-                        className="btn btn-primary btn-icon"
-                        disabled={status === 'BOT' || !inputText.trim()}
-                        style={{ padding: '12px', borderRadius: 'var(--radius-md)', opacity: status === 'BOT' ? 0.5 : 1 }}
+                        onClick={() => onSwitchMode('HUMAN')}
+                        className="btn btn-sm btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
                     >
-                        <Send size={20} />
+                        <UserCheck size={14} /> Devral
                     </button>
-                </form>
-            </div>
+                </div>
+            ) : (
+                <div style={{ padding: '20px', background: 'var(--bg-surface)', borderTop: '1px solid var(--border)' }}>
+                    <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '12px' }}>
+                        <input
+                            type="text"
+                            value={inputText}
+                            onChange={(e) => setInputText(e.target.value)}
+                            placeholder="Mesaj yazın..."
+                            autoFocus
+                            style={{
+                                flex: 1,
+                                padding: '12px 16px',
+                                borderRadius: 'var(--radius-md)',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-elevated)',
+                                outline: 'none',
+                            }}
+                        />
+                        <button
+                            type="submit"
+                            className="btn btn-primary btn-icon"
+                            disabled={!inputText.trim()}
+                            style={{ padding: '12px', borderRadius: 'var(--radius-md)' }}
+                        >
+                            <Send size={20} />
+                        </button>
+                    </form>
+                </div>
+            )}
         </div>
     );
 }
