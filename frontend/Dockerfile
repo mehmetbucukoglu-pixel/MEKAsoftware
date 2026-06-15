@@ -6,12 +6,17 @@ RUN npm ci
 
 COPY . .
 
-# NEXT_PUBLIC vars must be available at build time
 ARG NEXT_PUBLIC_API_URL=https://api.mekapanel.com/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 RUN npm run build
 
+# Standalone mode requires static files to be copied manually
+RUN cp -r .next/static .next/standalone/.next/static && \
+    cp -r public .next/standalone/public
+
+WORKDIR /app/.next/standalone
 EXPOSE 3000
 ENV HOSTNAME=0.0.0.0
-CMD ["node", ".next/standalone/server.js"]
+ENV PORT=3000
+CMD ["node", "server.js"]
