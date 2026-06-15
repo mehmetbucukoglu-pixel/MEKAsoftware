@@ -43,7 +43,12 @@ async function bootstrap() {
   const port = configService.get<number>('APP_PORT', 3000);
   await app.listen(port, '0.0.0.0');
 
-  console.log(`🚀 KlinikApp API running on http://localhost:${port}`);
+  // Debug: verify actual listening address
+  const httpServer = app.getHttpServer();
+  const addr = httpServer.address();
+  console.log(`🔍 Server address: ${JSON.stringify(addr)}`);
+  console.log(`🚀 KlinikApp API running on http://localhost:${port} ${process.env.APP_ENV} ${process.env.APP_NAME}`);
   console.log(`📖 Swagger docs: http://localhost:${port}/api/docs`);
+
 }
 bootstrap();
