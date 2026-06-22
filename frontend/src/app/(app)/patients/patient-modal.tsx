@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Check, AlertCircle, Calendar, UserRound } from 'lucide-react';
-import { patientApi, Patient, CreatePatientInput } from '@/lib/api';
+import { patientApi, Patient, CreatePatientInput, userApi } from '@/lib/api';
+import { normalizePhoneForStorage } from '@/lib/format';
 
 interface PatientModalProps {
     isOpen: boolean;
@@ -24,6 +25,8 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
         gender: '',
         notes: '',
     });
+    const [doctors, setDoctors] = useState<{ id: string; firstName: string; lastName: string }[]>([]);
+    const [selectedDoctorId, setSelectedDoctorId] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState('');
@@ -33,6 +36,17 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
 
     const isEdit = !!patient;
 
+    // Doktor listesini çek
+    useEffect(() => {
+        if (!isOpen) return;
+        userApi.getDoctors().then((res: any) => {
+            const list = res.data || [];
+            setDoctors(list);
+            // Tek doktor varsa otomatik seç
+            if (list.length === 1 && !patient) setSelectedDoctorId(list[0].id);
+        }).catch(() => {});
+    }, [isOpen]);
+
     useEffect(() => {
         if (patient) {
             setForm({
@@ -40,20 +54,22 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                 lastName: patient.lastName || '',
                 phone: patient.phone || '',
                 phone2: (patient as any).phone2 || '',
-                email: patient.email || '',
-                address: patient.address || '',
-                dateOfBirth: patient.dateOfBirth ? patient.dateOfBirth.split('T')[0] : '',
-                gender: patient.gender || '',
-                notes: patient.notes || '',
+                email: '',
+                address: '',
+                dateOfBirth: '',
+                gender: '',
+                notes: '',
             });
+            setSelectedDoctorId((patient as any).metadata?.primaryDoctorId || '');
         } else {
             setForm({ firstName: '', lastName: '', phone: '', phone2: '', email: '', address: '', dateOfBirth: '', gender: '', notes: '' });
+            if (doctors.length === 1) setSelectedDoctorId(doctors[0].id);
         }
         setErrors({});
         setSubmitError('');
         setPhoneWarning(null);
         setSuccessData(null);
-    }, [patient, isOpen]);
+    }, [patient, isOpen, doctors]);
 
     useEffect(() => {
         if (!isOpen || isEdit) return;
@@ -86,8 +102,6 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
         if (!form.firstName || form.firstName.length < 2) newErrors.firstName = 'Ad en az 2 karakter olmalıdır';
         if (!form.lastName || form.lastName.length < 2) newErrors.lastName = 'Soyad en az 2 karakter olmalıdır';
         if (!form.phone) newErrors.phone = 'Telefon zorunludur';
-        if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) newErrors.email = 'Geçerli bir e-posta giriniz';
-        if (form.address && form.address.length < 5) newErrors.address = 'Adres en az 5 karakter olmalıdır';
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -100,17 +114,14 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
         setSubmitError('');
 
         try {
-            const payload: CreatePatientInput = {
+            const payload: any = {
                 firstName: form.firstName,
                 lastName: form.lastName,
-                phone: form.phone,
-                address: form.address,
+                phone: normalizePhoneForStorage(form.phone),
+                address: '',
             };
-            if (form.phone2) payload.phone2 = form.phone2;
-            if (form.email) payload.email = form.email;
-            if (form.dateOfBirth) payload.dateOfBirth = form.dateOfBirth;
-            if (form.gender) payload.gender = form.gender;
-            if (form.notes) payload.notes = form.notes;
+            if (form.phone2) payload.phone2 = normalizePhoneForStorage((form as any).phone2);
+            if (selectedDoctorId) payload.metadata = { primaryDoctorId: selectedDoctorId };
 
             if (isEdit && patient) {
                 await patientApi.update(patient.id, payload);
@@ -208,7 +219,6 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                             </div>
                         ) : (
                             <>
-
                                 <div className="form-row">
                                     <div className="form-group">
                                         <label className="label">Ad *</label>
@@ -239,6 +249,12 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                                             className="input"
                                             value={form.phone}
                                             onChange={(e) => handleChange('phone', e.target.value)}
+                                            onFocus={(e) => {
+                                                if (!e.target.value) handleChange('phone', '+90');
+                                            }}
+                                            onBlur={(e) => {
+                                                if (e.target.value === '+90') handleChange('phone', '');
+                                            }}
                                             placeholder="+905550001111"
                                         />
                                         {errors.phone && <div className="form-error">{errors.phone}</div>}
@@ -265,24 +281,17 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                                             className="input"
                                             value={(form as any).phone2 || ''}
                                             onChange={(e) => handleChange('phone2' as any, e.target.value)}
+                                            onFocus={(e) => {
+                                                if (!e.target.value) handleChange('phone2' as any, '+90');
+                                            }}
+                                            onBlur={(e) => {
+                                                if (e.target.value === '+90') handleChange('phone2' as any, '');
+                                            }}
                                             placeholder="+905550002222"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="form-group" style={{ marginBottom: '12px' }}>
-                                    <label className="label">E-posta</label>
-                                    <input
-                                        className="input"
-                                        type="email"
-                                        value={form.email}
-                                        onChange={(e) => handleChange('email', e.target.value)}
-                                        placeholder="hasta@email.com"
-                                    />
-                                    {errors.email && <div className="form-error">{errors.email}</div>}
-                                </div>
-
-                                <div className="form-group" style={{ marginBottom: '12px' }}>
                                     <label className="label">Adres</label>
                                     <textarea
                                         className="textarea"

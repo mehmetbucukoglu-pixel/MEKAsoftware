@@ -402,6 +402,17 @@ export class MessagingService {
                 if (lastAppointment?.doctor) {
                     doctorId = lastAppointment.doctor.id;
                     doctorName = `Dr. ${lastAppointment.doctor.firstName} ${lastAppointment.doctor.lastName}`;
+                } else {
+                    // Fallback: check patient.metadata.primaryDoctorId (set during registration)
+                    const patient = await this.prisma.patient.findUnique({ where: { id: resolvedPatientId } });
+                    const primaryDoctorId = (patient?.metadata as any)?.primaryDoctorId;
+                    if (primaryDoctorId) {
+                        const doc = await this.prisma.user.findUnique({ where: { id: primaryDoctorId }, select: { id: true, firstName: true, lastName: true } });
+                        if (doc) {
+                            doctorId = doc.id;
+                            doctorName = `Dr. ${doc.firstName} ${doc.lastName}`;
+                        }
+                    }
                 }
             }
 
