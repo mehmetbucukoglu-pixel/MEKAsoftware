@@ -333,6 +333,7 @@ export class MessagingService {
     }
 
     async getStatusByPhone(clinicId: string, waPhone: string) {
+        if (!clinicId) return { mode: 'BOT', isRegistered: false, isNewConversation: true, doctorName: null, doctorId: null, combinedText: '', patientName: null, sentiment: 'NEUTRAL', linkedPatients: [] };
         const cleanPhone = waPhone.replace(/\D/g, '');
         const conv = await this.prisma.conversation.findUnique({
             where: { clinicId_waPhone: { clinicId, waPhone: cleanPhone } },
@@ -469,6 +470,7 @@ export class MessagingService {
 
     /** Get the latest inbound message ID for debounce — n8n checks this after waiting */
     async getLatestInboundId(clinicId: string, waPhone: string) {
+        if (!clinicId) return { latestWaMessageId: null };
         const cleanPhone = waPhone.replace(/\D/g, '');
         const conv = await this.prisma.conversation.findUnique({
             where: { clinicId_waPhone: { clinicId, waPhone: cleanPhone } },
