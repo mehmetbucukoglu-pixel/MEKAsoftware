@@ -133,7 +133,7 @@ export class MessagingService {
             this.socketGateway.emitToStaff(clinicId, 'conversation_updated', updatedConv);
         }
 
-        return message;
+        return plainMessage;
     }
 
     async handleInboundWebhook(data: WhatsappWebhookDto) {
