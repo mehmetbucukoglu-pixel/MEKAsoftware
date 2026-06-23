@@ -875,6 +875,9 @@ export class AppointmentService {
             patientPhone: apt.patient.phone,
             doctorName: `Dr. ${apt.doctor.firstName} ${apt.doctor.lastName}`,
             startTime: apt.startTime,
+            dateFormatted: new Date(apt.startTime).toLocaleDateString('tr-TR', {
+                day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Istanbul',
+            }),
             timeFormatted: new Date(apt.startTime).toLocaleTimeString('tr-TR', {
                 hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul',
             }),
