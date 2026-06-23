@@ -696,7 +696,7 @@ export class MessagingService {
                     'Content-Type': 'application/json',
                     'x-n8n-secret': secret || '',
                 },
-                body: JSON.stringify({ to: waPhone, message: body, mediaUrl }),
+                body: JSON.stringify({ to: waPhone, message: body, mediaUrl, clinicId, source: 'HUMAN_RELAY' }),
             });
 
             if (!response.ok) {
