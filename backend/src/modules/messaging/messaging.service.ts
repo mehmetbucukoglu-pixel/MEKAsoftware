@@ -112,7 +112,7 @@ export class MessagingService {
         // --- Outbound WhatsApp relay via n8n ---
         // Only send if conversation is in HUMAN mode (bot handles BOT mode itself)
         if (conv?.status === 'HUMAN') {
-            await this.relayToWhatsApp(conv.waPhone, body, mediaUrl);
+            await this.relayToWhatsApp(clinicId, conv.waPhone, body, mediaUrl);
 
             // Mesaj gönderen kişi artık bu konuşmanın sahibi olur (assignedTo güncelle)
             const updatedConv = await this.prisma.conversation.update({
@@ -664,18 +664,31 @@ export class MessagingService {
     // --- Private Helpers ---
 
     /**
-     * Calls n8n outbound webhook to send a WhatsApp message via Meta Cloud API.
-     * Gracefully degrades: if not configured or call fails, logs error but does not throw.
+     * Klinik bazlı outbound webhook URL'ini kullanarak WhatsApp mesajı gönderir.
+     * Önce clinic.settings.outboundWebhookUrl'e bakar, yoksa global env var'a düşer.
      */
-    private async relayToWhatsApp(waPhone: string, body?: string, mediaUrl?: string) {
-        const webhookUrl = this.configService.get<string>('N8N_OUTBOUND_WEBHOOK_URL');
-        const secret = this.configService.get<string>('N8N_WEBHOOK_SECRET');
+    private async relayToWhatsApp(clinicId: string, waPhone: string, body?: string, mediaUrl?: string) {
+        // 1. Klinik ayarlarından URL'i çek
+        let webhookUrl: string | undefined;
+        try {
+            const clinic = await this.prisma.clinic.findUnique({
+                where: { id: clinicId },
+                select: { settings: true },
+            });
+            webhookUrl = (clinic?.settings as any)?.outboundWebhookUrl;
+        } catch { /* ignore — fallback to env */ }
+
+        // 2. Yoksa global env var'a bak (tek klinik / geliştirme ortamı)
+        if (!webhookUrl) {
+            webhookUrl = this.configService.get<string>('N8N_OUTBOUND_WEBHOOK_URL');
+        }
 
         if (!webhookUrl) {
-            console.warn('[Messaging] N8N_OUTBOUND_WEBHOOK_URL not configured — skipping WhatsApp relay.');
+            console.warn(`[Messaging] Outbound webhook URL not configured for clinic ${clinicId} — skipping WhatsApp relay.`);
             return;
         }
 
+        const secret = this.configService.get<string>('N8N_WEBHOOK_SECRET');
         try {
             const response = await fetch(webhookUrl, {
                 method: 'POST',
