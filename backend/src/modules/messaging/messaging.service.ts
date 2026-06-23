@@ -464,6 +464,30 @@ export class MessagingService {
             name: `${link.patient.firstName} ${link.patient.lastName}`
         }));
 
+        // Check for a recently-sent reminder that patient may be responding to
+        let pendingReminder: { appointmentId: string; appointmentTime: string; doctorName: string } | null = null;
+        if (resolvedPatientId) {
+            const now = new Date();
+            const in48h = new Date(now.getTime() + 48 * 3600 * 1000);
+            const reminderAppt = await this.prisma.appointment.findFirst({
+                where: {
+                    clinicId,
+                    patientId: resolvedPatientId,
+                    reminderStatus: 'SENT',
+                    status: 'CONFIRMED',
+                    startTime: { gte: now, lte: in48h },
+                },
+                include: { doctor: { select: { firstName: true, lastName: true } } },
+            });
+            if (reminderAppt) {
+                pendingReminder = {
+                    appointmentId: reminderAppt.id,
+                    appointmentTime: new Date(reminderAppt.startTime).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }),
+                    doctorName: `Dr. ${reminderAppt.doctor.firstName} ${reminderAppt.doctor.lastName}`,
+                };
+            }
+        }
+
         const isNewConversation = !conv;
 
         return {
@@ -476,6 +500,7 @@ export class MessagingService {
             patientName,
             sentiment,
             linkedPatients,
+            pendingReminder,
         };
     }
 
