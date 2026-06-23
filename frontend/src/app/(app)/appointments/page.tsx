@@ -223,10 +223,16 @@ export default function AppointmentsPage() {
         if (!clinic?.id || !user?.id) return;
         const socket = getSocket(clinic.id, user.id, user.role ?? '');
         const refresh = () => handleRefresh();
+        // Backend: underscore format (appointment_created, appointment_cancelled)
+        socket.on('appointment_created', refresh);
+        socket.on('appointment_cancelled', refresh);
+        // Frontend-originated: colon format (appointment:created, etc.)
         socket.on('appointment:created', refresh);
         socket.on('appointment:updated', refresh);
         socket.on('appointment:cancelled', refresh);
         return () => {
+            socket.off('appointment_created', refresh);
+            socket.off('appointment_cancelled', refresh);
             socket.off('appointment:created', refresh);
             socket.off('appointment:updated', refresh);
             socket.off('appointment:cancelled', refresh);
