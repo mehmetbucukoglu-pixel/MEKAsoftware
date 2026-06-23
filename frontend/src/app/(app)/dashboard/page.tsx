@@ -414,13 +414,23 @@ export default function DashboardPage() {
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
-                                {activity.map((a: any, i: number) => {
+                                {(() => {
+                                    // İptal ardından gelen CREATED event'leri (aynı hasta, ≤5 dk) gizle
+                                    const cancelledPatients = new Set(
+                                        activity
+                                            .filter((a: any) => a.action === 'WHATSAPP_CANCEL' || a.action === 'CANCELLED')
+                                            .map((a: any) => a.patientName)
+                                    );
+                                    const filtered = activity.filter((a: any) => {
+                                        if (a.action === 'DELETED' || a.action === 'DELETE') return false;
+                                        if (a.action === 'CREATED' && cancelledPatients.has(a.patientName)) return false;
+                                        return true;
+                                    });
+                                    return filtered.map((a: any, i: number) => {
                                     const actionStyle =
                                         a.action === 'CREATED'          ? { color: '#10b981', bg: 'rgba(16,185,129,0.1)',  label: '+ Yeni' } :
                                         a.action === 'CANCELLED'        ? { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: '✕ İptal' } :
-                                        a.action === 'WHATSAPP_CANCEL'  ? { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: '📵 İptal edildi' } :
-                                        a.action === 'DELETED'          ? { color: '#6b7280', bg: 'rgba(107,114,128,0.1)', label: '🗑 Silindi' } :
-                                        a.action === 'DELETE'           ? { color: '#6b7280', bg: 'rgba(107,114,128,0.1)', label: '🗑 Silindi' } :
+                                        a.action === 'WHATSAPP_CANCEL'  ? { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: '📵 İptal' } :
                                         a.action === 'WHATSAPP_UPDATE'  ? { color: '#3b82f6', bg: 'rgba(59,130,246,0.1)',  label: '📅 Düzenlendi' } :
                                         { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', label: '↻ Güncellendi' };
                                     const isWA = a.action?.startsWith('WHATSAPP') || a.source === 'WHATSAPP';
@@ -465,7 +475,6 @@ export default function DashboardPage() {
                                                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                                     {new Date(a.time).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                                                 </span>
-                                                {/* Source badge — Bot veya Manuel */}
                                                 <span style={{
                                                     fontSize: '0.65rem',
                                                     color: isWA ? '#25d366' : '#94a3b8',
@@ -477,7 +486,8 @@ export default function DashboardPage() {
                                             </div>
                                         </Wrapper>
                                     );
-                                })}
+                                });
+                                })()}
                             </div>
                         )}
                     </div>
