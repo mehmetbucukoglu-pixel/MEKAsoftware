@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import {
     ArrowLeft, Edit2, Calendar, FileText, Phone, Mail,
     User, Cake, StickyNote, Clock, Loader2, CreditCard, MapPin,
-    DollarSign, Plus, Info, ChevronsUp, ChevronsDown, MessageSquare
+    DollarSign, Plus, Info, ChevronsUp, ChevronsDown, MessageSquare, Trash2
 } from 'lucide-react';
 import { patientApi, clinicalNoteApi, financeApi, Patient, ClinicalNote, Payment } from '@/lib/api';
 import PatientModal from '../patient-modal';
@@ -30,11 +30,14 @@ export default function PatientDetailPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [infoOpen, setInfoOpen] = useState(true);
+    const [deleteConfirm, setDeleteConfirm] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Visibility shortcuts
     const isDoctor = user?.role === 'DOCTOR';
     const isAccountant = user?.role === 'ACCOUNTANT';
     const isAdmin = user?.role === 'ADMIN';
+    const canDelete = true; // Tüm roller hasta silebilir
 
     // Determine the initial active tab ONCE, not on every render
     const initialTab = useMemo<TabId>(() => {
@@ -113,6 +116,19 @@ export default function PatientDetailPage() {
     const handleEditSuccess = () => {
         setToast({ type: 'success', message: 'Hasta güncellendi' });
         fetchPatient();
+    };
+
+    const handleDelete = async () => {
+        setIsDeleting(true);
+        try {
+            await patientApi.delete(patientId);
+            setToast({ type: 'success', message: 'Hasta silindi' });
+            setTimeout(() => router.push('/patients'), 1200);
+        } catch {
+            setToast({ type: 'error', message: 'Silme işlemi başarısız' });
+            setIsDeleting(false);
+        }
+        setDeleteConfirm(false);
     };
 
     // Use ref-based approach to avoid re-creating the callback when canvasNoteId changes
@@ -267,6 +283,15 @@ export default function PatientDetailPage() {
                     <button className="btn btn-secondary btn-sm" onClick={() => setModalOpen(true)}>
                         <Edit2 size={14} /> Düzenle
                     </button>
+                    {canDelete && (
+                        <button
+                            className="btn btn-sm"
+                            onClick={() => setDeleteConfirm(true)}
+                            style={{ background: 'var(--error, #ef4444)', color: '#fff', border: 'none' }}
+                        >
+                            <Trash2 size={14} /> Sil
+                        </button>
+                    )}
                     {patient.notes && (
                         <div title={`Genel Notlar: ${patient.notes}`} style={{ padding: '6px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-md)', cursor: 'help' }}>
                             <Info size={16} style={{ color: 'var(--primary)' }} />
@@ -424,6 +449,53 @@ export default function PatientDetailPage() {
                 onSuccess={handleEditSuccess}
                 patient={patient}
             />
+
+            {/* Delete Confirm Dialog */}
+            {deleteConfirm && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                }}>
+                    <div style={{
+                        background: 'var(--bg-card, #1e1e2e)', borderRadius: '12px',
+                        padding: '28px', maxWidth: '380px', width: '90%',
+                        border: '1px solid var(--border)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                            <div style={{ background: 'rgba(239,68,68,0.15)', borderRadius: '50%', padding: '10px', flexShrink: 0 }}>
+                                <Trash2 size={20} style={{ color: '#ef4444' }} />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Hastayı Sil</h3>
+                                <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                                    Bu işlem geri alınabilir (Admin panelinden restore edilebilir).
+                                </p>
+                            </div>
+                        </div>
+                        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                            <strong>{patient.firstName} {patient.lastName}</strong> adlı hastayı silmek istediğinize emin misiniz?
+                        </p>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setDeleteConfirm(false)}
+                                disabled={isDeleting}
+                            >
+                                İptal
+                            </button>
+                            <button
+                                className="btn btn-sm"
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                style={{ background: '#ef4444', color: '#fff', border: 'none' }}
+                            >
+                                {isDeleting ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
+                                {isDeleting ? 'Siliniyor...' : 'Evet, Sil'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

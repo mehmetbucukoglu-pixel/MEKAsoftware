@@ -77,7 +77,7 @@ export class PatientController {
     }
 
     @Delete(':id')
-    @Roles('ADMIN' as any)
+    @Roles('ADMIN' as any, 'ASSISTANT' as any, 'DOCTOR' as any)
     @ApiOperation({ summary: 'Hasta deaktif et (soft delete)' })
     remove(
         @CurrentUser() user: CurrentUserPayload,

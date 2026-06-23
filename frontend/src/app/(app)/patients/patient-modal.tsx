@@ -292,53 +292,37 @@ export default function PatientModal({ isOpen, onClose, onSuccess, patient }: Pa
                                     </div>
                                 </div>
 
-                                    <label className="label">Adres</label>
-                                    <textarea
-                                        className="textarea"
-                                        value={form.address}
-                                        onChange={(e) => handleChange('address', e.target.value)}
-                                        placeholder="İl, İlçe, Mahalle, Sokak, No"
-                                        rows={2}
+                                <div className="form-group">
+                                    <label className="label">
+                                        Doğum Tarihi
+                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '6px', fontWeight: 400 }}>(opsiyonel)</span>
+                                    </label>
+                                    <input
+                                        className="input"
+                                        type="date"
+                                        value={form.dateOfBirth}
+                                        onChange={(e) => handleChange('dateOfBirth', e.target.value)}
+                                        style={{ colorScheme: 'dark' }}
                                     />
-                                    {errors.address && <div className="form-error">{errors.address}</div>}
                                 </div>
 
-                                <div className="form-row">
+                                {doctors.length > 0 && (
                                     <div className="form-group">
-                                        <label className="label">Doğum Tarihi</label>
-                                        <input
-                                            className="input"
-                                            type="date"
-                                            value={form.dateOfBirth}
-                                            onChange={(e) => handleChange('dateOfBirth', e.target.value)}
-                                            style={{ colorScheme: 'dark' }}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="label">Cinsiyet</label>
+                                        <label className="label">Doktor</label>
                                         <select
                                             className="select"
-                                            value={form.gender}
-                                            onChange={(e) => handleChange('gender', e.target.value)}
+                                            value={selectedDoctorId}
+                                            onChange={(e) => setSelectedDoctorId(e.target.value)}
                                         >
                                             <option value="">Seçiniz</option>
-                                            <option value="MALE">Erkek</option>
-                                            <option value="FEMALE">Kadın</option>
-                                            <option value="OTHER">Diğer</option>
+                                            {doctors.map((d) => (
+                                                <option key={d.id} value={d.id}>
+                                                    Dr. {d.firstName} {d.lastName}
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="label">Notlar</label>
-                                    <textarea
-                                        className="textarea"
-                                        value={form.notes}
-                                        onChange={(e) => handleChange('notes', e.target.value)}
-                                        placeholder="Alerji, kronik hastalık vb."
-                                        rows={3}
-                                    />
-                                </div>
+                                )}
                             </>
                         )}
                     </div>
