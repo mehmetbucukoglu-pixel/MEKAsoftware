@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsEmail, MinLength, MaxLength, Length, Matches, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEmail, MinLength, IsIn, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePatientDto {
@@ -49,4 +49,9 @@ export class CreatePatientDto {
     @IsOptional()
     @IsString()
     phone2?: string;
+
+    @ApiPropertyOptional({ example: { primaryDoctorId: 'uuid' }, description: 'Ek meta veriler (branş spesifik)' })
+    @IsOptional()
+    @IsObject()
+    metadata?: Record<string, any>;
 }
