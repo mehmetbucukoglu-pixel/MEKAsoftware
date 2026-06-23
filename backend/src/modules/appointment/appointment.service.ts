@@ -402,10 +402,15 @@ export class AppointmentService {
         if (!doctor) throw new BadRequestException(`Doktor bulunamadı: "${data.doctorName}"`);
 
         // 4. Create Appointment
+        // Normalize startTime: eğer timezone bilgisi yoksa Türkiye saati (+03:00) kabul et
+        const rawStart = String(data.startTime || '');
+        const hasOffset = rawStart.endsWith('Z') || /[+\-]\d{2}:\d{2}$/.test(rawStart);
+        const normalizedStart = hasOffset ? rawStart : rawStart + '+03:00';
+
         const appointment = await this.create(clinicId, {
             doctorId: doctor.id,
             patientId: patientId!,
-            startTime: data.startTime,
+            startTime: normalizedStart,
             durationMin: Number(data.durationMin) || 60,
             notes: data.notes,
             source: 'WHATSAPP',
@@ -598,8 +603,16 @@ export class AppointmentService {
             day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul',
         });
 
+        // Normalize startTime: timezone yoksa Türkiye (+03:00) kabul et
+        const rawUpdateStart = data.startTime ? String(data.startTime) : undefined;
+        const normalizedUpdateStart = rawUpdateStart
+            ? (rawUpdateStart.endsWith('Z') || /[+\-]\d{2}:\d{2}$/.test(rawUpdateStart)
+                ? rawUpdateStart
+                : rawUpdateStart + '+03:00')
+            : undefined;
+
         const result = await this.update(clinicId, appointmentId, {
-            startTime: data.startTime ? new Date(data.startTime) : undefined,
+            startTime: normalizedUpdateStart ? new Date(normalizedUpdateStart) : undefined,
             durationMin: data.durationMin ? Number(data.durationMin) : undefined,
         });
         this.socketGateway.emitToClinic(clinicId, 'appointment:updated', { appointmentId });
