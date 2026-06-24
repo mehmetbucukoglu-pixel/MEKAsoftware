@@ -745,7 +745,7 @@ export class AppointmentService {
         await this.pushService.sendToRoles(
             clinicId,
             ['DOCTOR', 'ASSISTANT', 'ADMIN'],
-            'appointmentUpdated',
+            'appointmentConfirmed',
             {
                 title: '✅ Randevu Teyit Edildi (WhatsApp)',
                 body: `${patName} — ${timeStr}`,

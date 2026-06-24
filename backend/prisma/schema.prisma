@@ -619,6 +619,7 @@ model NotificationPreference {
   escalatedMessages    Boolean @default(true)  @map("escalated_messages")
   appointmentCreated   Boolean @default(true)  @map("appointment_created")
   appointmentCancelled Boolean @default(true)  @map("appointment_cancelled")
+  appointmentConfirmed Boolean @default(true)  @map("appointment_confirmed")
   appointmentUpdated   Boolean @default(false) @map("appointment_updated")
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
