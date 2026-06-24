@@ -189,11 +189,17 @@ export default function DashboardPage() {
         socket.on('conversation_updated', handleUpdate);
         socket.on('conversation_escalated', handleUpdate);
         socket.on('appointment_created', handleUpdate);
+        socket.on('appointment:confirmed', handleUpdate);
+        socket.on('appointment:cancelled', handleUpdate);
+        socket.on('appointment:updated', handleUpdate);
 
         return () => {
             socket.off('conversation_updated', handleUpdate);
             socket.off('conversation_escalated', handleUpdate);
             socket.off('appointment_created', handleUpdate);
+            socket.off('appointment:confirmed', handleUpdate);
+            socket.off('appointment:cancelled', handleUpdate);
+            socket.off('appointment:updated', handleUpdate);
         };
     }, [clinic, user, fetchDashboardData]);
 
@@ -422,15 +428,17 @@ export default function DashboardPage() {
                                             .map((a: any) => a.patientName)
                                     );
                                     const filtered = activity.filter((a: any) => {
-                                        if (a.action === 'DELETED' || a.action === 'DELETE') return false;
+                                        // DELETE artık gösteriliyor — "Silindi" etiketi ile
                                         if (a.action === 'CREATED' && cancelledPatients.has(a.patientName)) return false;
                                         return true;
                                     });
                                     return filtered.map((a: any, i: number) => {
                                     const actionStyle =
                                         a.action === 'CREATED'          ? { color: '#10b981', bg: 'rgba(16,185,129,0.1)',  label: '+ Yeni' } :
+                                        a.action === 'DELETE'           ? { color: '#64748b', bg: 'rgba(100,116,139,0.1)', label: '🗑 Silindi' } :
+                                        a.action === 'DELETED'          ? { color: '#64748b', bg: 'rgba(100,116,139,0.1)', label: '🗑 Silindi' } :
                                         a.action === 'CANCELLED'        ? { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: '✕ İptal' } :
-                                        a.action === 'WHATSAPP_CANCEL'  ? { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: '📵 İptal' } :
+                                        a.action === 'WHATSAPP_CANCEL'  ? { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: '📵 İptal Edildi' } :
                                         a.action === 'WHATSAPP_UPDATE'  ? { color: '#3b82f6', bg: 'rgba(59,130,246,0.1)',  label: '📅 Düzenlendi' } :
                                         { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', label: '↻ Güncellendi' };
                                     const isWA = a.action?.startsWith('WHATSAPP') || a.source === 'WHATSAPP';
