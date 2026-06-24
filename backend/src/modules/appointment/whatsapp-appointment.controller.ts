@@ -179,6 +179,19 @@ export class WhatsappAppointmentController {
         return result;
     }
 
+    @Post('confirm-reminder-by-id')
+    @ApiOperation({ summary: 'WhatsApp üzerinden hatırlatma teyidi (appointmentId body\'den alınır — n8n AI tool için)' })
+    @ApiQuery({ name: 'clinicId', required: true, description: 'Klinik ID — n8n her workflow için geçer.' })
+    async whatsappConfirmReminderById(
+        @Body() data: { appointmentId: string },
+        @Query('clinicId') clinicId?: string,
+    ) {
+        const resolvedClinicId = this.resolveClinicId(clinicId);
+        const result = await this.appointmentService.confirmReminderFromWhatsApp(resolvedClinicId, data.appointmentId);
+        this.socketGateway.emitToClinic(resolvedClinicId, 'appointment:confirmed', { appointmentId: data.appointmentId });
+        return result;
+    }
+
     @Patch(':id/confirm-reminder')
     @ApiOperation({ summary: 'WhatsApp üzerinden randevu teyidini onayla' })
     @ApiQuery({ name: 'clinicId', required: true, description: 'Klinik ID — n8n her workflow için geçer.' })

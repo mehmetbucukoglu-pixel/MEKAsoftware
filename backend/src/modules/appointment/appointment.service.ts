@@ -725,7 +725,7 @@ export class AppointmentService {
         const appointment = await this.findOne(clinicId, appointmentId);
         if (appointment.status === 'CANCELLED') throw new BadRequestException('Bu randevu iptal edilmiş.');
 
-        return this.prisma.appointment.update({
+        const updated = await this.prisma.appointment.update({
             where: { id: appointmentId },
             data: { reminderStatus: 'CONFIRMED' },
             include: {
@@ -733,6 +733,28 @@ export class AppointmentService {
                 doctor: { select: { id: true, firstName: true, lastName: true } },
             },
         });
+
+        // Real-time: takvim + yarınki randevular widget'ı güncellensin
+        this.socketGateway.emitToClinic(clinicId, 'appointment:confirmed', { appointmentId });
+
+        // Push notification — kliniğe bildir
+        const patName = `${updated.patient?.firstName} ${updated.patient?.lastName}`;
+        const timeStr = new Date(appointment.startTime).toLocaleString('tr-TR', {
+            day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul',
+        });
+        await this.pushService.sendToRoles(
+            clinicId,
+            ['DOCTOR', 'ASSISTANT', 'ADMIN'],
+            'appointmentConfirmed',
+            {
+                title: '✅ Randevu Teyit Edildi (WhatsApp)',
+                body: `${patName} — ${timeStr}`,
+                url: '/mobile/calendar',
+                tag: `confirm-${appointmentId}`,
+            },
+        );
+
+        return updated;
     }
 
     async getMissingFollowups(clinicId: string) {
