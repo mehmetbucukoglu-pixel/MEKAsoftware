@@ -373,9 +373,10 @@ export default function DashboardPage() {
                                 {reminders.map((r: any) => {
                                     const rs = r.reminderStatus;
                                     const badge =
-                                        rs === 'CONFIRMED' ? { text: 'Onaylandı', cls: 'badge-success' } :
+                                        rs === 'CONFIRMED' ? { text: '✅ Onaylandı', cls: 'badge-success' } :
+                                        rs === 'RESCHEDULED' ? { text: '🔄 Ertelendi', cls: 'badge-warning' } :
                                         rs === 'SENT' ? { text: 'Gönderildi', cls: 'badge-info' } :
-                                        rs === 'CANCELLED' ? { text: 'İptal', cls: 'badge-error' } :
+                                        rs === 'CANCELLED' ? { text: '❌ İptal', cls: 'badge-error' } :
                                         { text: 'Bekliyor', cls: 'badge-warning' };
                                     return (
                                         <div key={r.appointmentId} style={{
