@@ -15,7 +15,6 @@ export type NotificationEventType =
     | 'escalatedMessages'
     | 'appointmentCreated'
     | 'appointmentCancelled'
-    | 'appointmentConfirmed'
     | 'appointmentUpdated';
 
 @Injectable()
