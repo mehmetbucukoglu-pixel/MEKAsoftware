@@ -615,6 +615,14 @@ export class AppointmentService {
             startTime: normalizedUpdateStart ? new Date(normalizedUpdateStart) : undefined,
             durationMin: data.durationMin ? Number(data.durationMin) : undefined,
         });
+
+        // Eğer hatırlatma gönderilmişti ve hasta erteledi → RESCHEDULED olarak işaretle
+        if (appointment.reminderStatus === 'SENT') {
+            await this.prisma.appointment.update({
+                where: { id: appointmentId },
+                data: { reminderStatus: 'RESCHEDULED' },
+            });
+        }
         this.socketGateway.emitToClinic(clinicId, 'appointment:updated', { appointmentId });
 
         // Push notification — randevu değişikliği bildirimi

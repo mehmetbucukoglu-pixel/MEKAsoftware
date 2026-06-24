@@ -217,6 +217,7 @@ enum ReminderStatus {
   PENDING
   SENT
   CONFIRMED
+  RESCHEDULED
   CANCELLED
 }
 

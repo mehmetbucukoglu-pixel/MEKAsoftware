@@ -140,21 +140,46 @@ export class DashboardService {
         // Widget: "Yarınki Randevular" — teyit mesajları yarınki randevulara atılır
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        const appointments = await this.prisma.appointment.findMany({
-            where: {
-                clinicId,
-                startTime: { gte: startOfDay(tomorrow), lte: endOfDay(tomorrow) },
-                status: { not: 'CANCELLED' },
-            },
-            include: {
-                patient: { select: { firstName: true, lastName: true } },
-                doctor: { select: { firstName: true, lastName: true } },
-            },
-            orderBy: { startTime: 'asc' },
-            take: 20,
-        });
+        const today = new Date();
 
-        return appointments.map(apt => ({
+        const [appointments, rescheduled] = await Promise.all([
+            // Yarınki normal randevular
+            this.prisma.appointment.findMany({
+                where: {
+                    clinicId,
+                    startTime: { gte: startOfDay(tomorrow), lte: endOfDay(tomorrow) },
+                    status: { not: 'CANCELLED' },
+                },
+                include: {
+                    patient: { select: { firstName: true, lastName: true } },
+                    doctor: { select: { firstName: true, lastName: true } },
+                },
+                orderBy: { startTime: 'asc' },
+                take: 20,
+            }),
+            // Bugün ertelenen randevular (hatırlatıcı gönderilmişti, hasta erteledi)
+            this.prisma.appointment.findMany({
+                where: {
+                    clinicId,
+                    reminderStatus: 'RESCHEDULED',
+                    updatedAt: { gte: startOfDay(today), lte: endOfDay(today) },
+                },
+                include: {
+                    patient: { select: { firstName: true, lastName: true } },
+                    doctor: { select: { firstName: true, lastName: true } },
+                },
+                orderBy: { updatedAt: 'desc' },
+                take: 10,
+            }),
+        ]);
+
+        const apptIds = new Set(appointments.map(a => a.id));
+        const merged = [
+            ...appointments,
+            ...rescheduled.filter(r => !apptIds.has(r.id)), // çift kayıt önle
+        ];
+
+        return merged.map(apt => ({
             appointmentId: apt.id,
             patientName: `${apt.patient.firstName} ${apt.patient.lastName}`,
             doctorName: `${apt.doctor.firstName} ${apt.doctor.lastName}`,
